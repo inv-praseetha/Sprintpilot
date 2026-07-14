@@ -97,6 +97,11 @@ class AuthenticationService:
             logger.warning(f"Disabled account login attempt: Employee {email} is inactive.")
             raise DisabledEmployeeException("Employee account is disabled.")
 
+        # 3.5. Validate role permission (Only Project Manager and Team Lead are allowed to log in)
+        if employee.role not in [Employee.Role.PROJECT_MANAGER, Employee.Role.TEAM_LEAD]:
+            logger.warning(f"Role restricted login attempt: Employee {email} with role {employee.role} is not permitted to log in.")
+            raise UnauthorizedEmployeeException("Only Project Managers and Team Leads are authorized to log in.")
+
         # 4. Link Google ID / Check Google ID mismatch (Atomic row lock check)
         with transaction.atomic():
             # Acquire row lock
