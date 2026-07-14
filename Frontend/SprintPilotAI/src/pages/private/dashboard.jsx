@@ -140,7 +140,7 @@ const Dashboard = () => {
 
   const getY = (tasks) => {
     const ratio = tasks / maxTasks;
-    return 250 - ratio * (250 - 50);
+    return 380 - ratio * (380 - 40);
   };
 
   const getX = (index) => {
@@ -155,7 +155,7 @@ const Dashboard = () => {
       const val = Math.round((maxTasks * i) / (count - 1));
       ticks.push({
         label: `${val} Tasks`,
-        y: 250 - (i / (count - 1)) * (250 - 50)
+        y: 380 - (i / (count - 1)) * (380 - 40)
       });
     }
     return ticks;
@@ -194,7 +194,7 @@ const Dashboard = () => {
       sprint,
       project,
       xPercent: (x / 800) * 100,
-      yPercent: (y / 310) * 100
+      yPercent: (y / 450) * 100
     });
   };
 
@@ -356,8 +356,8 @@ const Dashboard = () => {
         </div>
 
         {/* SVG Timeline Chart Wrapper */}
-        <div className="relative w-full h-80 overflow-visible">
-          <svg className="w-full h-full overflow-visible" viewBox="0 0 800 310" preserveAspectRatio="none">
+        <div className="relative w-full h-[450px] overflow-visible">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 800 450" preserveAspectRatio="none">
             {/* Y-Axis Horizontal Grid Lines and Labels */}
             {yTicks.map((tick, i) => (
               <g key={i} className="text-[10px] font-bold fill-slate-400 select-none">
@@ -387,9 +387,9 @@ const Dashboard = () => {
                 <line
                   key={i}
                   x1={x}
-                  y1="50"
+                  y1="40"
                   x2={x}
-                  y2="250"
+                  y2="380"
                   className="stroke-slate-100 dark:stroke-slate-800/40"
                   strokeWidth="1"
                 />
@@ -495,7 +495,7 @@ const Dashboard = () => {
                 <text
                   key={i}
                   x={x}
-                  y="280"
+                  y="415"
                   textAnchor="middle"
                   className="text-xs font-bold fill-slate-400 select-none"
                 >
