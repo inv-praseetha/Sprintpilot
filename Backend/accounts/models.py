@@ -7,6 +7,8 @@ class Employee(models.Model):
     class Role(models.TextChoices):
         PROJECT_MANAGER = "PROJECT_MANAGER", "Project Manager"
         TEAM_LEAD = "TEAM_LEAD", "Team Lead"
+        ENGINEER = "ENGINEER", 'Engineer'
+        
 
     id = models.UUIDField(
         primary_key=True,
