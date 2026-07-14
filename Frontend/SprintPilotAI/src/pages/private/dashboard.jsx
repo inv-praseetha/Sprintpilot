@@ -1,97 +1,222 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useTheme } from '../../components/layout/MainLayouut';
-import {
-  ArrowUpRight,
-  ChevronDown,
-  MoreHorizontal,
-  SlidersHorizontal,
-  Search
-} from 'lucide-react';
+import { ArrowUpRight, Search, SlidersHorizontal, MoreHorizontal } from 'lucide-react';
+
+// Mock projects and sprint data
+const projectsData = {
+  'Cloud Sync Platform': [
+    { name: 'Sprint 1', startDate: '2026-05-01', endDate: '2026-05-14', status: 'Completed', completedTasks: 12, activeTasks: 0 },
+    { name: 'Sprint 2', startDate: '2026-05-15', endDate: '2026-05-28', status: 'Completed', completedTasks: 15, activeTasks: 0 },
+    { name: 'Sprint 3', startDate: '2026-05-29', endDate: '2026-06-11', status: 'Completed', completedTasks: 10, activeTasks: 0 },
+    { name: 'Sprint 4', startDate: '2026-06-12', endDate: '2026-06-25', status: 'Completed', completedTasks: 18, activeTasks: 0 },
+    { name: 'Sprint 5', startDate: '2026-06-26', endDate: '2026-07-09', status: 'In Progress', completedTasks: 8, activeTasks: 6 },
+    { name: 'Sprint 6', startDate: '2026-07-10', endDate: '2026-07-23', status: 'Planned', completedTasks: 0, activeTasks: 0 }
+  ],
+  'AI Analytics Hub': [
+    { name: 'Sprint 1', startDate: '2026-04-15', endDate: '2026-04-28', status: 'Completed', completedTasks: 8, activeTasks: 0 },
+    { name: 'Sprint 2', startDate: '2026-04-29', endDate: '2026-05-12', status: 'Completed', completedTasks: 10, activeTasks: 0 },
+    { name: 'Sprint 3', startDate: '2026-05-13', endDate: '2026-05-26', status: 'Delayed', completedTasks: 4, activeTasks: 9 },
+    { name: 'Sprint 4', startDate: '2026-05-27', endDate: '2026-06-09', status: 'Completed', completedTasks: 14, activeTasks: 0 },
+    { name: 'Sprint 5', startDate: '2026-06-10', endDate: '2026-06-23', status: 'Completed', completedTasks: 12, activeTasks: 0 },
+    { name: 'Sprint 6', startDate: '2026-06-24', endDate: '2026-07-07', status: 'In Progress', completedTasks: 5, activeTasks: 8 }
+  ],
+  'Developer Portal': [
+    { name: 'Sprint 1', startDate: '2026-06-01', endDate: '2026-06-14', status: 'Completed', completedTasks: 20, activeTasks: 0 },
+    { name: 'Sprint 2', startDate: '2026-06-15', endDate: '2026-06-28', status: 'Completed', completedTasks: 16, activeTasks: 0 },
+    { name: 'Sprint 3', startDate: '2026-06-29', endDate: '2026-07-12', status: 'In Progress', completedTasks: 7, activeTasks: 10 },
+    { name: 'Sprint 4', startDate: '2026-07-13', endDate: '2026-07-26', status: 'Planned', completedTasks: 0, activeTasks: 0 },
+    { name: 'Sprint 5', startDate: '2026-07-27', endDate: '2026-08-09', status: 'Planned', completedTasks: 0, activeTasks: 0 },
+    { name: 'Sprint 6', startDate: '2026-08-10', endDate: '2026-08-23', status: 'Planned', completedTasks: 0, activeTasks: 0 }
+  ]
+};
+
+const projectConfig = {
+  'Cloud Sync Platform': { color: '#ea580c' },
+  'AI Analytics Hub': { color: '#3b82f6' },
+  'Developer Portal': { color: '#d946ef' }
+};
+
+// Team performance data
+const initialTeamMembers = [
+  {
+    id: 'EMP-01',
+    name: 'Praseetha KU',
+    role: 'Lead Frontend',
+    roleColor: 'bg-orange-500',
+    totalTasks: 28,
+    completed: 26,
+    onTimeRate: '92%',
+    status: 'Excellent',
+    statusType: 'excellent'
+  },
+  {
+    id: 'EMP-02',
+    name: 'Abhiram S',
+    role: 'Backend Architect',
+    roleColor: 'bg-blue-500',
+    totalTasks: 24,
+    completed: 21,
+    onTimeRate: '88%',
+    status: 'High Performer',
+    statusType: 'excellent'
+  },
+  {
+    id: 'EMP-03',
+    name: 'Ananthu M',
+    role: 'QA Automation',
+    roleColor: 'bg-purple-500',
+    totalTasks: 35,
+    completed: 30,
+    onTimeRate: '85%',
+    status: 'Good',
+    statusType: 'good'
+  },
+  {
+    id: 'EMP-04',
+    name: 'Abid Muhammad',
+    role: 'DevOps Engineer',
+    roleColor: 'bg-emerald-500',
+    totalTasks: 18,
+    completed: 12,
+    onTimeRate: '66%',
+    status: 'Needs Review',
+    statusType: 'review'
+  }
+];
+
+const getInitials = (name) => {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const getAvatarColorClass = (roleColor) => {
+  switch (roleColor) {
+    case 'bg-orange-500':
+      return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+    case 'bg-blue-500':
+      return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+    case 'bg-purple-500':
+      return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+    case 'bg-emerald-500':
+      return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+    default:
+      return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+  }
+};
 
 const Dashboard = () => {
   const { darkMode } = useTheme();
+  const [hoveredSprint, setHoveredSprint] = useState(null);
+  
+  // Performance table state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMembers, setSelectedMembers] = useState(new Set());
-  const [timeframe, setTimeframe] = useState('This Week');
-  const [showTimeframeDropdown, setShowTimeframeDropdown] = useState(false);
 
-  // Sample Team Members Data
-  const teamMembers = [
-    {
-      id: 'E001',
-      name: 'Sifat Hasan',
-      role: 'UI/UX Designer',
-      roleColor: 'bg-emerald-500',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      totalTasks: 14,
-      completed: 10,
-      onProgress: 10,
-      overdue: 1,
-      status: 'Available',
-      statusType: 'available'
-    },
-    {
-      id: 'E002',
-      name: 'Onim Khan',
-      role: 'Frontend Developer',
-      roleColor: 'bg-rose-500',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-      totalTasks: 5,
-      completed: 3,
-      onProgress: 3,
-      overdue: 2,
-      status: 'On Leave',
-      statusType: 'on-leave'
-    },
-    {
-      id: 'E004',
-      name: 'Binoy Kumar',
-      role: 'Brand Designer',
-      roleColor: 'bg-indigo-500',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-      totalTasks: 10,
-      completed: 8,
-      onProgress: 8,
-      overdue: 1,
-      status: 'Available',
-      statusType: 'available'
+  const maxTasks = useMemo(() => {
+    let maxVal = 10;
+    Object.values(projectsData).forEach(sprints => {
+      sprints.forEach(s => {
+        if (s.completedTasks > maxVal) {
+          maxVal = s.completedTasks;
+        }
+      });
+    });
+    const roundedMax = Math.ceil(maxVal / 5) * 5;
+    return Math.max(roundedMax, 10);
+  }, []);
+
+  const longestSprintsProject = useMemo(() => {
+    let longest = [];
+    Object.values(projectsData).forEach(sprints => {
+      if (sprints.length > longest.length) {
+        longest = sprints;
+      }
+    });
+    return longest;
+  }, []);
+
+  const maxSprintsCount = longestSprintsProject.length;
+
+  const getY = (tasks) => {
+    const ratio = tasks / maxTasks;
+    return 250 - ratio * (250 - 50);
+  };
+
+  const getX = (index) => {
+    const divisor = maxSprintsCount > 1 ? maxSprintsCount - 1 : 1;
+    return 90 + (index / divisor) * 640;
+  };
+
+  const yTicks = useMemo(() => {
+    const ticks = [];
+    const count = 5;
+    for (let i = 0; i < count; i++) {
+      const val = Math.round((maxTasks * i) / (count - 1));
+      ticks.push({
+        label: `${val} Tasks`,
+        y: 250 - (i / (count - 1)) * (250 - 50)
+      });
     }
-  ];
+    return ticks;
+  }, [maxTasks]);
 
-  // Filtering team members
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'Completed':
+        return {
+          fill: '#10b981',
+          stroke: '#10b981'
+        };
+      case 'In Progress':
+        return {
+          fill: '#6366f1',
+          stroke: '#6366f1'
+        };
+      case 'Delayed':
+        return {
+          fill: '#f43f5e',
+          stroke: '#f43f5e'
+        };
+      case 'Planned':
+      default:
+        return {
+          fill: '#94a3b8',
+          stroke: '#94a3b8'
+        };
+    }
+  };
+
+  const handleMouseEnter = (sprint, index, project) => {
+    const x = getX(index);
+    const y = getY(sprint.completedTasks);
+    setHoveredSprint({
+      sprint,
+      project,
+      xPercent: (x / 800) * 100,
+      yPercent: (y / 310) * 100
+    });
+  };
+
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   const filteredMembers = useMemo(() => {
-    return teamMembers.filter(member => 
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.id.toLowerCase().includes(searchQuery.toLowerCase())
+    return initialTeamMembers.filter((m) =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.role.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery]);
 
-  const toggleSelectMember = (id) => {
-    const next = new Set(selectedMembers);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setSelectedMembers(next);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedMembers.size === teamMembers.length) {
-      setSelectedMembers(new Set());
-    } else {
-      setSelectedMembers(new Set(teamMembers.map(m => m.id)));
-    }
-  };
-
   return (
-    <main className="p-8 lg:p-10 space-y-8 max-w-[1400px] mx-auto">
+    <main className="p-8 lg:p-10 space-y-8 mx-auto">
       {/* WELCOME BANNER */}
       <section className="text-left">
         <span className="text-sm font-medium text-slate-400">Ready to conquer your projects?</span>
         <h1 className="text-3xl font-extrabold tracking-tight mt-1 flex items-center gap-2">
-          Welcome Back, <span className={darkMode ? 'text-white' : 'text-slate-900'}>Sifat Hasan.</span> 👋
+          Welcome Back, <span className={darkMode ? 'text-white' : 'text-slate-900'}>Ashwin Sanalkumar</span> 👋
         </h1>
       </section>
 
@@ -99,9 +224,8 @@ const Dashboard = () => {
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         
         {/* Card 1: Total Project */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Total Project</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -120,9 +244,8 @@ const Dashboard = () => {
         </div>
 
         {/* Card 2: Total Tasks */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Total Tasks</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -145,9 +268,8 @@ const Dashboard = () => {
         </div>
 
         {/* Card 3: Tasks Pending */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Tasks Pending</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -165,18 +287,17 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Card 4: Project Overdue */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        {/* Card 4: Tasks Overdue */}
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-slate-400">Project Overdue</span>
+            <span className="text-sm font-medium text-slate-400">Tasks Overdue</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
               <ArrowUpRight className="w-4 h-4 text-slate-500" />
             </div>
           </div>
           <div className="flex items-end justify-between">
-            <span className="text-4xl font-extrabold tracking-tight">20</span>
+            <span className="text-4xl font-extrabold text-red-500 tracking-tight">20</span>
             {/* Dotted sparkline visual */}
             <div className="flex items-end gap-[3px] h-8 pb-2">
               {[3, 2, 4, 3, 5, 4, 6, 5, 4, 3, 2, 3, 4, 3, 5, 4].map((h, i) => (
@@ -191,146 +312,370 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* CHARTS SECTION - Responsive Line Graph */}
-      <section className={`p-6 rounded-3xl border ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-      }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      {/* CHARTS SECTION - Dynamic Sprint Schedule & Status */}
+      <section className={`p-6 rounded-3xl border relative ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+        }`}>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
           <div className="text-left">
-            <h3 className="font-bold text-lg">Sprint Progress & Performance</h3>
-            <span className="text-xs text-slate-400">Track tasks, efficiency, and velocity across current sprints</span>
+            <h3 className="font-bold text-lg">Sprint Schedule & Status</h3>
+            <span className="text-xs text-slate-400">Track timelines, status, and task load for project sprints</span>
           </div>
 
-          {/* Legend and dropdown */}
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-orange-500" />
-                <span className="text-xs font-semibold text-slate-500">Tasks Completed</span>
+          {/* Legends: Status and Projects */}
+          <div className="flex flex-wrap items-center gap-6">
+            {/* Status Legend */}
+            <div className="flex flex-wrap items-center gap-3 pr-5 border-r border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-xs font-semibold text-slate-500">Completed</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-indigo-500" />
-                <span className="text-xs font-semibold text-slate-500">Active Tasks</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                <span className="text-xs font-semibold text-slate-500">In Progress</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="text-xs font-semibold text-slate-500">Delayed</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                <span className="text-xs font-semibold text-slate-500">Planned</span>
               </div>
             </div>
 
-            <div className="relative">
-              <button 
-                onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors cursor-pointer ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-50 border-slate-100 hover:bg-slate-100/70'
+            {/* Project Legend */}
+            <div className="flex flex-wrap items-center gap-4">
+              {Object.entries(projectConfig).map(([projName, config]) => (
+                <div key={projName} className="flex items-center gap-2">
+                  <span className="w-3.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{projName}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* SVG Timeline Chart Wrapper */}
+        <div className="relative w-full h-80 overflow-visible">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 800 310" preserveAspectRatio="none">
+            {/* Y-Axis Horizontal Grid Lines and Labels */}
+            {yTicks.map((tick, i) => (
+              <g key={i} className="text-[10px] font-bold fill-slate-400 select-none">
+                <line
+                  x1="80"
+                  y1={tick.y}
+                  x2="750"
+                  y2={tick.y}
+                  className="stroke-slate-100 dark:stroke-slate-800/60"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+                <text
+                  x="70"
+                  y={tick.y + 3}
+                  textAnchor="end"
+                >
+                  {tick.label}
+                </text>
+              </g>
+            ))}
+
+            {/* Vertical grid lines mapping to Sprints */}
+            {longestSprintsProject.map((s, i) => {
+              const x = getX(i);
+              return (
+                <line
+                  key={i}
+                  x1={x}
+                  y1="50"
+                  x2={x}
+                  y2="250"
+                  className="stroke-slate-100 dark:stroke-slate-800/40"
+                  strokeWidth="1"
+                />
+              );
+            })}
+
+            {/* Connecting lines for each project */}
+            {Object.entries(projectsData).map(([projName, sprints]) => {
+              const config = projectConfig[projName];
+              const isHovered = hoveredSprint?.project === projName;
+              const hasActiveHover = hoveredSprint !== null;
+              const opacity = hasActiveHover ? (isHovered ? 'opacity-100' : 'opacity-20') : 'opacity-70';
+              return (
+                <path
+                  key={projName}
+                  d={sprints.map((s, i) => {
+                    const x = getX(i);
+                    const y = getY(s.completedTasks);
+                    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+                  }).join(' ')}
+                  fill="none"
+                  stroke={config.color}
+                  strokeWidth="3"
+                  className={`transition-all duration-300 ${opacity}`}
+                />
+              );
+            })}
+
+            {/* Interactive Sprint Dots for all projects */}
+            {Object.entries(projectsData).map(([projName, sprints]) => {
+              const isHoveredProj = hoveredSprint?.project === projName;
+              const hasActiveHover = hoveredSprint !== null;
+              const opacity = hasActiveHover ? (isHoveredProj ? 'opacity-100' : 'opacity-20') : 'opacity-100';
+
+              return (
+                <g
+                  key={projName}
+                  className={`transition-all duration-300 ${opacity}`}
+                >
+                  {sprints.map((s, i) => {
+                    const x = getX(i);
+                    const y = getY(s.completedTasks);
+                    const style = getStatusStyle(s.status);
+                    const isHoveredDot = hoveredSprint?.sprint === s;
+
+                    return (
+                      <g
+                        key={i}
+                        className="cursor-pointer group/dot"
+                        onMouseEnter={() => handleMouseEnter(s, i, projName)}
+                        onMouseLeave={() => setHoveredSprint(null)}
+                      >
+                        {/* Invisible hover detector target */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="16"
+                          fill="transparent"
+                        />
+
+                        {/* Outer Hover Ring (glow) */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="12"
+                          className={`transition-all duration-300 ${isHoveredDot ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}
+                          fill={style.stroke}
+                          fillOpacity="0.15"
+                          stroke={style.stroke}
+                          strokeOpacity="0.4"
+                          strokeWidth="1.5"
+                          style={{ transformOrigin: `${x}px ${y}px` }}
+                        />
+
+                        {/* Inner Glow Circle */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="6"
+                          fill={style.fill}
+                          className="transition-all duration-300 group-hover/dot:scale-110"
+                          style={{ transformOrigin: `${x}px ${y}px` }}
+                        />
+
+                        {/* Center core dot */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r="3"
+                          fill={darkMode ? '#0f172a' : '#ffffff'}
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })}
+
+            {/* X-Axis labels inside the SVG */}
+            {longestSprintsProject.map((s, i) => {
+              const x = getX(i);
+              return (
+                <text
+                  key={i}
+                  x={x}
+                  y="280"
+                  textAnchor="middle"
+                  className="text-xs font-bold fill-slate-400 select-none"
+                >
+                  {s.name}
+                </text>
+              );
+            })}
+          </svg>
+
+          {/* Floating Tooltip */}
+          {hoveredSprint && (
+            <div
+              className={`absolute p-4 rounded-2xl shadow-xl border z-20 pointer-events-none transition-all duration-200 text-left ${darkMode ? 'bg-slate-950/95 border-slate-800 text-white backdrop-blur-md' : 'bg-white/95 border-slate-100 text-slate-900 backdrop-blur-md'
                 }`}
-              >
-                <span>Active Sprints</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
-              </button>
-              {showTimeframeDropdown && (
-                <div className={`absolute right-0 mt-2 w-40 rounded-xl shadow-lg border py-1.5 z-10 ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white border-slate-100 text-slate-700'
-                }`}>
-                  {['Sprint 1-6', 'All Sprints'].map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => setShowTimeframeDropdown(false)}
-                      className="w-full text-left px-4 py-2 text-xs font-medium hover:bg-orange-500/10 hover:text-orange-500 transition-colors"
-                    >
-                      {opt}
-                    </button>
-                  ))}
+              style={{
+                left: `${hoveredSprint.xPercent}%`,
+                top: `${hoveredSprint.yPercent}%`,
+                transform: 'translate(-50%, -108%)',
+                minWidth: '200px'
+              }}
+            >
+              <div className="font-semibold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
+                {hoveredSprint.project}
+              </div>
+              <div className="font-bold text-sm mb-1">{hoveredSprint.sprint.name}</div>
+              <div className="text-[10px] text-slate-400 mb-2">
+                {formatDate(hoveredSprint.sprint.startDate)} - {formatDate(hoveredSprint.sprint.endDate)}
+              </div>
+
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className={`inline-block w-2 h-2 rounded-full ${hoveredSprint.sprint.status === 'Completed' ? 'bg-emerald-500' :
+                    hoveredSprint.sprint.status === 'In Progress' ? 'bg-indigo-500' :
+                      hoveredSprint.sprint.status === 'Delayed' ? 'bg-rose-500' :
+                        'bg-slate-400'
+                  }`} />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {hoveredSprint.sprint.status}
+                </span>
+              </div>
+
+              {hoveredSprint.sprint.status !== 'Planned' && (
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-tight">Completed</span>
+                    <span className="font-extrabold text-orange-500 text-sm">{hoveredSprint.sprint.completedTasks} Tasks</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-tight">Active</span>
+                    <span className="font-extrabold text-indigo-500 text-sm">{hoveredSprint.sprint.activeTasks} Tasks</span>
+                  </div>
                 </div>
               )}
             </div>
+          )}
+        </div>
+      </section>
+
+      {/* TEAM PERFORMANCE LIST */}
+      <section className={`p-6 rounded-3xl border ${
+        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+      }`}>
+        {/* Section Header Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="text-left">
+            <h3 className="font-bold text-lg">Team Performance</h3>
+            <span className="text-xs text-slate-400">Track task completions and efficiency metrics for team members</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Search bar inside section */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search team members"
+                className={`py-2 pl-9 pr-4 text-xs rounded-xl outline-none border transition-all ${
+                  darkMode 
+                    ? 'bg-slate-800 text-slate-200 border-slate-700 placeholder-slate-500 focus:bg-slate-700/80 focus:ring-1 focus:ring-slate-600' 
+                    : 'bg-white text-slate-700 border-slate-200 placeholder-slate-400 focus:border-slate-300'
+                }`}
+              />
+            </div>
+
+            {/* Filter Button */}
+            <button className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+              darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Filter</span>
+            </button>
           </div>
         </div>
 
-        {/* SVG Line Chart Wrapper */}
-        <div className="relative w-full h-80 overflow-hidden">
-          <svg className="w-full h-full" viewBox="0 0 800 300" preserveAspectRatio="none">
-            <defs>
-              {/* Completed Tasks Gradient */}
-              <linearGradient id="completedGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f97316" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#f97316" stopOpacity="0.00" />
-              </linearGradient>
-              {/* Active Tasks Gradient */}
-              <linearGradient id="activeGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00" />
-              </linearGradient>
-            </defs>
+        {/* Table Container */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-semibold text-left">
+                <th className="py-4 px-4 font-semibold text-slate-400">ID</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">Name</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">Role</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">Total Tasks</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">Completed</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">On-Time Rate</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">Efficiency</th>
+                <th className="py-4 px-4 w-12 text-center font-semibold text-slate-400">More</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-left">
+              {filteredMembers.map((member) => (
+                <tr 
+                  key={member.id} 
+                  className="text-sm font-medium transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                >
+                  {/* ID */}
+                  <td className={`py-4 px-4 font-semibold text-left ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{member.id}</td>
+                  
+                  {/* Name + Avatar */}
+                  <td className="py-4 px-4 text-left">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border ${getAvatarColorClass(member.roleColor)}`}>
+                        {getInitials(member.name)}
+                      </div>
+                      <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{member.name}</span>
+                    </div>
+                  </td>
 
-            {/* Horizontal Grid lines */}
-            <g className="stroke-slate-100 dark:stroke-slate-800/60" strokeWidth="1" strokeDasharray="4 4">
-              <line x1="50" y1="50" x2="750" y2="50" />
-              <line x1="50" y1="100" x2="750" y2="100" />
-              <line x1="50" y1="150" x2="750" y2="150" />
-              <line x1="50" y1="200" x2="750" y2="200" />
-              <line x1="50" y1="250" x2="750" y2="250" />
-            </g>
+                  {/* Role */}
+                  <td className="py-4 px-4 text-left">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${member.roleColor}`} />
+                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>{member.role}</span>
+                    </div>
+                  </td>
 
-            {/* Vertical grid lines mapping to sprints */}
-            <g className="stroke-slate-100 dark:stroke-slate-800/40" strokeWidth="1">
-              <line x1="50" y1="50" x2="50" y2="250" />
-              <line x1="190" y1="50" x2="190" y2="250" />
-              <line x1="330" y1="50" x2="330" y2="250" />
-              <line x1="470" y1="50" x2="470" y2="250" />
-              <line x1="610" y1="50" x2="610" y2="250" />
-              <line x1="750" y1="50" x2="750" y2="250" />
-            </g>
+                  {/* Total Tasks */}
+                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.totalTasks} Tasks</td>
 
-            {/* Area Gradients */}
-            <path d="M 50 220 Q 120 180 190 170 Q 260 160 330 190 Q 400 220 470 110 Q 540 50 610 80 Q 680 110 750 30 L 750 250 L 50 250 Z" fill="url(#completedGrad)" />
-            <path d="M 50 110 Q 120 120 190 130 Q 260 140 330 100 Q 400 60 470 150 Q 540 220 610 110 Q 680 50 750 140 L 750 250 L 50 250 Z" fill="url(#activeGrad)" />
+                  {/* Completed */}
+                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.completed} Tasks</td>
 
-            {/* Completed Tasks Line (Orange) */}
-            <path
-              d="M 50 220 Q 120 180 190 170 Q 260 160 330 190 Q 400 220 470 110 Q 540 50 610 80 Q 680 110 750 30"
-              fill="none"
-              stroke="#f97316"
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
+                  {/* On-Time Rate */}
+                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.onTimeRate}</td>
 
-            {/* Active Tasks Line (Indigo) */}
-            <path
-              d="M 50 110 Q 120 120 190 130 Q 260 140 330 100 Q 400 60 470 150 Q 540 220 610 110 Q 680 50 750 140"
-              fill="none"
-              stroke="#6366f1"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-            />
+                  {/* Status Badge */}
+                  <td className="py-4 px-4 text-left">
+                    {member.statusType === 'excellent' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20">
+                        {member.status}
+                      </span>
+                    ) : member.statusType === 'good' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
+                        {member.status}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20">
+                        {member.status}
+                      </span>
+                    )}
+                  </td>
 
-            {/* Interactive Nodes / Circles */}
-            {/* Completed Task Dots */}
-            <g className="fill-orange-500 stroke-white dark:stroke-slate-900" strokeWidth="2.5">
-              <circle cx="50" cy="220" r="5.5" />
-              <circle cx="190" cy="170" r="5.5" />
-              <circle cx="330" cy="190" r="5.5" />
-              <circle cx="470" cy="110" r="5.5" />
-              <circle cx="610" cy="80" r="5.5" />
-              <circle cx="750" cy="30" r="5.5" />
-            </g>
+                  {/* Actions button */}
+                  <td className="py-4 px-4 text-center">
+                    <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
-            {/* Active Task Dots */}
-            <g className="fill-indigo-500 stroke-white dark:stroke-slate-900" strokeWidth="2.5">
-              <circle cx="50" cy="110" r="5" />
-              <circle cx="190" cy="130" r="5" />
-              <circle cx="330" cy="100" r="5" />
-              <circle cx="470" cy="150" r="5" />
-              <circle cx="610" cy="110" r="5" />
-              <circle cx="750" cy="140" r="5" />
-            </g>
-          </svg>
-        </div>
-
-        {/* X-Axis labels below the SVG */}
-        <div className="flex justify-between text-xs font-semibold text-slate-400 px-6 sm:px-12 mt-2">
-          <span>Sprint 1</span>
-          <span>Sprint 2</span>
-          <span>Sprint 3</span>
-          <span>Sprint 4</span>
-          <span>Sprint 5</span>
-          <span>Sprint 6</span>
+              {filteredMembers.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="py-8 text-center text-slate-400">
+                    No team members match search query
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

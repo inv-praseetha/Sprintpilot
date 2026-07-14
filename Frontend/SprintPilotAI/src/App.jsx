@@ -10,7 +10,7 @@ function App() {
     <Router>
       <MainLayouut>
         <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/test" element={<Test />} />
           {/* Fallback to 404 page */}
           <Route path="*" element={<NotFound />} />

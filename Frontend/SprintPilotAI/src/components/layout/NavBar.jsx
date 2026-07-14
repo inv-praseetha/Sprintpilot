@@ -19,18 +19,6 @@ export default function NavBar() {
         </button>
 
         {/* Main search bar */}
-        <div className="relative w-40 sm:w-72 md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className={`w-full py-3 pl-11 pr-4 text-sm rounded-2xl outline-none transition-all border ${
-              darkMode 
-                ? 'bg-slate-900 text-slate-200 border-slate-800 placeholder-slate-500 focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-700' 
-                : 'bg-white text-slate-700 border-slate-100 placeholder-slate-400 focus:shadow-md focus:shadow-slate-100 focus:ring-1 focus:ring-slate-100'
-            }`}
-          />
-        </div>
       </div>
 
       {/* User profile and notification controls */}
