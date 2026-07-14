@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from './MainLayouut';
-import { Search, HelpCircle, Bell, Menu } from 'lucide-react';
+import { HelpCircle, Bell, Menu, LogOut } from 'lucide-react';
 
 export default function NavBar() {
   const { darkMode, setSidebarOpen } = useTheme();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <header className="flex items-center justify-between p-6 pb-0 lg:p-10 lg:pb-0 gap-4">
@@ -17,20 +20,6 @@ export default function NavBar() {
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        {/* Main search bar */}
-        <div className="relative w-40 sm:w-72 md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className={`w-full py-3 pl-11 pr-4 text-sm rounded-2xl outline-none transition-all border ${
-              darkMode 
-                ? 'bg-slate-900 text-slate-200 border-slate-800 placeholder-slate-500 focus:bg-slate-800/80 focus:ring-1 focus:ring-slate-700' 
-                : 'bg-white text-slate-700 border-slate-100 placeholder-slate-400 focus:shadow-md focus:shadow-slate-100 focus:ring-1 focus:ring-slate-100'
-            }`}
-          />
-        </div>
       </div>
 
       {/* User profile and notification controls */}
@@ -47,15 +36,49 @@ export default function NavBar() {
           <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-500" />
         </button>
         
-        {/* Profile badge */}
-        <div className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800">
-          <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold text-base ring-2 ring-orange-500/10 select-none">
-            AS
-          </div>
-          <div className="hidden md:block text-left">
-            <span className="block font-semibold text-sm leading-tight">Ashwin Sanalkumar</span>
-            <span className="block text-[11px] text-slate-400">Project Manager</span>
-          </div>
+        {/* Profile badge with dropdown */}
+        <div className="relative">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800 cursor-pointer text-left focus:outline-none"
+          >
+            <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold text-base ring-2 ring-orange-500/10 select-none">
+              AS
+            </div>
+            <div className="hidden md:block">
+              <span className={`block font-semibold text-sm leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ashwin Sanalkumar</span>
+              <span className="block text-[11px] text-slate-400">Project Manager</span>
+            </div>
+          </button>
+
+          {isDropdownOpen && (
+            <>
+              {/* Overlay background to close dropdown when clicking outside */}
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setIsDropdownOpen(false)}
+              />
+              <div className={`absolute right-0 mt-2 w-48 rounded-2xl border p-2 shadow-xl z-50 transition-all ${
+                darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-700'
+              }`}>
+                <button 
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('refresh_token');
+                    localStorage.removeItem('user');
+                    navigate('/');
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
+                    darkMode ? 'hover:bg-slate-800/80 text-rose-400' : 'hover:bg-rose-50 text-rose-600'
+                  }`}
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

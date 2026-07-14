@@ -59,7 +59,7 @@ export default function SideBar() {
   const { darkMode, setDarkMode, sidebarOpen, setSidebarOpen } = useTheme();
 
   const menuItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
+    { name: 'Dashboard', icon: LayoutDashboard, to: '/' },
     { name: 'Projects', icon: FolderKanban, to: '/projects' },
     { name: 'Sprints', icon: Bot, to: '/sprints' }
   ];
