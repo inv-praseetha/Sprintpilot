@@ -11,6 +11,13 @@ from project.serializers import (
 from project.services import ProjectService
 from project.models import Project
 
+from rest_framework.pagination import PageNumberPagination
+
+class ProjectPagination(PageNumberPagination):
+    page_size = 5
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class ProjectCreateView(APIView):
     """
     API View to handle project listing and creation.
@@ -47,6 +54,13 @@ class ProjectCreateView(APIView):
         team_lead = request.query_params.get('team_lead')
         if team_lead:
             projects = projects.filter(team_lead__id=team_lead)
+        
+        paginator = ProjectPagination()
+        page = paginator.paginate_queryset(projects, request, view=self)
+        if page is not None:
+            serializer = ProjectDetailSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
         serializer = ProjectDetailSerializer(projects, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

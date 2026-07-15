@@ -6,11 +6,10 @@ def validate_project_dates(project_type: str, start_date, end_date) -> None:
     """
     Validates project dates based on project type.
     """
-    if project_type == "WATERFALL":
-        if not start_date or not end_date:
-            raise ProjectValidationException("start_date and end_date are required for WATERFALL projects.")
-        if end_date <= start_date:
-            raise ProjectValidationException("end_date must be greater than start_date.")
+    if not start_date or not end_date:
+        raise ProjectValidationException(f"start_date and end_date are required.")
+    if end_date <= start_date:
+        raise ProjectValidationException("end_date must be greater than start_date.")
 
 
 def validate_team_lead(team_lead_id) -> Employee:

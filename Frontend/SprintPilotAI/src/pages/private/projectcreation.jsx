@@ -25,6 +25,50 @@ import {
   Trash2
 } from 'lucide-react';
 
+export const calculateEndDate = (startDateStr, workingDaysStr) => {
+  if (!startDateStr || !workingDaysStr) return '';
+  const totalDays = parseInt(workingDaysStr, 10);
+  if (isNaN(totalDays) || totalDays <= 0) return '';
+
+  let currentDate = new Date(startDateStr);
+  let addedDays = 0;
+
+  // Roll forward if starting on a weekend
+  while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  while (addedDays < totalDays - 1) {
+    currentDate.setDate(currentDate.getDate() + 1);
+    const dayOfWeek = currentDate.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      addedDays++;
+    }
+  }
+
+  const year = currentDate.getFullYear();
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const day = String(currentDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getEffectiveSkills = (project) => {
+  if (!project.skills || project.skills.length === 0) return [];
+  if (!project.members || project.members.length === 0) {
+    return project.skills;
+  }
+
+  const memberSkillIds = new Set();
+  project.members.forEach(member => {
+    if (member.skills) {
+      member.skills.forEach(s => memberSkillIds.add(s.id));
+    }
+  });
+
+  const effective = project.skills.filter(skill => memberSkillIds.has(skill.id));
+  return effective.length > 0 ? effective : project.skills;
+};
+
 export default function ProjectCreation() {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
@@ -42,6 +86,12 @@ export default function ProjectCreation() {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   // Form Field States
   const [name, setName] = useState('');
@@ -92,11 +142,28 @@ export default function ProjectCreation() {
   };
 
   // Load Projects List
-  const fetchProjects = async () => {
+  const fetchProjects = async (page = 1) => {
     setLoadingProjects(true);
     try {
-      const res = await apiClient.get('projects/');
-      setProjects(res.data);
+      const params = {
+        page,
+        name: searchQuery || undefined,
+        status: statusFilter !== 'ALL' ? statusFilter : undefined
+      };
+      const res = await apiClient.get('projects/', { params });
+      if (res.data && res.data.results !== undefined) {
+        setProjects(res.data.results);
+        setTotalCount(res.data.count);
+        setHasNextPage(res.data.next !== null);
+        setHasPrevPage(res.data.previous !== null);
+        setCurrentPage(page);
+      } else {
+        setProjects(Array.isArray(res.data) ? res.data : []);
+        setTotalCount(Array.isArray(res.data) ? res.data.length : 0);
+        setHasNextPage(false);
+        setHasPrevPage(false);
+        setCurrentPage(1);
+      }
     } catch (err) {
       console.error('Error fetching projects:', err);
     } finally {
@@ -106,9 +173,17 @@ export default function ProjectCreation() {
 
   // Load initial data
   useEffect(() => {
-    fetchProjects();
     fetchMetadata();
   }, []);
+
+  // Fetch projects when searchQuery or statusFilter changes
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchProjects(1);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, statusFilter]);
 
   // Automatically update number of days when Type changes
   useEffect(() => {
@@ -132,15 +207,10 @@ export default function ProjectCreation() {
     }
   }, [startDate, endDate, type]);
 
-  // Filter Projects by Search and Status
+  // Filter Projects by Search and Status (Now handled on server-side pagination)
   const filteredProjects = useMemo(() => {
-    return projects.filter(project => {
-      const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesStatus = statusFilter === 'ALL' || project.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [projects, searchQuery, statusFilter]);
+    return projects;
+  }, [projects]);
 
   // Filter Team Leads (Employees with role TEAM_LEAD)
   const teamLeads = useMemo(() => {
@@ -199,6 +269,7 @@ export default function ProjectCreation() {
       return;
     }
     let computedDays = numberOfDays ? parseInt(numberOfDays, 10) : null;
+    let computedEndDate = endDate || null;
     if (type === 'WATERFALL') {
       if (!startDate || !endDate) {
         setFormError("Start Date and End Date are required for Waterfall projects.");
@@ -215,15 +286,27 @@ export default function ProjectCreation() {
       const diffTime = Math.abs(end - start);
       computedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     } else {
-      // AGILE requires number of days
+      // AGILE requires number of days and start date
+      if (!startDate) {
+        setFormError("Start Date is required for Agile projects.");
+        setSubmitting(false);
+        return;
+      }
       if (!numberOfDays || parseInt(numberOfDays, 10) <= 0) {
         setFormError("Number of days is required for Agile projects.");
         setSubmitting(false);
         return;
       }
+      computedEndDate = calculateEndDate(startDate, numberOfDays);
     }
     if (!teamSize || parseInt(teamSize, 10) <= 0) {
       setFormError("Team size must be a positive number.");
+      setSubmitting(false);
+      return;
+    }
+    const maxTeamSize = parseInt(teamSize, 10);
+    if (selectedMembers.length > maxTeamSize) {
+      setFormError(`Cannot allocate more members (${selectedMembers.length}) than the project team size (${maxTeamSize}).`);
       setSubmitting(false);
       return;
     }
@@ -244,7 +327,7 @@ export default function ProjectCreation() {
       status,
       type,
       start_date: startDate || null,
-      end_date: endDate || null,
+      end_date: computedEndDate,
       number_of_days: computedDays,
       team_lead: teamLead,
       members: selectedMembers,
@@ -477,7 +560,7 @@ export default function ProjectCreation() {
                   <tr
                     key={project.id}
                     onClick={(e) => handleRowClick(e, project.id)}
-                    className="text-sm font-semibold transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20 cursor-pointer"
+                    className="text-sm font-semibold transition-colors hover:bg-slate-50/20 dark:hover:bg-slate-900/10 cursor-pointer"
                   >
                     {/* Project Title & Description */}
                     <td className="py-5 px-6 max-w-sm">
@@ -554,25 +637,46 @@ export default function ProjectCreation() {
 
                     {/* Tech Stack Tags */}
                     <td className="py-5 px-4 max-w-[200px]">
-                      <div className="flex flex-wrap gap-1">
-                        {project.skills && project.skills.length > 0 ? (
-                          project.skills.slice(0, 3).map((skill) => (
-                            <span
-                              key={skill.id}
-                              className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
-                            >
-                              {skill.name}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-semibold italic">None</span>
-                        )}
-                        {project.skills && project.skills.length > 3 && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                            +{project.skills.length - 3}
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const effectiveSkills = getEffectiveSkills(project);
+                        const uniqueCats = Array.from(new Set(effectiveSkills.map(s => s.category).filter(Boolean)));
+                        return (
+                          <div className="space-y-1.5">
+                            {/* Unique Categories */}
+                            {uniqueCats.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {uniqueCats.map((cat) => (
+                                  <span
+                                    key={cat}
+                                    className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {effectiveSkills.length > 0 ? (
+                                effectiveSkills.slice(0, 3).map((skill) => (
+                                  <span
+                                    key={skill.id}
+                                    className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                  >
+                                    {skill.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-semibold italic">None</span>
+                              )}
+                              {effectiveSkills.length > 3 && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                                  +{effectiveSkills.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Team Size Column */}
@@ -588,14 +692,14 @@ export default function ProjectCreation() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleEditProject(project)}
-                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors cursor-pointer"
+                            className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border border-blue-500/20 transition-all cursor-pointer"
                             title="Edit Project"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteProject(project.id)}
-                            className="p-2 rounded-xl bg-rose-50/50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
                             title="Delete Project"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -607,6 +711,69 @@ export default function ProjectCreation() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${
+            darkMode 
+              ? 'border-slate-850 bg-slate-900/60' 
+              : 'border-slate-100 bg-slate-50/30'
+          }`}>
+            <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{Math.ceil(totalCount / 5) || 1}</span> ({totalCount} total projects)
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fetchProjects(currentPage - 1)}
+                disabled={!hasPrevPage}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${
+                  hasPrevPage
+                    ? darkMode
+                      ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                      : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-705 cursor-pointer shadow-sm shadow-slate-100/50'
+                    : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                }`}
+              >
+                Previous
+              </button>
+
+              {/* Dynamic Page Numbers */}
+              {Array.from({ length: Math.ceil(totalCount / 5) || 1 }, (_, i) => i + 1).map((p) => {
+                const isSelected = p === currentPage;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => fetchProjects(p)}
+                    className={`w-8.5 h-8.5 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-500 border-blue-500 text-white shadow-md shadow-blue-500/15'
+                        : darkMode
+                          ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
+                          : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => fetchProjects(currentPage + 1)}
+                disabled={!hasNextPage}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${
+                  hasNextPage
+                    ? darkMode
+                      ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                      : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-705 cursor-pointer shadow-sm shadow-slate-100/50'
+                    : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -620,6 +787,7 @@ export default function ProjectCreation() {
         <ProjectForm
           handleSubmit={handleSubmit}
           formError={formError}
+          calculateEndDate={calculateEndDate}
           darkMode={darkMode}
           name={name}
           setName={setName}

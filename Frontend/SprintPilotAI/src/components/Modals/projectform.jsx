@@ -4,6 +4,7 @@ import { AlertCircle, Code, Check, Users, Loader2 } from 'lucide-react';
 export default function ProjectForm({
   handleSubmit,
   formError,
+  calculateEndDate,
   darkMode,
   name,
   setName,
@@ -38,7 +39,7 @@ export default function ProjectForm({
 }) {
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[72vh] overflow-y-auto">
-      
+
       {/* Form Feedback */}
       {formError && (
         <div className="flex gap-3 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-sm font-semibold">
@@ -57,11 +58,10 @@ export default function ProjectForm({
             placeholder="Enter project name..."
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-              darkMode 
-                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                 : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
-            }`}
+              }`}
           />
         </div>
 
@@ -72,11 +72,10 @@ export default function ProjectForm({
             placeholder="Brief description of the project scope and deliverables..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none resize-none ${
-              darkMode 
-                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none resize-none ${darkMode
+                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                 : 'bg-slate-50 border-slate-105 text-slate-800 focus:border-orange-500 focus:bg-white'
-            }`}
+              }`}
           />
         </div>
       </div>
@@ -92,13 +91,12 @@ export default function ProjectForm({
                 type="button"
                 key={t}
                 onClick={() => setType(t)}
-                className={`py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                  type === t
+                className={`py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${type === t
                     ? 'bg-orange-500/10 border-orange-500/40 text-orange-500'
                     : darkMode
                       ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-300'
                       : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {t}
               </button>
@@ -112,11 +110,10 @@ export default function ProjectForm({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-bold transition-all outline-none ${
-              darkMode 
-                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-bold transition-all outline-none ${darkMode
+                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                 : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-            }`}
+              }`}
           >
             <option value="ACTIVE">Active</option>
             <option value="ON_HOLD">On Hold</option>
@@ -133,11 +130,10 @@ export default function ProjectForm({
             placeholder="0"
             value={teamSize}
             onChange={(e) => setTeamSize(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-              darkMode 
-                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                 : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-            }`}
+              }`}
           />
         </div>
       </div>
@@ -155,11 +151,10 @@ export default function ProjectForm({
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-                  darkMode 
-                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                     : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                }`}
+                  }`}
               />
             </div>
 
@@ -172,11 +167,10 @@ export default function ProjectForm({
                 required
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-                  darkMode 
-                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                     : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                }`}
+                  }`}
               />
             </div>
           </div>
@@ -187,20 +181,44 @@ export default function ProjectForm({
           )}
         </div>
       ) : (
-        <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Duration (Days) *</label>
-          <input
-            type="number"
-            required
-            placeholder="10"
-            value={numberOfDays}
-            onChange={(e) => setNumberOfDays(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-              darkMode 
-                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
-                : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-            }`}
-          />
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="space-y-2 text-left">
+              <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">
+                Start Date *
+              </label>
+              <input
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
+                    : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
+                  }`}
+              />
+            </div>
+
+            <div className="space-y-2 text-left">
+              <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Duration (Days) *</label>
+              <input
+                type="number"
+                required
+                placeholder="10"
+                value={numberOfDays}
+                onChange={(e) => setNumberOfDays(e.target.value)}
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
+                    : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
+                  }`}
+              />
+            </div>
+          </div>
+          {startDate && numberOfDays && parseInt(numberOfDays, 10) > 0 && calculateEndDate && (
+            <div className="text-xs font-extrabold text-orange-500 text-left pl-1">
+              Calculated End Date: {calculateEndDate(startDate, numberOfDays)} (Mon to Fri Working Days)
+            </div>
+          )}
         </div>
       )}
 
@@ -211,11 +229,10 @@ export default function ProjectForm({
           required
           value={teamLead}
           onChange={(e) => setTeamLead(e.target.value)}
-          className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-            darkMode 
-              ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500' 
+          className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+              ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
               : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-          }`}
+            }`}
         >
           <option value="">Select Team Lead...</option>
           {teamLeads.map((lead) => (
@@ -232,7 +249,7 @@ export default function ProjectForm({
           <label className="text-xs font-bold text-slate-455 uppercase tracking-wider flex items-center gap-1.5">
             <Code className="w-4.5 h-4.5 text-slate-400" /> Technical Skills Required
           </label>
-          
+
           {/* Category Selection Filter */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
             {['ALL', 'UI', 'QA', 'INFRA', 'BACKEND'].map((cat) => (
@@ -240,13 +257,12 @@ export default function ProjectForm({
                 type="button"
                 key={cat}
                 onClick={() => setSkillCategoryFilter(cat)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all border cursor-pointer ${
-                  skillCategoryFilter === cat
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all border cursor-pointer ${skillCategoryFilter === cat
                     ? 'bg-orange-500 text-white border-orange-500'
                     : darkMode
                       ? 'bg-slate-950 border-slate-800 text-slate-450 hover:text-slate-300'
                       : 'bg-white border-slate-150 text-slate-500 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {cat}
               </button>
@@ -263,13 +279,12 @@ export default function ProjectForm({
                 type="button"
                 key={skill.id}
                 onClick={() => toggleSkillSelection(skill.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  isSelected
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isSelected
                     ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10'
                     : darkMode
                       ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
                       : 'bg-white border border-slate-150 text-slate-600 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 <span>{skill.name}</span>
                 {isSelected && <Check className="w-3.5 h-3.5" />}
@@ -286,7 +301,7 @@ export default function ProjectForm({
       <div className="space-y-2 text-left">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
           <label className="text-xs font-bold text-slate-455 uppercase tracking-wider flex items-center gap-1.5">
-            <Users className="w-4.5 h-4.5 text-slate-400" /> Team Members Allocation
+            <Users className="w-4.5 h-4.5 text-slate-400" /> Team Members Allocation ({selectedMembers.length}/{teamSize || 0})
           </label>
           {selectedSkills.length > 0 && (
             <span className="text-[10px] text-orange-500 font-bold bg-orange-500/10 px-2 py-0.5 rounded-md">
@@ -294,6 +309,12 @@ export default function ProjectForm({
             </span>
           )}
         </div>
+        {teamSize && selectedMembers.length > parseInt(teamSize, 10) && (
+          <div className="text-[10px] font-bold text-rose-500 flex items-center gap-1 pl-1">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Allocated members exceed team size limit of {teamSize}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-52 overflow-y-auto p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/60">
           {filteredEmployeesForSelection.map((empProfile) => {
@@ -302,13 +323,12 @@ export default function ProjectForm({
               <div
                 key={empProfile.id}
                 onClick={() => toggleMemberSelection(empProfile.id)}
-                className={`p-3 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                  isSelected
+                className={`p-3 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isSelected
                     ? 'border-orange-500/40 bg-orange-500/[0.04]'
                     : darkMode
                       ? 'border-slate-850 hover:bg-slate-900 bg-slate-900/60'
                       : 'border-slate-150 hover:bg-slate-50 bg-white'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-7.5 h-7.5 rounded-full bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold text-xs border border-slate-200 dark:border-slate-800">
@@ -329,7 +349,7 @@ export default function ProjectForm({
                             .map((s) => (
                               <span
                                 key={s.id}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20"
+                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                               >
                                 {s.name}
                               </span>
@@ -340,13 +360,12 @@ export default function ProjectForm({
                   </div>
                 </div>
 
-                <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
-                  isSelected
+                <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${isSelected
                     ? 'bg-orange-500 border-orange-500 text-white'
                     : darkMode
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-200 bg-white'
-                }`}>
+                  }`}>
                   {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                 </div>
               </div>
@@ -365,11 +384,10 @@ export default function ProjectForm({
         <button
           type="button"
           onClick={onClose}
-          className={`px-5.5 py-3 rounded-2xl font-bold text-sm transition-all cursor-pointer ${
-            darkMode
+          className={`px-5.5 py-3 rounded-2xl font-bold text-sm transition-all cursor-pointer ${darkMode
               ? 'bg-slate-800 hover:bg-slate-700 text-slate-350'
               : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
-          }`}
+            }`}
         >
           Cancel
         </button>

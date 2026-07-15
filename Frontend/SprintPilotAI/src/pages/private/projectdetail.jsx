@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
+import AddMembersModal from '../../components/Modals/AddMembersModal';
 import {
   ArrowLeft,
   ChevronDown,
@@ -20,6 +21,23 @@ import {
   AlertCircle,
   FileSpreadsheet
 } from 'lucide-react';
+
+export const getEffectiveSkills = (project) => {
+  if (!project.skills || project.skills.length === 0) return [];
+  if (!project.members || project.members.length === 0) {
+    return project.skills;
+  }
+
+  const memberSkillIds = new Set();
+  project.members.forEach(member => {
+    if (member.skills) {
+      member.skills.forEach(s => memberSkillIds.add(s.id));
+    }
+  });
+
+  const effective = project.skills.filter(skill => memberSkillIds.has(skill.id));
+  return effective.length > 0 ? effective : project.skills;
+};
 
 export default function ProjectDetail() {
   const { projectId } = useParams();
@@ -41,9 +59,14 @@ export default function ProjectDetail() {
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
 
   // Add Member State
-  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [updatingMembers, setUpdatingMembers] = useState(false);
+  const [modalError, setModalError] = useState(null);
+
+  useEffect(() => {
+    if (!showAddMembersModal) {
+      setModalError(null);
+    }
+  }, [showAddMembersModal]);
 
   // Sprint Upload State
   const [uploadFile, setUploadFile] = useState(null);
@@ -108,18 +131,22 @@ export default function ProjectDetail() {
       .toUpperCase();
   };
 
-  // Add selected members to project
-  const handleAddMembersSubmit = async (e) => {
-    e.preventDefault();
-    if (selectedNewMembers.length === 0) return;
+  const handleAddMembers = async (selectedIds, onSuccessCallback) => {
+    if (selectedIds.length === 0) return;
+
+    const currentMemberIds = project.members.map(m => m.id);
+    const updatedMemberIds = [...currentMemberIds, ...selectedIds];
+
+    if (project.team_size && updatedMemberIds.length > project.team_size) {
+      setModalError(`Cannot allocate more members than the project team size of ${project.team_size}. You have ${currentMemberIds.length} current members and selected ${selectedIds.length} new members (total ${updatedMemberIds.length}).`);
+      return;
+    }
 
     setUpdatingMembers(true);
+    setModalError(null);
     try {
       // Create member UUID list to submit
       // Note: Backend expect profile UUIDs
-      const currentMemberIds = project.members.map(m => m.id);
-      const updatedMemberIds = [...currentMemberIds, ...selectedNewMembers];
-
       const requestData = {
         name: project.name,
         description: project.description || null,
@@ -131,13 +158,13 @@ export default function ProjectDetail() {
         team_lead: project.team_lead?.id || null,
         members: updatedMemberIds,
         skills: project.skills.map(s => s.id),
-        team_size: updatedMemberIds.length
+        team_size: project.team_size
       };
 
       const res = await apiClient.put(`projects/${projectId}/`, requestData);
       setProject(res.data);
       setShowAddMembersModal(false);
-      setSelectedNewMembers([]);
+      if (onSuccessCallback) onSuccessCallback();
     } catch (err) {
       console.error('[ProjectDetail] Error adding members:', err);
       alert(err.response?.data?.detail || 'Failed to add members.');
@@ -232,27 +259,7 @@ export default function ProjectDetail() {
     }, 150);
   };
 
-  // Filter out employees already inside the project for multi-select
-  const availableEmployees = useMemo(() => {
-    if (!employees || !project) return [];
-    const currentMemberUserIds = project.members.map(m => m.user.id);
-    // Filter out users who are already members OR the team lead
-    return employees.filter(emp => {
-      const isLead = project.team_lead?.id === emp.user.id;
-      const isMember = currentMemberUserIds.includes(emp.user.id);
-      const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-                            emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
-      return !isLead && !isMember && matchesSearch;
-    });
-  }, [employees, project, memberSearchQuery]);
 
-  const toggleSelectNewMember = (profileId) => {
-    setSelectedNewMembers(prev => 
-      prev.includes(profileId) 
-        ? prev.filter(id => id !== profileId) 
-        : [...prev, profileId]
-    );
-  };
 
   if (loading) {
     return (
@@ -325,7 +332,7 @@ export default function ProjectDetail() {
           <div className="flex items-center gap-3 w-full md:w-auto">
             <button
               onClick={() => setShowAddMembersModal(true)}
-              className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/10"
+              className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/10"
             >
               <UserPlus className="w-4 h-4" />
               Add Members
@@ -442,23 +449,45 @@ export default function ProjectDetail() {
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Required Skills</h4>
                 
-                <div className="flex items-start gap-3">
-                  <Code className="w-4 h-4 text-slate-400 mt-0.5" />
-                  <div className="flex flex-wrap gap-2">
-                    {project.skills && project.skills.length > 0 ? (
-                      project.skills.map((skill) => (
-                        <span
-                          key={skill.id}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 rounded-lg text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
-                        >
-                          {skill.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm font-extrabold text-slate-400">No specific skills listed.</span>
-                    )}
-                  </div>
-                </div>
+                {(() => {
+                  const effectiveSkills = getEffectiveSkills(project);
+                  const uniqueCats = Array.from(new Set(effectiveSkills.map(s => s.category).filter(Boolean)));
+                  return (
+                    <div className="space-y-3">
+                      {/* Unique Categories */}
+                      {uniqueCats.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pl-7">
+                          {uniqueCats.map((cat) => (
+                            <span
+                              key={cat}
+                              className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-500/10 rounded-md text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-3">
+                        <Code className="w-4 h-4 text-slate-400 mt-0.5" />
+                        <div className="flex flex-wrap gap-2">
+                          {effectiveSkills.length > 0 ? (
+                            effectiveSkills.map((skill) => (
+                              <span
+                                key={skill.id}
+                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-blue-500/10 rounded-lg text-blue-650 dark:text-blue-400 border border-blue-500/20"
+                              >
+                                {skill.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm font-extrabold text-slate-400">No specific skills listed.</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Administrative metadata / limits */}
@@ -507,9 +536,47 @@ export default function ProjectDetail() {
           </span>
         </div>
 
-        {project.members && project.members.length > 0 ? (
+        {(project.team_lead || (project.members && project.members.length > 0)) ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
-            {project.members.map((member) => (
+            {/* Prepend Team Lead if exists */}
+            {project.team_lead && (
+              <div
+                className={`p-4 rounded-2xl border flex items-center justify-between transition-all group ${
+                  darkMode 
+                    ? 'bg-slate-900/60 border-slate-800' 
+                    : 'bg-white border-slate-100 shadow-sm shadow-slate-100/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-sm">
+                    {getInitials(project.team_lead.full_name)}
+                  </div>
+                  <div>
+                    <h5 className={`font-extrabold text-sm flex items-center gap-1.5 ${
+                      darkMode ? 'text-white' : 'text-slate-800'
+                    }`}>
+                      {project.team_lead.full_name}
+                      <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                        Lead
+                      </span>
+                    </h5>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        Team Lead
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 block font-medium">
+                      {project.team_lead.email}
+                    </span>
+                  </div>
+                </div>
+                {/* Empty container to align layout with members who have a remove button */}
+                <div />
+              </div>
+            )}
+
+            {/* Render Members */}
+            {project.members && project.members.map((member) => (
               <div
                 key={member.id}
                 className={`p-4 rounded-2xl border flex items-center justify-between transition-all group ${
@@ -519,11 +586,13 @@ export default function ProjectDetail() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-500 font-black text-sm">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-sm">
                     {getInitials(member.user.full_name)}
                   </div>
                   <div>
-                    <h5 className="font-extrabold text-sm text-slate-800 dark:text-white">
+                    <h5 className={`font-extrabold text-sm ${
+                      darkMode ? 'text-white' : 'text-slate-800'
+                    }`}>
                       {member.user.full_name}
                     </h5>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-1">
@@ -537,7 +606,7 @@ export default function ProjectDetail() {
                             .map((s) => (
                               <span
                                 key={s.id}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20"
+                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                               >
                                 {s.name}
                               </span>
@@ -571,7 +640,7 @@ export default function ProjectDetail() {
             {isProjectManager && (
               <button
                 onClick={() => setShowAddMembersModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
               >
                 <UserPlus className="w-4 h-4" />
                 Add First Member
@@ -582,153 +651,21 @@ export default function ProjectDetail() {
       </div>
 
       {/* 3. MODAL: ADD MEMBERS */}
-      {showAddMembersModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
-            {/* Header */}
-            <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
-              <div className="text-left">
-                <h3 className="font-extrabold text-base tracking-tight">Add Team Members</h3>
-                <p className="text-xs text-slate-400">Select employees to allocate to this project</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAddMembersModal(false);
-                  setSelectedNewMembers([]);
-                  setMemberSearchQuery('');
-                }}
-                className={`p-2 rounded-xl transition-colors ${
-                  darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-                }`}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Content & List */}
-            <form onSubmit={handleAddMembersSubmit}>
-              <div className="p-6 space-y-4 max-h-[350px] overflow-y-auto">
-                {/* Search Bar */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search by name or role..."
-                    value={memberSearchQuery}
-                    onChange={(e) => setMemberSearchQuery(e.target.value)}
-                    className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-indigo-500 transition-colors ${
-                      darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white'
-                        : 'bg-white border-slate-200 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                {/* Employees List */}
-                <div className="space-y-2">
-                  {availableEmployees.length > 0 ? (
-                    availableEmployees.map((emp) => {
-                      const isSelected = selectedNewMembers.includes(emp.id);
-                      return (
-                        <div
-                          key={emp.id}
-                          onClick={() => toggleSelectNewMember(emp.id)}
-                          className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
-                            isSelected
-                              ? 'border-indigo-500 bg-indigo-500/5'
-                              : darkMode
-                                ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
-                                : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 text-left">
-                            <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-xs">
-                              {getInitials(emp.user.full_name)}
-                            </div>
-                            <div>
-                              <span className="block text-xs font-black text-slate-800 dark:text-white">
-                                {emp.user.full_name}
-                              </span>
-                              <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                  {emp.designation}
-                                </span>
-                                {project.skills && project.skills.length > 0 && emp.skills && (
-                                  <div className="flex flex-wrap gap-1">
-                                    {emp.skills
-                                      .filter((s) => project.skills.some(ps => ps.id === s.id))
-                                      .map((s) => (
-                                        <span
-                                          key={s.id}
-                                          className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20"
-                                        >
-                                          {s.name}
-                                        </span>
-                                      ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Selected Check Indicator */}
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
-                            isSelected
-                              ? 'bg-indigo-500 border-indigo-500 text-white'
-                              : 'border-slate-300 dark:border-slate-700'
-                          }`}>
-                            {isSelected && <Check className="w-3 h-3" />}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="py-8 text-center text-slate-400 text-xs font-bold">
-                      No other eligible employees found.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddMembersModal(false);
-                    setSelectedNewMembers([]);
-                    setMemberSearchQuery('');
-                  }}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
-                    darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingMembers || selectedNewMembers.length === 0}
-                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md"
-                >
-                  {updatingMembers ? (
-                    <div className="flex items-center gap-1">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    `Add ${selectedNewMembers.length} member(s)`
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AddMembersModal
+        show={showAddMembersModal}
+        onClose={() => setShowAddMembersModal(false)}
+        darkMode={darkMode}
+        employees={employees}
+        project={project}
+        onAddMembers={handleAddMembers}
+        updatingMembers={updatingMembers}
+        modalError={modalError}
+        setModalError={setModalError}
+      />
 
       {/* 4. MODAL: UPLOAD SPRINT */}
       {showUploadSprintModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
           <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
             darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
