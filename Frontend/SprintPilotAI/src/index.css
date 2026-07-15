@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+  --color-synchro-red: #ff5733;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f8f9fa;
+  color: #333333;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* Custom styles for diagonal stripe pattern on March bar in dashboard chart */
+.diagonal-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #ff6b4a,
+    #ff6b4a 10px,
+    #ff856b 10px,
+    #ff856b 20px
+  );
+}
+
+/* Style to make custom dotted sparkline charts look clean */
+.dotted-line {
+  background-image: radial-gradient(circle, #ff6b4a 2px, transparent 3px);
+  background-size: 12px 12px;
+}
