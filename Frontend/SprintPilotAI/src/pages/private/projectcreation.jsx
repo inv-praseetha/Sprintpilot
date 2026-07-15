@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import ProjectModal from '../../components/Modals/projectmodal';
 import ProjectForm from '../../components/Modals/projectform';
+import apiClient from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import {
   Plus,
   Search,
@@ -26,10 +28,7 @@ import {
 export default function ProjectCreation() {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
-
-  // Authentication State
-  const [currentUser, setCurrentUser] = useState(null);
-  const [token, setToken] = useState('');
+  const { user: currentUser, logout: handleLogout } = useAuth();
 
   // Domain Data States
   const [projects, setProjects] = useState([]);
@@ -65,100 +64,39 @@ export default function ProjectCreation() {
   const [metaError, setMetaError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Initialize Auth & load configuration
-  useEffect(() => {
-    const savedToken = localStorage.getItem('access_token');
-    const savedUser = localStorage.getItem('user');
-
-    if (!savedToken) {
-      navigate('/');
-      return;
-    }
-
-    setToken(savedToken);
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    navigate('/');
-  };
-
   // Check if User is Project Manager
   const isProjectManager = useMemo(() => {
     return currentUser?.role === 'PROJECT_MANAGER';
   }, [currentUser]);
 
   // Load Skills & Employee Profiles
-  const fetchMetadata = async (authToken) => {
+  const fetchMetadata = async () => {
     setLoadingMeta(true);
     setMetaError(null);
-    console.log("[fetchMetadata] Initiating metadata fetch with token:", authToken ? `${authToken.slice(0, 10)}...` : 'None');
+    console.log("[fetchMetadata] Initiating metadata fetch");
     try {
       // 1. Fetch Skills
-      const skillsRes = await fetch('http://localhost:8000/api/projects/skills/', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      console.log("[fetchMetadata] Skills response status:", skillsRes.status);
-      if (skillsRes.ok) {
-        const skillsData = await skillsRes.json();
-        console.log("[fetchMetadata] Skills data loaded:", skillsData);
-        setSkills(skillsData);
-      } else {
-        const errText = await skillsRes.text();
-        console.error("[fetchMetadata] Failed to fetch skills:", skillsRes.status, errText);
-        setMetaError(`Failed to load skills: Status ${skillsRes.status}`);
-      }
+      const skillsRes = await apiClient.get('projects/skills/');
+      setSkills(skillsRes.data);
 
       // 2. Fetch Employee Profiles
-      const employeesRes = await fetch('http://localhost:8000/api/projects/employees/', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      console.log("[fetchMetadata] Employees response status:", employeesRes.status);
-      if (employeesRes.ok) {
-        const employeesData = await employeesRes.json();
-        console.log("[fetchMetadata] Employees data loaded:", employeesData);
-        setEmployees(employeesData);
-      } else {
-        const errText = await employeesRes.text();
-        console.error("[fetchMetadata] Failed to fetch employees:", employeesRes.status, errText);
-        setMetaError(prev => prev ? `${prev} & Failed to load employees: Status ${employeesRes.status}` : `Failed to load employees: Status ${employeesRes.status}`);
-      }
+      const employeesRes = await apiClient.get('projects/employees/');
+      setEmployees(employeesRes.data);
 
     } catch (err) {
       console.error('[fetchMetadata] Error fetching metadata:', err);
-      setMetaError(`Network connection error: ${err.message}`);
+      setMetaError(`Network connection error: ${err.message || 'Error fetching metadata'}`);
     } finally {
       setLoadingMeta(false);
     }
   };
 
   // Load Projects List
-  const fetchProjects = async (authToken) => {
+  const fetchProjects = async () => {
     setLoadingProjects(true);
     try {
-      const res = await fetch('http://localhost:8000/api/projects/', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data);
-      } else {
-        console.error('Failed to fetch projects');
-      }
+      const res = await apiClient.get('projects/');
+      setProjects(res.data);
     } catch (err) {
       console.error('Error fetching projects:', err);
     } finally {
@@ -168,11 +106,9 @@ export default function ProjectCreation() {
 
   // Load initial data
   useEffect(() => {
-    if (token) {
-      fetchProjects(token);
-      fetchMetadata(token);
-    }
-  }, [token]);
+    fetchProjects();
+    fetchMetadata();
+  }, []);
 
   // Automatically update number of days when Type changes
   useEffect(() => {
@@ -317,32 +253,16 @@ export default function ProjectCreation() {
     };
 
     try {
-      const url = editingProjectId 
-        ? `http://localhost:8000/api/projects/${editingProjectId}/` 
-        : 'http://localhost:8000/api/projects/';
-      const method = editingProjectId ? 'PUT' : 'POST';
+      const response = editingProjectId 
+        ? await apiClient.put(`projects/${editingProjectId}/`, requestData) 
+        : await apiClient.post('projects/', requestData);
 
-      const res = await fetch(url, {
-        method: method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        fetchProjects(token);
-        setShowModal(false);
-        resetForm();
-      } else {
-        setFormError(data.detail || JSON.stringify(data));
-      }
+      fetchProjects();
+      setShowModal(false);
+      resetForm();
     } catch (err) {
       console.error('Error saving project:', err);
-      setFormError('Failed to connect to the server. Please check your network.');
+      setFormError(err.response?.data?.detail || err.message || 'Failed to save project.');
     } finally {
       setSubmitting(false);
     }
@@ -388,22 +308,11 @@ export default function ProjectCreation() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/projects/${projectId}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        fetchProjects(token);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        alert(data.detail || "Failed to delete project.");
-      }
+      await apiClient.delete(`projects/${projectId}/`);
+      fetchProjects();
     } catch (err) {
       console.error("Error deleting project:", err);
-      alert("Failed to connect to the server. Please check your network.");
+      alert(err.response?.data?.detail || err.message || "Failed to delete project.");
     }
   };
 
@@ -764,7 +673,7 @@ export default function ProjectCreation() {
         <div className="flex gap-2 pt-2">
           <button
             type="button"
-            onClick={() => fetchMetadata(token)}
+            onClick={() => fetchMetadata()}
             className="px-3 py-1 rounded bg-orange-500 text-white font-bold text-[10px] hover:bg-orange-600 transition-all cursor-pointer"
           >
             Force Sync Metadata
