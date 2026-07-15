@@ -724,6 +724,7 @@ export default function ProjectCreation() {
           toggleMemberSelection={toggleMemberSelection}
           onClose={() => setShowModal(false)}
           submitting={submitting}
+          editingProjectId={editingProjectId}
         />
       </ProjectModal>
 
