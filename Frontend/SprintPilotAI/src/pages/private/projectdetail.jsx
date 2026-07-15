@@ -4,6 +4,7 @@ import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
 import TaskUploadModal from '../../components/Modals/TaskUploadModal';
 import { getEffectiveSkills } from './projectcreation';
+import SprintServices from '../../services/SprintServices';
 import {
   FolderKanban,
   Layers,
@@ -96,8 +97,7 @@ export default function ProjectDetail() {
   const [successAlert, setSuccessAlert] = useState(null);
 
   // Sprints state
-  const [sprints, setSprints] = useState({});
-  const [activeSprintName, setActiveSprintName] = useState('');
+  const [sprints, setSprints] = useState([]);
 
   // Initialize and check authentication
   useEffect(() => {
@@ -145,55 +145,38 @@ export default function ProjectDetail() {
     }
   }, [projectId]);
 
-  useEffect(() => {
-    if (project && project.name) {
-      const saved = localStorage.getItem(`project_sprints_${projectId}`);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setSprints(parsed);
-          const keys = Object.keys(parsed);
-          setActiveSprintName(keys[keys.length - 1]);
-          return;
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      const matched = mockSprintsData[project.name];
-      if (matched) {
-        setSprints(matched);
-        localStorage.setItem(`project_sprints_${projectId}`, JSON.stringify(matched));
-        const keys = Object.keys(matched);
-        setActiveSprintName(keys[keys.length - 1]);
-      } else {
-        setSprints({});
-        setActiveSprintName('');
-      }
+  const fetchSprints = async () => {
+    try {
+      const data = await SprintServices.getProjectSprints(projectId);
+      setSprints(data);
+    } catch (err) {
+      console.error('[ProjectDetail] Error fetching sprints:', err);
     }
-  }, [project, projectId]);
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      fetchSprints();
+    }
+  }, [projectId]);
 
   // Compute sprint metadata details list for presentation
   const sprintListDetails = useMemo(() => {
-    return Object.entries(sprints).map(([sprintName, taskList]) => {
-      const totalTasks = taskList.length;
+    if (!Array.isArray(sprints)) return [];
+    return sprints.map((sprint) => {
+      const totalTasks = sprint.tasks ? sprint.tasks.length : 0;
       
-      // Derive start and end dates from the tasks in the sprint
       let startDate = 'N/A';
       let endDate = 'N/A';
-      
-      const startDates = taskList.map(t => t.startDate).filter(Boolean);
-      const endDates = taskList.map(t => t.endDate).filter(Boolean);
-      
-      if (startDates.length > 0) {
-        startDate = new Date(startDates[0]).toLocaleDateString('en-US', {
+      if (sprint.start_date) {
+        startDate = new Date(sprint.start_date).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric'
         });
       }
-      if (endDates.length > 0) {
-        endDate = new Date(endDates[0]).toLocaleDateString('en-US', {
+      if (sprint.end_date) {
+        endDate = new Date(sprint.end_date).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric'
@@ -201,7 +184,8 @@ export default function ProjectDetail() {
       }
       
       return {
-        name: sprintName,
+        id: sprint.id,
+        name: sprint.name,
         totalTasks,
         startDate,
         endDate
@@ -302,18 +286,33 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleImportSuccess = ({ milestoneName, tasksWithDates, targetProjectKey }) => {
-    setSprints(prev => {
-      const updated = {
-        ...prev,
-        [milestoneName]: tasksWithDates
+  const handleImportSuccess = async ({ milestoneName, tasksWithDates, targetProjectKey }) => {
+    try {
+      let startDate = new Date().toISOString().split('T')[0];
+      let endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      if (tasksWithDates.length > 0) {
+        if (tasksWithDates[0].startDate) startDate = tasksWithDates[0].startDate;
+        if (tasksWithDates[0].endDate) endDate = tasksWithDates[0].endDate;
+      }
+
+      const sprintData = {
+        name: milestoneName,
+        goal: '',
+        start_date: startDate,
+        end_date: endDate,
+        status: 'PLANNED',
+        tasks: tasksWithDates
       };
-      localStorage.setItem(`project_sprints_${projectId}`, JSON.stringify(updated));
-      return updated;
-    });
-    setActiveSprintName(milestoneName);
-    setSuccessAlert(`Successfully imported Milestone "${milestoneName}" with ${tasksWithDates.length} tasks!`);
-    setTimeout(() => setSuccessAlert(null), 5000);
+
+      await SprintServices.createSprint(projectId, sprintData);
+      await fetchSprints();
+
+      setSuccessAlert(`Successfully imported Milestone "${milestoneName}" with ${tasksWithDates.length} tasks!`);
+      setTimeout(() => setSuccessAlert(null), 5000);
+    } catch (err) {
+      console.error('[ProjectDetail] Error creating sprint:', err);
+      alert(err.response?.data?.detail || 'Failed to import sprint tasks.');
+    }
   };
 
   // Filter out employees already inside the project for multi-select
@@ -767,13 +766,15 @@ export default function ProjectDetail() {
                   {sprintListDetails.map((sprint, idx) => (
                     <tr 
                       key={idx} 
-                      onClick={() => navigate(`/projects/${projectId}/sprints/${encodeURIComponent(sprint.name)}`)}
+                      onClick={() => navigate(`/projects/${projectId}/sprints/${sprint.id}`)}
                       className={`transition-all duration-150 cursor-pointer ${
                         darkMode ? 'bg-slate-900/40 hover:bg-slate-850/60 text-slate-330' : 'bg-white hover:bg-slate-50 text-slate-700'
                       }`}
                     >
                       {/* Name */}
-                      <td className="py-4 px-5 font-extrabold text-sm text-slate-800 dark:text-white">
+                      <td className={`py-4 px-5 font-extrabold text-sm ${
+                        darkMode ? 'text-white' : 'text-slate-800'
+                      }`}>
                         {sprint.name}
                       </td>
 
@@ -888,11 +889,15 @@ export default function ProjectDetail() {
                           }`}
                         >
                           <div className="flex items-center gap-3 text-left">
-                            <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-xs">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                              darkMode ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-800'
+                            }`}>
                               {getInitials(emp.user.full_name)}
                             </div>
                             <div>
-                              <span className="block text-xs font-black text-slate-800 dark:text-white">
+                              <span className={`block text-xs font-black ${
+                                darkMode ? 'text-white' : 'text-slate-800'
+                              }`}>
                                 {emp.user.full_name}
                               </span>
                               <div className="flex flex-wrap items-center gap-2 mt-0.5">
@@ -998,6 +1003,7 @@ export default function ProjectDetail() {
             }
           }}
           onImportSuccess={handleImportSuccess}
+          projectType={project.type}
         />
       )}
 

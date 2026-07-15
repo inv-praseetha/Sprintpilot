@@ -28,7 +28,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/projects" element={<ProjectCreation/>} />
               <Route path="/projects/:projectId" element={<ProjectDetail />} />
-              <Route path="/projects/:projectId/sprints/:sprintName" element={<SprintDetail />} />
+              <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
               <Route path="/test" element={<Test />} />
               {/* Fallback to 404 page */}
               <Route path="*" element={<NotFound />} />
