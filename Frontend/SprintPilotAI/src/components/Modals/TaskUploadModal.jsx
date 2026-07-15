@@ -11,13 +11,39 @@ const categoryConfig = {
   QA: { color: '#10b981', bg: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' }
 };
 
+const calculateAgileEndDate = (startDateStr) => {
+  if (!startDateStr) return '';
+  const [year, month, day] = startDateStr.split('-').map(Number);
+  const current = new Date(year, month - 1, day);
+  
+  let workingDaysCount = 0;
+  let first = true;
+  while (workingDaysCount < 10) {
+    if (!first) {
+      current.setDate(current.getDate() + 1);
+    } else {
+      first = false;
+    }
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      workingDaysCount++;
+    }
+  }
+  
+  const y = current.getFullYear();
+  const m = String(current.getMonth() + 1).padStart(2, '0');
+  const d = String(current.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export default function TaskUploadModal({
   isOpen,
   onClose,
   darkMode,
   activeProject,
   projects,
-  onImportSuccess
+  onImportSuccess,
+  projectType
 }) {
   const [excelFile, setExcelFile] = useState(null);
   const [excelData, setExcelData] = useState([]);
@@ -172,14 +198,21 @@ export default function TaskUploadModal({
       setErrorMsg('Please specify the Start Date.');
       return;
     }
-    if (!sprintEndDate) {
-      setErrorMsg('Please specify the End Date.');
-      return;
+
+    let finalEndDate = sprintEndDate;
+    if (projectType === 'AGILE') {
+      finalEndDate = calculateAgileEndDate(sprintStartDate);
+    } else {
+      if (!sprintEndDate) {
+        setErrorMsg('Please specify the End Date.');
+        return;
+      }
+      if (new Date(sprintStartDate) > new Date(sprintEndDate)) {
+        setErrorMsg('Start Date must be before or equal to End Date.');
+        return;
+      }
     }
-    if (new Date(sprintStartDate) > new Date(sprintEndDate)) {
-      setErrorMsg('Start Date must be before or equal to End Date.');
-      return;
-    }
+
     if (excelData.length === 0) {
       setErrorMsg('No data loaded to import.');
       return;
@@ -188,7 +221,7 @@ export default function TaskUploadModal({
     const tasksWithDates = excelData.map(task => ({
       ...task,
       startDate: sprintStartDate,
-      endDate: sprintEndDate
+      endDate: finalEndDate
     }));
 
     const targetProjectKey = parsedProjectInfo.matchedKey || activeProject;
@@ -366,17 +399,39 @@ export default function TaskUploadModal({
                         }`}
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={sprintEndDate}
-                        onChange={(e) => setSprintEndDate(e.target.value)}
-                        className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 focus:ring-orange-500 ${
-                          darkMode ? 'bg-slate-850 border-slate-700 text-white [color-scheme:dark]' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
+                    {projectType === 'AGILE' ? (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Calculated End Date (10 Days)</label>
+                        <div className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border flex items-center justify-start ${
+                          darkMode ? 'bg-slate-855 border-slate-700 text-slate-450' : 'bg-slate-100 border-slate-200 text-slate-500'
+                        }`} style={{ minHeight: '42px' }}>
+                          {sprintStartDate ? (
+                            (() => {
+                              const endValStr = calculateAgileEndDate(sprintStartDate);
+                              return new Date(endValStr).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              });
+                            })()
+                          ) : (
+                            'Specify Start Date first'
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">End Date</label>
+                        <input
+                          type="date"
+                          value={sprintEndDate}
+                          onChange={(e) => setSprintEndDate(e.target.value)}
+                          className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                            darkMode ? 'bg-slate-850 border-slate-700 text-white [color-scheme:dark]' : 'bg-slate-50 border-slate-200 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
