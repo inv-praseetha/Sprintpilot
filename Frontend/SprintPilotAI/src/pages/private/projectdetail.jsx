@@ -2,11 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
-import AddMembersModal from '../../components/Modals/AddMembersModal';
+import TaskUploadModal from '../../components/Modals/TaskUploadModal';
+import { getEffectiveSkills } from './projectcreation';
 import {
+  FolderKanban,
+  Layers,
   ArrowLeft,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   UserPlus,
   UploadCloud,
   Users,
@@ -17,26 +21,50 @@ import {
   Trash2,
   X,
   Check,
+  CheckCircle2,
   Loader2,
   AlertCircle,
   FileSpreadsheet
 } from 'lucide-react';
 
-export const getEffectiveSkills = (project) => {
-  if (!project.skills || project.skills.length === 0) return [];
-  if (!project.members || project.members.length === 0) {
-    return project.skills;
+const mockSprintsData = {
+  'Cloud Sync Platform': {
+    'Sprint 5 (Current)': [
+      { title: 'Implement File Chunking API', desc: 'Develop backend handler to slice large binary assets into 4MB secure blobs.', category: 'BACKEND', startDate: '2026-06-26', endDate: '2026-07-02', status: 'Completed' },
+      { title: 'Design Decentralized Encryption Protocol', desc: 'Draft architecture review for key derivation functions using AES-GCM.', category: 'INFRA', startDate: '2026-06-28', endDate: '2026-07-05', status: 'Completed' },
+      { title: 'Build Web Upload Interface', desc: 'Create React dropzone dashboard with real-time multi-threaded upload progress bars.', category: 'UI', startDate: '2026-07-01', endDate: '2026-07-08', status: 'In Progress' },
+      { title: 'Perform Chunk Load Testing', desc: 'Author Apache JMeter scripts simulating 500 concurrent file chunk uploads.', category: 'QA', startDate: '2026-07-04', endDate: '2026-07-09', status: 'In Progress' }
+    ]
+  },
+  'AI Analytics Hub': {
+    'Sprint 6 (Current)': [
+      { title: 'Neural Model Fine-tuning', desc: 'Train LLM transformer blocks on refined developer timesheet corpus.', category: 'BACKEND', startDate: '2026-06-24', endDate: '2026-06-30', status: 'Completed' },
+      { title: 'Interactive Loss Curves Chart', desc: 'Plot training/validation telemetry curves with SVG tooltips in real-time.', category: 'UI', startDate: '2026-06-27', endDate: '2026-07-03', status: 'Completed' },
+      { title: 'API Telemetry Endpoints', desc: 'Create fast API handlers logging GPU temp and validation loss.', category: 'BACKEND', startDate: '2026-07-01', endDate: '2026-07-07', status: 'In Progress' },
+      { title: 'Integrate Docker GPU Runner', desc: 'Configure NVIDIA container toolkit runtime across local cluster instances.', category: 'INFRA', startDate: '2026-07-02', endDate: '2026-07-07', status: 'In Progress' }
+    ]
+  },
+  'Developer Portal': {
+    'Sprint 3 (Current)': [
+      { title: 'SDK Sandbox Playground', desc: 'Embed interactive typescript client preview console in browser layout.', category: 'UI', startDate: '2026-06-29', endDate: '2026-07-05', status: 'Completed' },
+      { title: 'OAuth2 Client Registration API', desc: 'Design backend handlers issuing client credentials, secrets, and auth scopes.', category: 'BACKEND', startDate: '2026-07-01', endDate: '2026-07-08', status: 'In Progress' },
+      { title: 'Swagger Spec OpenAPI Linting', desc: 'Implement automated YAML specs parsing and validation hooks on file upload.', category: 'QA', startDate: '2026-07-03', endDate: '2026-07-10', status: 'In Progress' }
+    ]
+  },
+  'Security Gateway': {
+    'Sprint 5 (Current)': [
+      { title: 'Redis Cache Rate Limiter', desc: 'Deploy sliding window algorithm tracking client token buckets in memory.', category: 'BACKEND', startDate: '2026-07-10', endDate: '2026-07-15', status: 'Completed' },
+      { title: 'Verify SSL Handshake Offloading', desc: 'Setup Nginx TLS terminate configurations on proxy nodes.', category: 'INFRA', startDate: '2026-07-12', endDate: '2026-07-18', status: 'In Progress' },
+      { title: 'Penetration Scripting Framework', desc: 'Write automated vulnerability scanners mapping auth token headers.', category: 'QA', startDate: '2026-07-14', endDate: '2026-07-21', status: 'In Progress' }
+    ]
   }
+};
 
-  const memberSkillIds = new Set();
-  project.members.forEach(member => {
-    if (member.skills) {
-      member.skills.forEach(s => memberSkillIds.add(s.id));
-    }
-  });
-
-  const effective = project.skills.filter(skill => memberSkillIds.has(skill.id));
-  return effective.length > 0 ? effective : project.skills;
+const categoryConfig = {
+  UI: { color: '#ea580c', bg: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
+  BACKEND: { color: '#3b82f6', bg: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
+  INFRA: { color: '#8b5cf6', bg: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
+  QA: { color: '#10b981', bg: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' }
 };
 
 export default function ProjectDetail() {
@@ -59,20 +87,17 @@ export default function ProjectDetail() {
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
 
   // Add Member State
+  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [updatingMembers, setUpdatingMembers] = useState(false);
   const [modalError, setModalError] = useState(null);
 
-  useEffect(() => {
-    if (!showAddMembersModal) {
-      setModalError(null);
-    }
-  }, [showAddMembersModal]);
+  // Success Toast Alert State
+  const [successAlert, setSuccessAlert] = useState(null);
 
-  // Sprint Upload State
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadState, setUploadState] = useState('idle'); // idle, uploading, parsing, success, error
-  const [dragActive, setDragActive] = useState(false);
+  // Sprints state
+  const [sprints, setSprints] = useState({});
+  const [activeSprintName, setActiveSprintName] = useState('');
 
   // Initialize and check authentication
   useEffect(() => {
@@ -119,6 +144,70 @@ export default function ProjectDetail() {
       fetchProjectData();
     }
   }, [projectId]);
+
+  useEffect(() => {
+    if (project && project.name) {
+      const saved = localStorage.getItem(`project_sprints_${projectId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setSprints(parsed);
+          const keys = Object.keys(parsed);
+          setActiveSprintName(keys[keys.length - 1]);
+          return;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const matched = mockSprintsData[project.name];
+      if (matched) {
+        setSprints(matched);
+        localStorage.setItem(`project_sprints_${projectId}`, JSON.stringify(matched));
+        const keys = Object.keys(matched);
+        setActiveSprintName(keys[keys.length - 1]);
+      } else {
+        setSprints({});
+        setActiveSprintName('');
+      }
+    }
+  }, [project, projectId]);
+
+  // Compute sprint metadata details list for presentation
+  const sprintListDetails = useMemo(() => {
+    return Object.entries(sprints).map(([sprintName, taskList]) => {
+      const totalTasks = taskList.length;
+      
+      // Derive start and end dates from the tasks in the sprint
+      let startDate = 'N/A';
+      let endDate = 'N/A';
+      
+      const startDates = taskList.map(t => t.startDate).filter(Boolean);
+      const endDates = taskList.map(t => t.endDate).filter(Boolean);
+      
+      if (startDates.length > 0) {
+        startDate = new Date(startDates[0]).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+      if (endDates.length > 0) {
+        endDate = new Date(endDates[0]).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+      
+      return {
+        name: sprintName,
+        totalTasks,
+        startDate,
+        endDate
+      };
+    });
+  }, [sprints]);
 
   // Get Initials for Avatar
   const getInitials = (fullName) => {
@@ -173,6 +262,14 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleAddMembersSubmit = (e) => {
+    e.preventDefault();
+    handleAddMembers(selectedNewMembers, () => {
+      setSelectedNewMembers([]);
+      setMemberSearchQuery('');
+    });
+  };
+
   // Remove member from project
   const handleRemoveMember = async (memberProfileId) => {
     if (!window.confirm('Are you sure you want to remove this member from the project?')) {
@@ -205,61 +302,41 @@ export default function ProjectDetail() {
     }
   };
 
-  // Drag and drop events for file upload
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
+  const handleImportSuccess = ({ milestoneName, tasksWithDates, targetProjectKey }) => {
+    setSprints(prev => {
+      const updated = {
+        ...prev,
+        [milestoneName]: tasksWithDates
+      };
+      localStorage.setItem(`project_sprints_${projectId}`, JSON.stringify(updated));
+      return updated;
+    });
+    setActiveSprintName(milestoneName);
+    setSuccessAlert(`Successfully imported Milestone "${milestoneName}" with ${tasksWithDates.length} tasks!`);
+    setTimeout(() => setSuccessAlert(null), 5000);
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
+  // Filter out employees already inside the project for multi-select
+  const availableEmployees = useMemo(() => {
+    if (!employees || !project) return [];
+    const currentMemberUserIds = project.members.map(m => m.user.id);
+    // Filter out users who are already members OR the team lead
+    return employees.filter(emp => {
+      const isLead = project.team_lead?.id === emp.user.id;
+      const isMember = currentMemberUserIds.includes(emp.user.id);
+      const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                            emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
+      return !isLead && !isMember && matchesSearch;
+    });
+  }, [employees, project, memberSearchQuery]);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      setUploadFile(file);
-      simulateUpload();
-    }
+  const toggleSelectNewMember = (profileId) => {
+    setSelectedNewMembers(prev => 
+      prev.includes(profileId) 
+        ? prev.filter(id => id !== profileId) 
+        : [...prev, profileId]
+    );
   };
-
-  const handleFileSelect = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setUploadFile(file);
-      simulateUpload();
-    }
-  };
-
-  // Simulate file upload with incremental progress
-  const simulateUpload = () => {
-    setUploadState('uploading');
-    setUploadProgress(0);
-
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setUploadState('parsing');
-          // Wait 1.2s to mock file parsing
-          setTimeout(() => {
-            setUploadState('success');
-          }, 1200);
-          return 100;
-        }
-        // Random incremental steps
-        const step = Math.floor(Math.random() * 15) + 5;
-        return Math.min(prev + step, 100);
-      });
-    }, 150);
-  };
-
-
 
   if (loading) {
     return (
@@ -338,12 +415,7 @@ export default function ProjectDetail() {
               Add Members
             </button>
             <button
-              onClick={() => {
-                setUploadFile(null);
-                setUploadProgress(0);
-                setUploadState('idle');
-                setShowUploadSprintModal(true);
-              }}
+              onClick={() => setShowUploadSprintModal(true)}
               className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-orange-500/10"
             >
               <UploadCloud className="w-4 h-4" />
@@ -650,36 +722,119 @@ export default function ProjectDetail() {
         )}
       </div>
 
-      {/* 3. MODAL: ADD MEMBERS */}
-      <AddMembersModal
-        show={showAddMembersModal}
-        onClose={() => setShowAddMembersModal(false)}
-        darkMode={darkMode}
-        employees={employees}
-        project={project}
-        onAddMembers={handleAddMembers}
-        updatingMembers={updatingMembers}
-        modalError={modalError}
-        setModalError={setModalError}
-      />
+      {/* 3. SPRINTS LIST VIEW */}
+      <div className={`mt-8 p-6 rounded-3xl border ${
+        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/40'
+      }`}>
+        {/* Project Sub-Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center">
+              <FolderKanban className="w-5 h-5 text-orange-500" />
+            </div>
+            <div>
+              <h2 className="font-extrabold text-lg leading-tight text-left">Project Sprints & Milestones</h2>
+              <p className="text-xs text-slate-400 mt-0.5 text-left">Browse active sprints and click to view detailed task distributions</p>
+            </div>
+          </div>
 
-      {/* 4. MODAL: UPLOAD SPRINT */}
-      {showUploadSprintModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
+          <span className="text-xs font-semibold text-slate-400">
+            {sprintListDetails.length} Sprints Loaded
+          </span>
+        </div>
+
+        {/* SPRINTS LIST VIEW TABLE */}
+        {sprintListDetails.length > 0 ? (
+          <div className={`border rounded-3xl overflow-hidden ${
+            darkMode ? 'border-slate-800' : 'border-slate-100'
+          }`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[600px]">
+                <thead>
+                  <tr className={`text-[10px] font-black tracking-wider uppercase border-b ${
+                    darkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
+                  }`}>
+                    <th className="py-4 px-5">Sprint / Milestone Name</th>
+                    <th className="py-4 px-5 w-32 text-center">Total Tasks</th>
+                    <th className="py-4 px-5 w-40">Start Date</th>
+                    <th className="py-4 px-5 w-40">End Date</th>
+                    <th className="py-4 px-5 w-24"></th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y text-xs text-left ${
+                  darkMode ? 'divide-slate-800/60' : 'divide-slate-100'
+                }`}>
+                  {sprintListDetails.map((sprint, idx) => (
+                    <tr 
+                      key={idx} 
+                      onClick={() => navigate(`/projects/${projectId}/sprints/${encodeURIComponent(sprint.name)}`)}
+                      className={`transition-all duration-150 cursor-pointer ${
+                        darkMode ? 'bg-slate-900/40 hover:bg-slate-850/60 text-slate-330' : 'bg-white hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {/* Name */}
+                      <td className="py-4 px-5 font-extrabold text-sm text-slate-800 dark:text-white">
+                        {sprint.name}
+                      </td>
+
+                      {/* Total Tasks */}
+                      <td className="py-4 px-5 text-center font-bold">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                          darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {sprint.totalTasks}
+                        </span>
+                      </td>
+
+                      {/* Start Date */}
+                      <td className="py-4 px-5 font-semibold text-slate-400">
+                        {sprint.startDate}
+                      </td>
+
+                      {/* End Date */}
+                      <td className="py-4 px-5 font-semibold text-slate-400">
+                        {sprint.endDate}
+                      </td>
+
+                      {/* Chevron Link indicator */}
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex justify-end">
+                          <ChevronRight className="w-5 h-5 text-slate-400 hover:text-orange-500 transition-colors" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="py-16 flex flex-col items-center justify-center text-center">
+            <Layers className="w-12 h-12 text-slate-350 dark:text-slate-750 mb-3 animate-pulse" />
+            <h5 className="font-extrabold text-slate-400 text-sm">No Sprints Uploaded Yet</h5>
+            <p className="text-xs text-slate-400 mt-1 mb-4">Click "Upload Sprint" at the top to import tasks from an Excel template.</p>
+          </div>
+        )}
+      </div>
+
+      {/* 3. MODAL: ADD MEMBERS */}
+      {showAddMembersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
           <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
             darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             {/* Header */}
             <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
               <div className="text-left">
-                <h3 className="font-extrabold text-base tracking-tight">Upload Sprint Data</h3>
-                <p className="text-xs text-slate-400">Import sprints, sprint metrics, and task backlogs</p>
+                <h3 className="font-extrabold text-base tracking-tight">Add Team Members</h3>
+                <p className="text-xs text-slate-400">Select employees to allocate to this project</p>
               </div>
               <button
                 onClick={() => {
-                  setShowUploadSprintModal(false);
-                  setUploadFile(null);
-                  setUploadState('idle');
+                  setShowAddMembersModal(false);
+                  setSelectedNewMembers([]);
+                  setMemberSearchQuery('');
+                  setModalError(null);
                 }}
                 className={`p-2 rounded-xl transition-colors ${
                   darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
@@ -689,112 +844,161 @@ export default function ProjectDetail() {
               </button>
             </div>
 
-            {/* Dropzone / Upload Progress */}
-            <div className="p-6">
-              {uploadState === 'idle' && (
-                <div
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
-                    dragActive
-                      ? 'border-orange-500 bg-orange-500/5'
-                      : darkMode
-                        ? 'border-slate-800 bg-slate-950/50 hover:border-slate-700'
-                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50'
-                  }`}
-                  onClick={() => document.getElementById('sprint-file-input').click()}
-                >
+            {/* Content & List */}
+            <form onSubmit={handleAddMembersSubmit}>
+              <div className="p-6 space-y-4 max-h-[350px] overflow-y-auto">
+                {/* Search Bar */}
+                <div className="relative">
                   <input
-                    id="sprint-file-input"
-                    type="file"
-                    accept=".json,.xlsx,.csv,.xls"
-                    className="hidden"
-                    onChange={handleFileSelect}
+                    type="text"
+                    placeholder="Search by name or role..."
+                    value={memberSearchQuery}
+                    onChange={(e) => setMemberSearchQuery(e.target.value)}
+                    className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-indigo-500 transition-colors ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800 text-white'
+                        : 'bg-white border-slate-200 text-slate-800'
+                    }`}
                   />
-                  <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 mb-3">
-                    <UploadCloud className="w-6 h-6" />
-                  </div>
-                  <h5 className="font-black text-sm mb-1">Drag and drop file here</h5>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-4">
-                    JSON, EXCEL or CSV files (max 5MB)
-                  </p>
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
-                  >
-                    Select File
-                  </button>
                 </div>
-              )}
 
-              {/* Uploading progress state */}
-              {(uploadState === 'uploading' || uploadState === 'parsing') && (
-                <div className="py-6 flex flex-col items-center text-center space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 animate-pulse">
-                    <FileSpreadsheet className="w-6 h-6" />
+                {/* Error Banner */}
+                {modalError && (
+                  <div className="p-3.5 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold text-left flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>{modalError}</span>
                   </div>
-                  <div className="w-full space-y-1">
-                    <div className="flex justify-between text-xs font-extrabold text-slate-400">
-                      <span>{uploadState === 'uploading' ? 'Uploading sprint file...' : 'Analyzing sprint metadata...'}</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    {/* Linear Progress Bar */}
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500 transition-all duration-150"
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                    {uploadFile?.name} ({(uploadFile?.size / 1024).toFixed(1)} KB)
-                  </span>
-                </div>
-              )}
+                )}
 
-              {/* Success state */}
-              {uploadState === 'success' && (
-                <div className="py-6 flex flex-col items-center text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/25 flex items-center justify-center text-emerald-500 scale-100 transition-transform">
-                    <Check className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h5 className="font-extrabold text-slate-800 dark:text-white text-base">
-                      Sprint Successfully Synced!
-                    </h5>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Task breakdown, velocities, and timeline loaded into dashboard.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-950/50 rounded-2xl w-full border border-slate-100 dark:border-slate-850 flex items-center gap-3 text-left">
-                    <FileSpreadsheet className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <div className="truncate">
-                      <span className="block text-xs font-black text-slate-800 dark:text-white truncate">
-                        {uploadFile?.name}
-                      </span>
-                      <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                        Imported 12 new sprint tasks
-                      </span>
+                {/* Employees List */}
+                <div className="space-y-2">
+                  {availableEmployees.length > 0 ? (
+                    availableEmployees.map((emp) => {
+                      const isSelected = selectedNewMembers.includes(emp.id);
+                      return (
+                        <div
+                          key={emp.id}
+                          onClick={() => toggleSelectNewMember(emp.id)}
+                          className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                            isSelected
+                              ? 'border-indigo-500 bg-indigo-500/5'
+                              : darkMode
+                                ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                                : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 text-left">
+                            <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-xs">
+                              {getInitials(emp.user.full_name)}
+                            </div>
+                            <div>
+                              <span className="block text-xs font-black text-slate-800 dark:text-white">
+                                {emp.user.full_name}
+                              </span>
+                              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                  {emp.designation}
+                                </span>
+                                {project.skills && project.skills.length > 0 && emp.skills && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {emp.skills
+                                      .filter((s) => project.skills.some(ps => ps.id === s.id))
+                                      .map((s) => (
+                                        <span
+                                          key={s.id}
+                                          className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20"
+                                        >
+                                          {s.name}
+                                        </span>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Selected Check Indicator */}
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
+                            isSelected
+                              ? 'bg-indigo-500 border-indigo-500 text-white'
+                              : 'border-slate-300 dark:border-slate-700'
+                          }`}>
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                      No other eligible employees found.
                     </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUploadSprintModal(false);
-                      setUploadFile(null);
-                      setUploadState('idle');
-                    }}
-                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-emerald-500/15 mt-2"
-                  >
-                    Done
-                  </button>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddMembersModal(false);
+                    setSelectedNewMembers([]);
+                    setMemberSearchQuery('');
+                    setModalError(null);
+                  }}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
+                    darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingMembers || selectedNewMembers.length === 0}
+                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                >
+                  {updatingMembers ? (
+                    <div className="flex items-center gap-1">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    `Add ${selectedNewMembers.length} member(s)`
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
+
+      {/* Toast Alert */}
+      {successAlert && (
+        <div className="fixed bottom-6 right-6 bg-emerald-500 text-white px-5 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 animate-slide-up border border-emerald-400/20">
+          <CheckCircle2 className="w-5 h-5" />
+          <span className="text-sm font-semibold">{successAlert}</span>
+          <button onClick={() => setSuccessAlert(null)} className="hover:text-emerald-100 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 4. MODAL: UPLOAD SPRINT */}
+      {project && (
+        <TaskUploadModal
+          isOpen={showUploadSprintModal}
+          onClose={() => setShowUploadSprintModal(false)}
+          darkMode={darkMode}
+          activeProject={project.name}
+          projects={{
+            [project.name]: {
+              id: project.id || '',
+              name: project.name || '',
+              sprints: {}
+            }
+          }}
+          onImportSuccess={handleImportSuccess}
+        />
       )}
 
     </div>
