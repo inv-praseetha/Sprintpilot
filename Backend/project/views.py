@@ -27,13 +27,13 @@ class ProjectCreateView(APIView):
 
     def get(self, request, *args, **kwargs):
         # Query optimization: select_related & prefetch_related
-        projects = Project.objects.select_related(
+        projects = Project.objects.filter(is_deleted=False).select_related(
             "created_by",
             "team_lead"
         ).prefetch_related(
             "members__employee_profile__user",
             "project_stack__skill"
-        ).all()
+        )
         # Apply filters based on query parameters
         name = request.query_params.get('name')
         if name:
@@ -62,7 +62,7 @@ class ProjectCreateView(APIView):
         )
 
         # Query optimization for response object representation
-        project = Project.objects.select_related(
+        project = Project.objects.filter(is_deleted=False).select_related(
             "created_by", 
             "team_lead"
         ).prefetch_related(
@@ -124,7 +124,7 @@ class ProjectDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return Project.objects.select_related(
+            return Project.objects.filter(is_deleted=False).select_related(
                 "created_by", 
                 "team_lead"
             ).prefetch_related(
@@ -154,7 +154,7 @@ class ProjectDetailView(APIView):
             validated_data=serializer.validated_data
         )
 
-        refreshed_project = Project.objects.select_related(
+        refreshed_project = Project.objects.filter(is_deleted=False).select_related(
             "created_by", 
             "team_lead"
         ).prefetch_related(
@@ -170,6 +170,7 @@ class ProjectDetailView(APIView):
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        project.delete()
+        project.is_deleted = True
+        project.save(update_fields=["is_deleted", "updated_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
