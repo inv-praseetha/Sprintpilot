@@ -86,8 +86,6 @@ export default function ProjectDetail() {
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
 
   // Add Member State
-  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [updatingMembers, setUpdatingMembers] = useState(false);
 
   // Success Toast Alert State
@@ -218,18 +216,22 @@ export default function ProjectDetail() {
       .toUpperCase();
   };
 
-  // Add selected members to project
-  const handleAddMembersSubmit = async (e) => {
-    e.preventDefault();
-    if (selectedNewMembers.length === 0) return;
+  const handleAddMembers = async (selectedIds, onSuccessCallback) => {
+    if (selectedIds.length === 0) return;
+
+    const currentMemberIds = project.members.map(m => m.id);
+    const updatedMemberIds = [...currentMemberIds, ...selectedIds];
+
+    if (project.team_size && updatedMemberIds.length > project.team_size) {
+      setModalError(`Cannot allocate more members than the project team size of ${project.team_size}. You have ${currentMemberIds.length} current members and selected ${selectedIds.length} new members (total ${updatedMemberIds.length}).`);
+      return;
+    }
 
     setUpdatingMembers(true);
+    setModalError(null);
     try {
       // Create member UUID list to submit
       // Note: Backend expect profile UUIDs
-      const currentMemberIds = project.members.map(m => m.id);
-      const updatedMemberIds = [...currentMemberIds, ...selectedNewMembers];
-
       const requestData = {
         name: project.name,
         description: project.description || null,
@@ -241,13 +243,13 @@ export default function ProjectDetail() {
         team_lead: project.team_lead?.id || null,
         members: updatedMemberIds,
         skills: project.skills.map(s => s.id),
-        team_size: updatedMemberIds.length
+        team_size: project.team_size
       };
 
       const res = await apiClient.put(`projects/${projectId}/`, requestData);
       setProject(res.data);
       setShowAddMembersModal(false);
-      setSelectedNewMembers([]);
+      if (onSuccessCallback) onSuccessCallback();
     } catch (err) {
       console.error('[ProjectDetail] Error adding members:', err);
       alert(err.response?.data?.detail || 'Failed to add members.');
@@ -395,7 +397,7 @@ export default function ProjectDetail() {
           <div className="flex items-center gap-3 w-full md:w-auto">
             <button
               onClick={() => setShowAddMembersModal(true)}
-              className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/10"
+              className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/10"
             >
               <UserPlus className="w-4 h-4" />
               Add Members
@@ -507,23 +509,45 @@ export default function ProjectDetail() {
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Required Skills</h4>
                 
-                <div className="flex items-start gap-3">
-                  <Code className="w-4 h-4 text-slate-400 mt-0.5" />
-                  <div className="flex flex-wrap gap-2">
-                    {project.skills && project.skills.length > 0 ? (
-                      project.skills.map((skill) => (
-                        <span
-                          key={skill.id}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 rounded-lg text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
-                        >
-                          {skill.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm font-extrabold text-slate-400">No specific skills listed.</span>
-                    )}
-                  </div>
-                </div>
+                {(() => {
+                  const effectiveSkills = getEffectiveSkills(project);
+                  const uniqueCats = Array.from(new Set(effectiveSkills.map(s => s.category).filter(Boolean)));
+                  return (
+                    <div className="space-y-3">
+                      {/* Unique Categories */}
+                      {uniqueCats.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pl-7">
+                          {uniqueCats.map((cat) => (
+                            <span
+                              key={cat}
+                              className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-500/10 rounded-md text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-3">
+                        <Code className="w-4 h-4 text-slate-400 mt-0.5" />
+                        <div className="flex flex-wrap gap-2">
+                          {effectiveSkills.length > 0 ? (
+                            effectiveSkills.map((skill) => (
+                              <span
+                                key={skill.id}
+                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-blue-500/10 rounded-lg text-blue-650 dark:text-blue-400 border border-blue-500/20"
+                              >
+                                {skill.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm font-extrabold text-slate-400">No specific skills listed.</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Administrative metadata / limits */}
@@ -572,9 +596,47 @@ export default function ProjectDetail() {
           </span>
         </div>
 
-        {project.members && project.members.length > 0 ? (
+        {(project.team_lead || (project.members && project.members.length > 0)) ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
-            {project.members.map((member) => (
+            {/* Prepend Team Lead if exists */}
+            {project.team_lead && (
+              <div
+                className={`p-4 rounded-2xl border flex items-center justify-between transition-all group ${
+                  darkMode 
+                    ? 'bg-slate-900/60 border-slate-800' 
+                    : 'bg-white border-slate-100 shadow-sm shadow-slate-100/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-sm">
+                    {getInitials(project.team_lead.full_name)}
+                  </div>
+                  <div>
+                    <h5 className={`font-extrabold text-sm flex items-center gap-1.5 ${
+                      darkMode ? 'text-white' : 'text-slate-800'
+                    }`}>
+                      {project.team_lead.full_name}
+                      <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                        Lead
+                      </span>
+                    </h5>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                        Team Lead
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 block font-medium">
+                      {project.team_lead.email}
+                    </span>
+                  </div>
+                </div>
+                {/* Empty container to align layout with members who have a remove button */}
+                <div />
+              </div>
+            )}
+
+            {/* Render Members */}
+            {project.members && project.members.map((member) => (
               <div
                 key={member.id}
                 className={`p-4 rounded-2xl border flex items-center justify-between transition-all group ${
@@ -584,11 +646,13 @@ export default function ProjectDetail() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-500 font-black text-sm">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-sm">
                     {getInitials(member.user.full_name)}
                   </div>
                   <div>
-                    <h5 className="font-extrabold text-sm text-slate-800 dark:text-white">
+                    <h5 className={`font-extrabold text-sm ${
+                      darkMode ? 'text-white' : 'text-slate-800'
+                    }`}>
                       {member.user.full_name}
                     </h5>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-1">
@@ -602,7 +666,7 @@ export default function ProjectDetail() {
                             .map((s) => (
                               <span
                                 key={s.id}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20"
+                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                               >
                                 {s.name}
                               </span>
@@ -636,7 +700,7 @@ export default function ProjectDetail() {
             {isProjectManager && (
               <button
                 onClick={() => setShowAddMembersModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
               >
                 <UserPlus className="w-4 h-4" />
                 Add First Member
