@@ -65,6 +65,13 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         validate_members(attrs.get("members", []))
         validate_skills(attrs.get("skills", []))
         
+        # Validate that assigned members count does not exceed team size
+        team_size = attrs.get("team_size", 0)
+        members_count = len(attrs.get("members", []))
+        if members_count > team_size:
+            from project.exceptions import ProjectValidationException
+            raise ProjectValidationException(f"Cannot assign more members ({members_count}) than the project team size ({team_size}).")
+        
         return attrs
 
 
