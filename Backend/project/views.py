@@ -9,7 +9,7 @@ from project.serializers import (
     ProjectDetailSerializer
 )
 from project.services import ProjectService
-from project.models import Project
+from project.models import Project, ProjectMember
 
 from rest_framework.pagination import PageNumberPagination
 
@@ -184,7 +184,19 @@ class ProjectDetailView(APIView):
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
         
+        # Get member profiles associated with this project to sync later
+        member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))
+        profiles_to_sync = [p.id for p in member_profiles]
+        if project.team_lead:
+            lead_profile = EmployeeProfile.objects.filter(user=project.team_lead).first()
+            if lead_profile:
+                profiles_to_sync.append(lead_profile.id)
+        
         project.is_deleted = True
         project.save(update_fields=["is_deleted", "updated_at"])
+        
+        # Synchronize statuses of all involved profiles
+        ProjectService.sync_employee_statuses(profiles_to_sync)
+                
         return Response(status=status.HTTP_204_NO_CONTENT)
 

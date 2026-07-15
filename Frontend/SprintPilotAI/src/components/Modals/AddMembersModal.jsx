@@ -34,15 +34,15 @@ export default function AddMembersModal({
       const isLead = project.team_lead?.id === emp.user.id;
       const isMember = currentMemberUserIds.includes(emp.user.id);
       const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-                            emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
+        emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
       return !isLead && !isMember && matchesSearch;
     });
   }, [employees, project, memberSearchQuery]);
 
   const toggleSelectNewMember = (profileId) => {
-    setSelectedNewMembers(prev => 
-      prev.includes(profileId) 
-        ? prev.filter(id => id !== profileId) 
+    setSelectedNewMembers(prev =>
+      prev.includes(profileId)
+        ? prev.filter(id => id !== profileId)
         : [...prev, profileId]
     );
   };
@@ -68,9 +68,8 @@ export default function AddMembersModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
-      <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
-        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-      }`}>
+      <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+        }`}>
         {/* Header */}
         <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
           <div className="text-left">
@@ -79,9 +78,8 @@ export default function AddMembersModal({
           </div>
           <button
             onClick={handleClose}
-            className={`p-2 rounded-xl transition-colors cursor-pointer ${
-              darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-            }`}
+            className={`p-2 rounded-xl transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+              }`}
           >
             <X className="w-4 h-4" />
           </button>
@@ -97,11 +95,10 @@ export default function AddMembersModal({
                 placeholder="Search by name or role..."
                 value={memberSearchQuery}
                 onChange={(e) => setMemberSearchQuery(e.target.value)}
-                className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-blue-500 transition-colors ${
-                  darkMode
+                className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-orange-500 transition-colors ${darkMode
                     ? 'bg-slate-950 border-slate-800 text-white'
                     : 'bg-white border-slate-200 text-slate-800'
-                }`}
+                  }`}
               />
             </div>
 
@@ -122,7 +119,7 @@ export default function AddMembersModal({
                       setSelectedNewMembers(prev => Array.from(new Set([...prev, ...allIds])));
                     }
                   }}
-                  className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer bg-transparent border-none outline-none"
+                  className="text-[10px] font-bold text-orange-550 dark:text-orange-400 hover:underline cursor-pointer bg-transparent border-none outline-none"
                 >
                   {availableEmployees.every(e => selectedNewMembers.includes(e.id)) ? 'Deselect All' : 'Select All'}
                 </button>
@@ -138,20 +135,18 @@ export default function AddMembersModal({
                     <div
                       key={emp.id}
                       onClick={() => toggleSelectNewMember(emp.id)}
-                      className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-blue-500 bg-blue-500/5'
+                      className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isSelected
+                          ? 'border-orange-500 bg-orange-500/5'
                           : darkMode
                             ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
                             : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3 text-left">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs border transition-colors ${
-                          isSelected
-                            ? 'bg-blue-500/20 border-blue-500/30 text-blue-600 dark:text-blue-400'
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs border transition-colors ${isSelected
+                            ? 'bg-orange-500/20 border-orange-500/30 text-orange-600 dark:text-orange-400'
                             : 'bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800/80'
-                        }`}>
+                          }`}>
                           {getInitials(emp.user.full_name)}
                         </div>
                         <div>
@@ -162,6 +157,15 @@ export default function AddMembersModal({
                             <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                               {emp.designation}
                             </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                              emp.status === 'BUSY'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
+                                : emp.status === 'ACTIVE'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 border border-indigo-500/20'
+                            }`}>
+                              {emp.status || 'ACTIVE'}
+                            </span>
                             {project.skills && project.skills.length > 0 && emp.skills && (
                               <div className="flex flex-wrap gap-1">
                                 {emp.skills
@@ -169,7 +173,7 @@ export default function AddMembersModal({
                                   .map((s) => (
                                     <span
                                       key={s.id}
-                                      className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                      className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20"
                                     >
                                       {s.name}
                                     </span>
@@ -181,11 +185,10 @@ export default function AddMembersModal({
                       </div>
 
                       {/* Selected Check Indicator */}
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
-                        isSelected
-                          ? 'bg-blue-500 border-blue-500 text-white'
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${isSelected
+                          ? 'bg-orange-500 border-orange-500 text-white'
                           : 'border-slate-300 dark:border-slate-700'
-                      }`}>
+                        }`}>
                         {isSelected && <Check className="w-3 h-3" />}
                       </div>
                     </div>
@@ -209,20 +212,19 @@ export default function AddMembersModal({
           )}
 
           {/* Footer */}
-          <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-100/30">
+          <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
             <button
               type="button"
               onClick={handleClose}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${
-                darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-              }`}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
+                }`}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={updatingMembers || selectedNewMembers.length === 0}
-              className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+              className="px-5 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-orange-500/10 cursor-pointer"
             >
               {updatingMembers ? (
                 <div className="flex items-center gap-1">

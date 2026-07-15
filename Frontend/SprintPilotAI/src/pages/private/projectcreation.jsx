@@ -341,6 +341,7 @@ export default function ProjectCreation() {
         : await apiClient.post('projects/', requestData);
 
       fetchProjects();
+      fetchMetadata();
       setShowModal(false);
       resetForm();
     } catch (err) {
@@ -393,6 +394,7 @@ export default function ProjectCreation() {
     try {
       await apiClient.delete(`projects/${projectId}/`);
       fetchProjects();
+      fetchMetadata();
     } catch (err) {
       console.error("Error deleting project:", err);
       alert(err.response?.data?.detail || err.message || "Failed to delete project.");

@@ -342,6 +342,15 @@ export default function ProjectForm({
                       <span className="text-[9px] text-slate-400 block font-bold truncate">
                         {empProfile.designation || 'Developer'}
                       </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                        empProfile.status === 'BUSY'
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
+                          : empProfile.status === 'ACTIVE'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
+                            : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                      }`}>
+                        {empProfile.status || 'ACTIVE'}
+                      </span>
                       {selectedSkills.length > 0 && empProfile.skills && (
                         <div className="flex flex-wrap gap-1">
                           {empProfile.skills
