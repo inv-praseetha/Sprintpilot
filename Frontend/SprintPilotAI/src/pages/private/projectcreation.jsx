@@ -316,6 +316,12 @@ export default function ProjectCreation() {
     }
   };
 
+  const handleRowClick = (e, projectId) => {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('svg')) {
+      return;
+    }
+    navigate(`/projects/${projectId}`);
+  };
 
   const toggleMemberSelection = (id) => {
     setSelectedMembers(prev => 
@@ -470,7 +476,8 @@ export default function ProjectCreation() {
                 {filteredProjects.map((project) => (
                   <tr
                     key={project.id}
-                    className="text-sm font-semibold transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20"
+                    onClick={(e) => handleRowClick(e, project.id)}
+                    className="text-sm font-semibold transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20 cursor-pointer"
                   >
                     {/* Project Title & Description */}
                     <td className="py-5 px-6 max-w-sm">
@@ -552,7 +559,7 @@ export default function ProjectCreation() {
                           project.skills.slice(0, 3).map((skill) => (
                             <span
                               key={skill.id}
-                              className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-150/40 dark:border-slate-800"
+                              className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
                             >
                               {skill.name}
                             </span>

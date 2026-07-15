@@ -72,7 +72,7 @@ class Employee(models.Model):
 
 class EmployeeProfile(models.Model):
     class Status(models.TextChoices):
-        WFH = "WFH", "Work From Home"
+        WFH = "WFM", "WFM"
         ACTIVE = "ACTIVE", "Active"
         BUSY = "BUSY", "Busy"
 
