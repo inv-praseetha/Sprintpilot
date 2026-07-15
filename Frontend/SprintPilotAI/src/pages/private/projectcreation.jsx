@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import ProjectModal from '../../components/Modals/projectmodal';
 import ProjectForm from '../../components/Modals/projectform';
@@ -232,7 +232,7 @@ export default function ProjectCreation() {
     const filteredEmployeesForSelection = useMemo(() => {
       if (selectedSkills.length === 0) return employees;
       return employees.filter(emp =>
-        emp.skills && selectedSkills.every(skillId => emp.skills.some(empSkill => empSkill.id === skillId))
+        emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => empSkill.id === skillId))
       );
     }, [employees, selectedSkills]);
 
@@ -262,6 +262,7 @@ export default function ProjectCreation() {
       setSubmitting(false);
       return;
     }
+    let computedDays = numberOfDays ? parseInt(numberOfDays, 10) : null;
     if (type === 'WATERFALL') {
       if (!startDate || !endDate) {
         setFormError("Start Date and End Date are required for Waterfall projects.");
@@ -273,6 +274,10 @@ export default function ProjectCreation() {
         setSubmitting(false);
         return;
       }
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end - start);
+      computedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     } else {
       // AGILE requires number of days
       if (!numberOfDays || parseInt(numberOfDays, 10) <= 0) {
@@ -304,7 +309,7 @@ export default function ProjectCreation() {
       type,
       start_date: startDate || null,
       end_date: endDate || null,
-      number_of_days: numberOfDays ? parseInt(numberOfDays, 10) : null,
+      number_of_days: computedDays,
       team_lead: teamLead,
       members: selectedMembers,
       skills: selectedSkills,
@@ -564,7 +569,12 @@ export default function ProjectCreation() {
                         <span className={`block font-extrabold text-base tracking-tight ${
                           darkMode ? 'text-white' : 'text-slate-900'
                         }`}>
-                          {project.name}
+                          <Link 
+                            to={`/projects/${project.id}`} 
+                            className="hover:text-orange-500 transition-colors cursor-pointer"
+                          >
+                            {project.name}
+                          </Link>
                         </span>
                         <span className="block text-slate-400 text-xs font-medium line-clamp-2 leading-relaxed">
                           {project.description || 'No description provided.'}

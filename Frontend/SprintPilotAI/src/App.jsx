@@ -6,6 +6,7 @@ import Test from './pages/private/test';
 import NotFound from './pages/public/NotFound';
 import Login from './pages/auth/login';
 import ProjectCreation from './pages/private/projectcreation';
+import ProjectDetail from './pages/private/projectdetail';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
             <Routes>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/projects" element={<ProjectCreation/>} />
+              <Route path="/projects/:projectId" element={<ProjectDetail />} />
               <Route path="/test" element={<Test />} />
               {/* Fallback to 404 page */}
               <Route path="*" element={<NotFound />} />
