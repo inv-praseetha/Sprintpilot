@@ -15,7 +15,7 @@ const projectsData = {
   'AI Analytics Hub': [
     { name: 'Sprint 1', startDate: '2026-04-15', endDate: '2026-04-28', status: 'Completed', completedTasks: 8, activeTasks: 0 },
     { name: 'Sprint 2', startDate: '2026-04-29', endDate: '2026-05-12', status: 'Completed', completedTasks: 10, activeTasks: 0 },
-    { name: 'Sprint 3', startDate: '2026-05-13', endDate: '2026-05-26', status: 'Delayed', completedTasks: 4, activeTasks: 9 },
+    { name: 'Sprint 3', startDate: '2026-05-13', endDate: '2026-05-26', status: 'Completed', completedTasks: 13, activeTasks: 0 },
     { name: 'Sprint 4', startDate: '2026-05-27', endDate: '2026-06-09', status: 'Completed', completedTasks: 14, activeTasks: 0 },
     { name: 'Sprint 5', startDate: '2026-06-10', endDate: '2026-06-23', status: 'Completed', completedTasks: 12, activeTasks: 0 },
     { name: 'Sprint 6', startDate: '2026-06-24', endDate: '2026-07-07', status: 'In Progress', completedTasks: 5, activeTasks: 8 }
@@ -24,16 +24,25 @@ const projectsData = {
     { name: 'Sprint 1', startDate: '2026-06-01', endDate: '2026-06-14', status: 'Completed', completedTasks: 20, activeTasks: 0 },
     { name: 'Sprint 2', startDate: '2026-06-15', endDate: '2026-06-28', status: 'Completed', completedTasks: 16, activeTasks: 0 },
     { name: 'Sprint 3', startDate: '2026-06-29', endDate: '2026-07-12', status: 'In Progress', completedTasks: 7, activeTasks: 10 },
-    { name: 'Sprint 4', startDate: '2026-07-13', endDate: '2026-07-26', status: 'Planned', completedTasks: 0, activeTasks: 0 },
-    { name: 'Sprint 5', startDate: '2026-07-27', endDate: '2026-08-09', status: 'Planned', completedTasks: 0, activeTasks: 0 },
-    { name: 'Sprint 6', startDate: '2026-08-10', endDate: '2026-08-23', status: 'Planned', completedTasks: 0, activeTasks: 0 }
+    { name: 'Sprint 4', startDate: '2026-07-13', endDate: '2026-07-26', status: 'Not Planned', completedTasks: 0, activeTasks: 0 },
+    { name: 'Sprint 5', startDate: '2026-07-27', endDate: '2026-08-09', status: 'Not Planned', completedTasks: 0, activeTasks: 0 },
+    { name: 'Sprint 6', startDate: '2026-08-10', endDate: '2026-08-23', status: 'Not Planned', completedTasks: 0, activeTasks: 0 }
+  ],
+  'Security Gateway': [
+    { name: 'Sprint 1', startDate: '2026-05-15', endDate: '2026-05-28', status: 'Completed', completedTasks: 6, activeTasks: 0 },
+    { name: 'Sprint 2', startDate: '2026-05-29', endDate: '2026-06-11', status: 'Completed', completedTasks: 9, activeTasks: 0 },
+    { name: 'Sprint 3', startDate: '2026-06-12', endDate: '2026-06-25', status: 'Completed', completedTasks: 11, activeTasks: 0 },
+    { name: 'Sprint 4', startDate: '2026-06-26', endDate: '2026-07-09', status: 'Completed', completedTasks: 8, activeTasks: 0 },
+    { name: 'Sprint 5', startDate: '2026-07-10', endDate: '2026-07-23', status: 'Delayed', completedTasks: 4, activeTasks: 5 },
+    { name: 'Sprint 6', startDate: '2026-07-24', endDate: '2026-08-06', status: 'Not Planned', completedTasks: 0, activeTasks: 0 }
   ]
 };
 
 const projectConfig = {
   'Cloud Sync Platform': { color: '#ea580c' },
   'AI Analytics Hub': { color: '#3b82f6' },
-  'Developer Portal': { color: '#d946ef' }
+  'Developer Portal': { color: '#d946ef' },
+  'Security Gateway': { color: '#8b5cf6' }
 };
 
 // Team performance data
@@ -129,8 +138,9 @@ const Dashboard = () => {
   const longestSprintsProject = useMemo(() => {
     let longest = [];
     Object.values(projectsData).forEach(sprints => {
-      if (sprints.length > longest.length) {
-        longest = sprints;
+      const filtered = sprints.filter(s => s.status !== 'Not Planned');
+      if (filtered.length > longest.length) {
+        longest = filtered;
       }
     });
     return longest;
@@ -209,6 +219,58 @@ const Dashboard = () => {
       m.role.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery]);
+
+  const sprintBoxesData = useMemo(() => {
+    const list = [];
+    Object.entries(projectsData).forEach(([projName, sprints]) => {
+      sprints.forEach((sprint) => {
+        if (sprint.status === 'In Progress' || sprint.status === 'Delayed') {
+          list.push({
+            project: projName,
+            sprint: sprint,
+            sprintsHistory: sprints.filter(s => s.status !== 'Not Planned')
+          });
+        }
+      });
+    });
+    return list;
+  }, []);
+
+  const formatBoxDateRange = (start, end) => {
+    if (!start || !end) return 'Planned';
+    const opt = { month: 'short', day: '2-digit' };
+    const s = new Date(start).toLocaleDateString('en-US', opt);
+    const e = new Date(end).toLocaleDateString('en-US', opt);
+    return `${s} - ${e}`;
+  };
+
+  const getProjectSparklinePath = (sprintsHistory) => {
+    const maxVal = Math.max(...sprintsHistory.map(s => s.completedTasks), 1);
+    const width = 100;
+    const height = 30;
+    const padding = 4;
+    const points = sprintsHistory.map((s, idx) => {
+      const x = padding + (idx / (sprintsHistory.length - 1)) * (width - 2 * padding);
+      const y = height - padding - (s.completedTasks / maxVal) * (height - 2 * padding);
+      return `${x},${y}`;
+    });
+    return `M ${points.join(' L ')}`;
+  };
+
+  const getProjectSparklineAreaPath = (sprintsHistory) => {
+    const maxVal = Math.max(...sprintsHistory.map(s => s.completedTasks), 1);
+    const width = 100;
+    const height = 30;
+    const padding = 4;
+    const points = sprintsHistory.map((s, idx) => {
+      const x = padding + (idx / (sprintsHistory.length - 1)) * (width - 2 * padding);
+      const y = height - padding - (s.completedTasks / maxVal) * (height - 2 * padding);
+      return `${x},${y}`;
+    });
+    const firstX = padding;
+    const lastX = width - padding;
+    return `M ${firstX},${height} L ${points.join(' L ')} L ${lastX},${height} Z`;
+  };
 
   return (
     <main className="p-8 lg:p-10 space-y-8 mx-auto">
@@ -312,14 +374,106 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* CHARTS SECTION - Dynamic Sprint Schedule & Status */}
-      <section className={`p-6 rounded-3xl border relative ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-        }`}>
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
-          <div className="text-left">
-            <h3 className="font-bold text-lg">Sprint Schedule & Status</h3>
-            <span className="text-xs text-slate-400">Track timelines, status, and task load for project sprints</span>
-          </div>
+      {/* CHARTS GRID SECTION */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left: 2x2 Sprint Boxes */}
+        <div className="xl:col-span-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {sprintBoxesData.map((item, index) => {
+            const config = projectConfig[item.project] || { color: '#94a3b8' };
+            const sprint = item.sprint;
+            return (
+              <div 
+                key={`${item.project}-${sprint.name}`}
+                className={`p-5 rounded-3xl border transition-all duration-300 flex flex-col justify-between ${
+                  sprint.status === 'Delayed'
+                    ? (darkMode 
+                        ? 'bg-slate-900 border-rose-500/40 text-white shadow-lg shadow-rose-950/20' 
+                        : 'bg-rose-50/10 border-rose-100 text-slate-800 hover:shadow-xl hover:shadow-rose-100/50')
+                    : (darkMode 
+                        ? 'bg-slate-900 border-slate-800 text-white' 
+                        : 'bg-white border-slate-100 text-slate-800 hover:shadow-xl hover:shadow-slate-100/50')
+                }`}
+              >
+                <div>
+                  {/* Project Name & Color Dot */}
+                  <div className="flex items-center gap-1.5 mb-2 text-[10px] font-bold tracking-wider uppercase text-slate-400">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: config.color }} />
+                    <span className="truncate text-left">{item.project}</span>
+                  </div>
+
+                  {/* Sprint Name (without Status Badge) */}
+                  <div className="mb-1 text-left">
+                    <span className="text-sm font-extrabold tracking-tight">{sprint.name}</span>
+                  </div>
+                  
+                  <div className="text-[10px] text-slate-400 font-semibold tracking-wide text-left mb-3">
+                    {formatBoxDateRange(sprint.startDate, sprint.endDate)}
+                  </div>
+                </div>
+
+                {/* Sparkline of project history in Centre with increased size */}
+                {(() => {
+                  const sparklineColor = sprint.status === 'Delayed' ? '#f43f5e' : '#10b981';
+                  return (
+                    <div className="w-full h-16 my-3 overflow-visible">
+                      <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id={`grad-${index}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={sparklineColor} stopOpacity="0.25" />
+                            <stop offset="100%" stopColor={sparklineColor} stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d={getProjectSparklineAreaPath(item.sprintsHistory)}
+                          fill={`url(#grad-${index})`}
+                        />
+                        <path
+                          d={getProjectSparklinePath(item.sprintsHistory)}
+                          fill="none"
+                          stroke={sparklineColor}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  );
+                })()}
+
+                {/* Progress Details & History at the bottom */}
+                <div className="grid grid-cols-3 gap-2 text-left pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">Done</span>
+                    <span className="text-xs font-extrabold text-emerald-500">{sprint.completedTasks} Tasks</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">Active</span>
+                    <span className={`text-xs font-extrabold ${sprint.status === 'Delayed' ? 'text-rose-500' : 'text-indigo-500'}`}>
+                      {sprint.activeTasks} Tasks
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
+                      History
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium block">
+                      {item.sprintsHistory.length} Sprints
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right: Resized Main Graph */}
+        <section className={`xl:col-span-2 p-6 rounded-3xl border relative ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+          }`}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
+            <div className="text-left">
+              <h3 className="font-bold text-lg">Sprint Schedule & Status</h3>
+              <span className="text-xs text-slate-400">Track timelines, status, and task load for project sprints</span>
+            </div>
 
           {/* Legends: Status and Projects */}
           <div className="flex flex-wrap items-center gap-6">
@@ -402,10 +556,11 @@ const Dashboard = () => {
               const isHovered = hoveredSprint?.project === projName;
               const hasActiveHover = hoveredSprint !== null;
               const opacity = hasActiveHover ? (isHovered ? 'opacity-100' : 'opacity-20') : 'opacity-70';
+              const filteredSprints = sprints.filter(s => s.status !== 'Not Planned');
               return (
                 <path
                   key={projName}
-                  d={sprints.map((s, i) => {
+                  d={filteredSprints.map((s, i) => {
                     const x = getX(i);
                     const y = getY(s.completedTasks);
                     return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
@@ -423,13 +578,14 @@ const Dashboard = () => {
               const isHoveredProj = hoveredSprint?.project === projName;
               const hasActiveHover = hoveredSprint !== null;
               const opacity = hasActiveHover ? (isHoveredProj ? 'opacity-100' : 'opacity-20') : 'opacity-100';
+              const filteredSprints = sprints.filter(s => s.status !== 'Not Planned');
 
               return (
                 <g
                   key={projName}
                   className={`transition-all duration-300 ${opacity}`}
                 >
-                  {sprints.map((s, i) => {
+                  {filteredSprints.map((s, i) => {
                     const x = getX(i);
                     const y = getY(s.completedTasks);
                     const style = getStatusStyle(s.status);
@@ -552,6 +708,7 @@ const Dashboard = () => {
           )}
         </div>
       </section>
+      </div>
 
       {/* TEAM PERFORMANCE LIST */}
       <section className={`p-6 rounded-3xl border ${
