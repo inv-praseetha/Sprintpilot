@@ -449,7 +449,7 @@ export default function ProjectDetail() {
                       project.skills.map((skill) => (
                         <span
                           key={skill.id}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-750"
+                          className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 rounded-lg text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
                         >
                           {skill.name}
                         </span>
