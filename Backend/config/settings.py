@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'accounts',
+    'project',
 ]
 
 MIDDLEWARE = [
@@ -191,7 +192,10 @@ REST_FRAMEWORK = {
 
 
 # Simple JWT Configuration
+from datetime import timedelta
 SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'SIGNING_KEY': SECRET_KEY,
     'ALGORITHM': 'HS256',
     'AUTH_HEADER_TYPES': ('Bearer',),

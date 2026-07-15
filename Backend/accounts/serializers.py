@@ -26,3 +26,35 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "role",
         ]
         read_only_fields = fields
+
+
+from accounts.models import EmployeeProfile
+
+class EmployeeProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the EmployeeProfile model.
+    """
+    user = EmployeeSerializer(read_only=True)
+    skills = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeProfile
+        fields = [
+            "id",
+            "user",
+            "designation",
+            "experience_years",
+            "availability_percentage",
+            "current_capacity_hours",
+            "status",
+            "skills",
+        ]
+        read_only_fields = fields
+
+    def get_skills(self, obj):
+        return [
+            {"id": s.id, "name": s.name, "category": s.category}
+            for s in obj.skills.all()
+        ]
+
+
