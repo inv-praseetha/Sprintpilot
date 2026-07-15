@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
 import TaskUploadModal from '../../components/Modals/TaskUploadModal';
+import { getEffectiveSkills } from './projectcreation';
 import {
   FolderKanban,
   Layers,
@@ -86,7 +87,10 @@ export default function ProjectDetail() {
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
 
   // Add Member State
+  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [updatingMembers, setUpdatingMembers] = useState(false);
+  const [modalError, setModalError] = useState(null);
 
   // Success Toast Alert State
   const [successAlert, setSuccessAlert] = useState(null);
@@ -256,6 +260,14 @@ export default function ProjectDetail() {
     } finally {
       setUpdatingMembers(false);
     }
+  };
+
+  const handleAddMembersSubmit = (e) => {
+    e.preventDefault();
+    handleAddMembers(selectedNewMembers, () => {
+      setSelectedNewMembers([]);
+      setMemberSearchQuery('');
+    });
   };
 
   // Remove member from project
@@ -822,6 +834,7 @@ export default function ProjectDetail() {
                   setShowAddMembersModal(false);
                   setSelectedNewMembers([]);
                   setMemberSearchQuery('');
+                  setModalError(null);
                 }}
                 className={`p-2 rounded-xl transition-colors ${
                   darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
@@ -848,6 +861,14 @@ export default function ProjectDetail() {
                     }`}
                   />
                 </div>
+
+                {/* Error Banner */}
+                {modalError && (
+                  <div className="p-3.5 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold text-left flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>{modalError}</span>
+                  </div>
+                )}
 
                 {/* Employees List */}
                 <div className="space-y-2">
@@ -923,6 +944,7 @@ export default function ProjectDetail() {
                     setShowAddMembersModal(false);
                     setSelectedNewMembers([]);
                     setMemberSearchQuery('');
+                    setModalError(null);
                   }}
                   className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
                     darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
