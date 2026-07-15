@@ -106,3 +106,70 @@ class EmployeeProfileListView(APIView):
             profiles = profiles.filter(skills__name__icontains=skill)
         serializer = EmployeeProfileSerializer(profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ProjectDetailView(APIView):
+    """
+    API View to handle individual project operations (Retrieve, Update, Delete).
+    - GET /api/projects/<int:pk>/    : Retrieve details of a project (Authenticated users).
+    - PUT /api/projects/<int:pk>/    : Update a project (Only for Project Managers).
+    - DELETE /api/projects/<int:pk>/ : Delete a project (Only for Project Managers).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method in ['PUT', 'DELETE']:
+            return [IsAuthenticated(), IsProjectManager()]
+        return super().get_permissions()
+
+    def get_object(self, pk):
+        try:
+            return Project.objects.select_related(
+                "created_by", 
+                "team_lead"
+            ).prefetch_related(
+                "members__employee_profile__user", 
+                "project_stack__skill"
+            ).get(pk=pk)
+        except Project.DoesNotExist:
+            return None
+
+    def get(self, request, pk, *args, **kwargs):
+        project = self.get_object(pk)
+        if not project:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProjectDetailSerializer(project)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk, *args, **kwargs):
+        project = self.get_object(pk)
+        if not project:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ProjectCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated_project = ProjectService.update_project(
+            project=project,
+            validated_data=serializer.validated_data
+        )
+
+        refreshed_project = Project.objects.select_related(
+            "created_by", 
+            "team_lead"
+        ).prefetch_related(
+            "members__employee_profile__user", 
+            "project_stack__skill"
+        ).get(id=updated_project.id)
+
+        detail_serializer = ProjectDetailSerializer(refreshed_project)
+        return Response(detail_serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk, *args, **kwargs):
+        project = self.get_object(pk)
+        if not project:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        project.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+

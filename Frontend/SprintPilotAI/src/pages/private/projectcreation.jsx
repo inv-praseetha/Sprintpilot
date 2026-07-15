@@ -18,7 +18,9 @@ import {
   Loader2,
   Filter,
   CheckSquare,
-  ChevronDown
+  ChevronDown,
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 export default function ProjectCreation() {
@@ -38,6 +40,7 @@ export default function ProjectCreation() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -309,8 +312,13 @@ export default function ProjectCreation() {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/api/projects/', {
-        method: 'POST',
+      const url = editingProjectId 
+        ? `http://localhost:8000/api/projects/${editingProjectId}/` 
+        : 'http://localhost:8000/api/projects/';
+      const method = editingProjectId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method: method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -328,7 +336,7 @@ export default function ProjectCreation() {
         setFormError(data.detail || JSON.stringify(data));
       }
     } catch (err) {
-      console.error('Error creating project:', err);
+      console.error('Error saving project:', err);
       setFormError('Failed to connect to the server. Please check your network.');
     } finally {
       setSubmitting(false);
@@ -352,6 +360,48 @@ export default function ProjectCreation() {
     setSkillCategoryFilter('ALL');
     setFormError(null);
   };
+
+  const handleEditProject = (project) => {
+    setEditingProjectId(project.id);
+    setName(project.name || '');
+    setDescription(project.description || '');
+    setStatus(project.status || 'ACTIVE');
+    setType(project.type || 'AGILE');
+    setStartDate(project.start_date || '');
+    setEndDate(project.end_date || '');
+    setNumberOfDays(project.number_of_days ? String(project.number_of_days) : '10');
+    setTeamLead(project.team_lead?.id || '');
+    setSelectedMembers(project.members ? project.members.map(m => m.id || m) : []);
+    setSelectedSkills(project.skills ? project.skills.map(s => s.id || s) : []);
+    setTeamSize(project.team_size ? String(project.team_size) : '0');
+    setFormError(null);
+    setShowModal(true);
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (!window.confirm("Are you sure you want to delete this project?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:8000/api/projects/${projectId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (res.ok) {
+        fetchProjects(token);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.detail || "Failed to delete project.");
+      }
+    } catch (err) {
+      console.error("Error deleting project:", err);
+      alert("Failed to connect to the server. Please check your network.");
+    }
+  };
+
 
   const toggleMemberSelection = (id) => {
     setSelectedMembers(prev => 
@@ -380,7 +430,7 @@ export default function ProjectCreation() {
         <div>
           {isProjectManager ? (
             <button
-              onClick={() => { resetForm(); setShowModal(true); }}
+              onClick={() => { setEditingProjectId(null); resetForm(); setShowModal(true); }}
               className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-lg shadow-orange-500/25 hover:scale-[1.02] cursor-pointer"
             >
               <Plus className="w-5 h-5 stroke-[2.5]" />
@@ -485,126 +535,153 @@ export default function ProjectCreation() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <div
-              key={project.id}
-              className={`p-6.5 rounded-3xl border flex flex-col justify-between transition-all hover:scale-[1.01] ${
-                darkMode 
-                  ? 'bg-slate-900 border-slate-850 hover:border-slate-750' 
-                  : 'bg-white border-slate-100 hover:shadow-2xl hover:shadow-slate-100/70 hover:border-slate-200/50'
-              }`}
-            >
-              <div className="space-y-4.5">
-                {/* Badges Row */}
-                <div className="flex items-center justify-between">
-                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                    project.type === 'AGILE'
-                      ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
-                      : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
-                  }`}>
-                    {project.type}
-                  </span>
-
-                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                    project.status === 'ACTIVE'
-                      ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                      : project.status === 'ON_HOLD'
-                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                        : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
-                  }`}>
-                    {project.status.replace('_', ' ')}
-                  </span>
-                </div>
-
-                {/* Project Title */}
-                <div>
-                  <h3 className="font-extrabold text-2xl tracking-tight line-clamp-1">
-                    {project.name}
-                  </h3>
-                  <p className="text-slate-400 text-xs mt-2 line-clamp-2 leading-relaxed font-medium">
-                    {project.description || 'No description provided.'}
-                  </p>
-                </div>
-
-                {/* Date / Timeline Offset */}
-                <div className={`p-4 rounded-2xl flex items-center justify-between gap-4 text-xs font-bold ${
-                  darkMode ? 'bg-slate-950/60' : 'bg-slate-50/50'
-                }`}>
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Calendar className="w-4.5 h-4.5 text-slate-450" />
-                    {project.start_date ? (
-                      <span>{project.start_date} - {project.end_date || 'Ongoing'}</span>
-                    ) : (
-                      <span>No timeline set</span>
-                    )}
-                  </div>
-                  {project.number_of_days && (
-                    <div className="flex items-center gap-1.5 text-orange-500 font-extrabold">
-                      <Clock className="w-4 h-4" />
-                      <span>{project.number_of_days} Days</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Technical Stack (Skills) */}
-                {project.skills && project.skills.length > 0 && (
-                  <div className="space-y-1.5 text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                      <Code className="w-3 h-3 text-slate-400" /> Technologies / Skills
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {project.skills.map((skill) => (
-                        <span
-                          key={skill.id}
-                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400"
-                        >
-                          {skill.name}
+        <div className={`overflow-hidden rounded-3xl border transition-all ${
+          darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/50'
+        }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-bold text-left uppercase tracking-wider select-none">
+                  <th className="py-5 px-6">Project Details</th>
+                  <th className="py-5 px-4">Type</th>
+                  <th className="py-5 px-4">Status</th>
+                  <th className="py-5 px-4">Timeline</th>
+                  <th className="py-5 px-4">Team Lead</th>
+                  <th className="py-5 px-4">Tech Stack</th>
+                  <th className="py-5 px-6 text-right">Team Size</th>
+                  {isProjectManager && <th className="py-5 px-6 text-right">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-left">
+                {filteredProjects.map((project) => (
+                  <tr
+                    key={project.id}
+                    className="text-sm font-semibold transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20"
+                  >
+                    {/* Project Title & Description */}
+                    <td className="py-5 px-6 max-w-sm">
+                      <div className="space-y-1">
+                        <span className={`block font-extrabold text-base tracking-tight ${
+                          darkMode ? 'text-white' : 'text-slate-900'
+                        }`}>
+                          {project.name}
                         </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Members / Team Section */}
-              <div className="border-t border-slate-100 dark:border-slate-800/80 mt-6 pt-4 flex items-center justify-between">
-                {/* Team Lead Info */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-xs border border-orange-500/20 shadow-sm">
-                    {project.team_lead?.full_name ? project.team_lead.full_name.charAt(0) : 'TL'}
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Team Lead</span>
-                    <span className="text-xs font-bold text-slate-655 dark:text-slate-300">
-                      {project.team_lead?.full_name || 'Unassigned'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Team Members List */}
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[10px] font-black px-2.5 py-1.5 rounded-xl bg-orange-500/10 text-orange-500 border border-orange-500/25 shadow-sm" title="Total Team Size">
-                    Size: {project.team_size || 0}
-                  </span>
-                  <div className="flex -space-x-2.5 overflow-hidden">
-                    {project.members && project.members.map((member) => (
-                      <div
-                        key={member.id}
-                        title={`${member.user?.full_name} (${member.designation})`}
-                        className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-450 flex items-center justify-center font-bold text-[10px] border-2 border-white dark:border-slate-900"
-                      >
-                        {member.user?.full_name ? member.user.full_name.charAt(0) : '?'}
+                        <span className="block text-slate-400 text-xs font-medium line-clamp-2 leading-relaxed">
+                          {project.description || 'No description provided.'}
+                        </span>
                       </div>
-                    ))}
-                    {(!project.members || project.members.length === 0) && (
-                      <span className="text-[10px] text-slate-400 font-semibold italic">No members</span>
+                    </td>
+
+                    {/* Type Badge */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                        project.type === 'AGILE'
+                          ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+                          : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
+                      }`}>
+                        {project.type}
+                      </span>
+                    </td>
+
+                    {/* Status Badge */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                        project.status === 'ACTIVE'
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : project.status === 'ON_HOLD'
+                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
+                      }`}>
+                        {project.status.replace('_', ' ')}
+                      </span>
+                    </td>
+
+                    {/* Timeline & Duration */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-455 dark:text-slate-400">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>
+                            {project.start_date ? `${project.start_date} - ${project.end_date || 'Ongoing'}` : 'No timeline set'}
+                          </span>
+                        </div>
+                        {project.number_of_days && (
+                          <div className="flex items-center gap-1 text-[10px] text-orange-500 font-extrabold">
+                            <Clock className="w-3 h-3" />
+                            <span>{project.number_of_days} Days</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Team Lead */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-[10px] border border-orange-500/20 shadow-sm">
+                          {project.team_lead?.full_name ? project.team_lead.full_name.charAt(0) : 'TL'}
+                        </div>
+                        <span className={`text-xs font-bold ${darkMode ? 'text-slate-350' : 'text-slate-700'}`}>
+                          {project.team_lead?.full_name || 'Unassigned'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Tech Stack Tags */}
+                    <td className="py-5 px-4 max-w-[200px]">
+                      <div className="flex flex-wrap gap-1">
+                        {project.skills && project.skills.length > 0 ? (
+                          project.skills.slice(0, 3).map((skill) => (
+                            <span
+                              key={skill.id}
+                              className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-150/40 dark:border-slate-800"
+                            >
+                              {skill.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-semibold italic">None</span>
+                        )}
+                        {project.skills && project.skills.length > 3 && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                            +{project.skills.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Team Size Column */}
+                    <td className="py-5 px-6 whitespace-nowrap text-right">
+                      <span className="text-[10px] font-black px-2.5 py-1.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20 shadow-sm">
+                        {project.team_size || 0} Members
+                      </span>
+                    </td>
+
+                    {/* Actions Column */}
+                    {isProjectManager && (
+                      <td className="py-5 px-6 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEditProject(project)}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors cursor-pointer"
+                            title="Edit Project"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="p-2 rounded-xl bg-rose-50/50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                            title="Delete Project"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
