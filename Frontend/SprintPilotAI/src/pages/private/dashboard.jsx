@@ -401,26 +401,9 @@ const Dashboard = () => {
                     <span className="truncate text-left">{item.project}</span>
                   </div>
 
-                  {/* Sprint Name & Status Badge */}
-                  <div className="flex items-center justify-between mb-1">
+                  {/* Sprint Name (without Status Badge) */}
+                  <div className="mb-1 text-left">
                     <span className="text-sm font-extrabold tracking-tight">{sprint.name}</span>
-                    {sprint.status === 'Completed' ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20">
-                        Completed
-                      </span>
-                    ) : sprint.status === 'In Progress' ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20">
-                        Active
-                      </span>
-                    ) : sprint.status === 'Delayed' ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20">
-                        Delayed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-100 dark:border-slate-500/20">
-                        Planned
-                      </span>
-                    )}
                   </div>
                   
                   <div className="text-[10px] text-slate-400 font-semibold tracking-wide text-left mb-3">
@@ -428,8 +411,37 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Progress Details */}
-                <div className="grid grid-cols-2 gap-2 text-left mb-4 py-2 border-t border-b border-slate-100 dark:border-slate-800/60">
+                {/* Sparkline of project history in Centre with increased size */}
+                {(() => {
+                  const sparklineColor = sprint.status === 'Delayed' ? '#f43f5e' : '#10b981';
+                  return (
+                    <div className="w-full h-16 my-3 overflow-visible">
+                      <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id={`grad-${index}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={sparklineColor} stopOpacity="0.25" />
+                            <stop offset="100%" stopColor={sparklineColor} stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d={getProjectSparklineAreaPath(item.sprintsHistory)}
+                          fill={`url(#grad-${index})`}
+                        />
+                        <path
+                          d={getProjectSparklinePath(item.sprintsHistory)}
+                          fill="none"
+                          stroke={sparklineColor}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  );
+                })()}
+
+                {/* Progress Details & History at the bottom */}
+                <div className="grid grid-cols-3 gap-2 text-left pt-3 border-t border-slate-100 dark:border-slate-800/60">
                   <div>
                     <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">Done</span>
                     <span className="text-xs font-extrabold text-emerald-500">{sprint.completedTasks} Tasks</span>
@@ -440,33 +452,6 @@ const Dashboard = () => {
                       {sprint.activeTasks} Tasks
                     </span>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  {/* Sparkline of project history */}
-                  <div className="w-24 h-8 overflow-visible flex-shrink-0">
-                    <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id={`grad-${index}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={config.color} stopOpacity="0.25" />
-                          <stop offset="100%" stopColor={config.color} stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d={getProjectSparklineAreaPath(item.sprintsHistory)}
-                        fill={`url(#grad-${index})`}
-                      />
-                      <path
-                        d={getProjectSparklinePath(item.sprintsHistory)}
-                        fill="none"
-                        stroke={config.color}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-
                   <div className="text-right">
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
                       History
