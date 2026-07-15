@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './MainLayouut';
+import { useAuth } from '../../context/AuthContext';
 import { HelpCircle, Bell, Menu, LogOut } from 'lucide-react';
 
 export default function NavBar() {
   const { darkMode, setSidebarOpen } = useTheme();
+  const { logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -64,10 +66,7 @@ export default function NavBar() {
                 <button 
                   onClick={() => {
                     setIsDropdownOpen(false);
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
-                    localStorage.removeItem('user');
-                    navigate('/');
+                    logout();
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
                     darkMode ? 'hover:bg-slate-800/80 text-rose-400' : 'hover:bg-rose-50 text-rose-600'

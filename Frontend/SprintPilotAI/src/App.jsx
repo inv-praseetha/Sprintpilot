@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+import PublicRoute from './components/Auth/PublicRoute';
 import MainLayouut from './components/layout/MainLayouut';
 import Dashboard from './pages/private/dashboard';
 import Test from './pages/private/test';
@@ -9,23 +12,27 @@ import ProjectCreation from './pages/private/projectcreation';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Login />} />
-         <Route path="*" element={
-          <MainLayouut>
-            <Routes>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* PUBLIC ROUTES */}
+          <Route element={<PublicRoute />}>
+            <Route path="/" element={<Login />} />
+          </Route>
+
+          {/* PROTECTED ROUTES */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayouut />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/projects" element={<ProjectCreation/>} />
+              <Route path="/projects" element={<ProjectCreation />} />
               <Route path="/test" element={<Test />} />
               {/* Fallback to 404 page */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </MainLayouut>
-        } />
-      </Routes>
-    </Router>
+            </Route>
+          </Route>
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
-
 export default App;

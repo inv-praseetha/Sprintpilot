@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import SideBar from './SideBar';
 import NavBar from './NavBar';
 
@@ -20,7 +21,7 @@ export default function MainLayouut({ children }) {
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           <NavBar />
           <div className="flex-1 overflow-y-auto">
-            {children}
+            {children ? children : <Outlet />}
           </div>    
         </div>
       </div>
