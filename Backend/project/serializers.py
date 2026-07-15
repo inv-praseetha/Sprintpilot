@@ -1,0 +1,136 @@
+from rest_framework import serializers
+from accounts.serializers import EmployeeSerializer, EmployeeProfileSerializer
+from project.models import Project, Skill, ProjectMember, ProjectStack
+from project.validators import (
+    validate_project_dates,
+    validate_team_lead,
+    validate_members,
+    validate_skills
+)
+
+class SkillSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Skill model.
+    """
+    class Meta:
+        model = Skill
+        fields = ["id", "name", "category"]
+        read_only_fields = fields
+
+
+class ProjectCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer to validate Project creation input.
+    """
+    team_lead = serializers.UUIDField(required=True)
+    number_of_days = serializers.IntegerField(required=False, allow_null=True)
+    team_size = serializers.IntegerField(required=False, default=0)
+    members = serializers.ListField(
+        child=serializers.UUIDField(), 
+        required=False, 
+        default=list
+    )
+    skills = serializers.ListField(
+        child=serializers.UUIDField(), 
+        required=False, 
+        default=list
+    )
+
+    class Meta:
+        model = Project
+        fields = [
+            "name",
+            "description",
+            "status",
+            "type",
+            "start_date",
+            "end_date",
+            "number_of_days",
+            "team_lead",
+            "members",
+            "skills",
+            "team_size"
+        ]
+
+    def validate(self, attrs):
+        # Call the business logic validation checks
+        validate_project_dates(
+            attrs.get("type"),
+            attrs.get("start_date"),
+            attrs.get("end_date")
+        )
+        
+        # Validating values and returning the actual objects (or verifying existence)
+        validate_team_lead(attrs.get("team_lead"))
+        validate_members(attrs.get("members", []))
+        validate_skills(attrs.get("skills", []))
+        
+        return attrs
+
+
+class ProjectListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing Projects.
+    """
+    created_by = EmployeeSerializer(read_only=True)
+    team_lead = EmployeeSerializer(read_only=True)
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "name",
+            "description",
+            "created_by",
+            "status",
+            "type",
+            "start_date",
+            "end_date",
+            "number_of_days",
+            "team_lead",
+            "team_size",
+            "created_at",
+            "updated_at"
+        ]
+        read_only_fields = fields
+
+
+class ProjectDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for detailed Project view.
+    """
+    created_by = EmployeeSerializer(read_only=True)
+    team_lead = EmployeeSerializer(read_only=True)
+    members = serializers.SerializerMethodField()
+    skills = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "name",
+            "description",
+            "created_by",
+            "status",
+            "type",
+            "start_date",
+            "end_date",
+            "number_of_days",
+            "team_lead",
+            "members",
+            "skills",
+            "team_size",
+            "created_at",
+            "updated_at"
+        ]
+        read_only_fields = fields
+
+    def get_members(self, obj):
+        # Map through prefetched project_members relations (related name is now 'members')
+        profiles = [m.employee_profile for m in obj.members.all()]
+        return EmployeeProfileSerializer(profiles, many=True).data
+
+    def get_skills(self, obj):
+        # Map through prefetched project_stack relations
+        skills = [s.skill for s in obj.project_stack.all()]
+        return SkillSerializer(skills, many=True).data
