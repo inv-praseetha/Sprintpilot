@@ -29,6 +29,10 @@ class ProjectService:
         # Default number_of_days to 10 for AGILE type if not provided
         if validated_data.get("type") == "AGILE" and validated_data.get("number_of_days") is None:
             validated_data["number_of_days"] = 10
+        elif validated_data.get("type") == "WATERFALL" and validated_data.get("start_date") and validated_data.get("end_date"):
+            start = validated_data.get("start_date")
+            end = validated_data.get("end_date")
+            validated_data["number_of_days"] = (end - start).days
 
         # 1. Create the Project record
         project = Project.objects.create(
@@ -79,8 +83,10 @@ class ProjectService:
         # Default number_of_days to 10 for AGILE type if not provided
         if validated_data.get("type") == "AGILE" and validated_data.get("number_of_days") is None:
             validated_data["number_of_days"] = 10
-        elif validated_data.get("type") == "WATERFALL":
-            validated_data["number_of_days"] = None
+        elif validated_data.get("type") == "WATERFALL" and validated_data.get("start_date") and validated_data.get("end_date"):
+            start = validated_data.get("start_date")
+            end = validated_data.get("end_date")
+            validated_data["number_of_days"] = (end - start).days
 
         # Update Project fields
         project.team_lead = team_lead
