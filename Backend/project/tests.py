@@ -135,7 +135,7 @@ class ProjectMemberStatusTests(TestCase):
         self.profile1.refresh_from_db()
         self.profile2.refresh_from_db()
 
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH) # "WFM"
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFM) # "WFM"
         self.assertEqual(self.profile2.status, EmployeeProfile.Status.BUSY)
 
     def test_status_reverts_on_project_delete(self):
@@ -169,30 +169,16 @@ class ProjectMemberStatusTests(TestCase):
         
         factory = APIRequestFactory()
         request = factory.delete(f'/api/projects/{project.id}/')
+        from rest_framework.test import force_authenticate
+        force_authenticate(request, user=self.creator)
         
-
+        view = ProjectDetailView.as_view()
+        response = view(request, pk=project.id)
+        self.assertEqual(response.status_code, 204)
         
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         # Verify profile1 status is now WFM because they are no longer in any active project
         self.profile1.refresh_from_db()
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFM)
 
     def test_team_lead_status_transitions(self):
         """
@@ -244,7 +230,7 @@ class ProjectMemberStatusTests(TestCase):
         # self.team_lead should revert to WFH, lead2 should become BUSY
         self.lead_profile.refresh_from_db()
         lead2_profile.refresh_from_db()
-        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFH)
+        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFM)
         self.assertEqual(lead2_profile.status, EmployeeProfile.Status.BUSY)
 
         # 3. Delete the project
@@ -264,8 +250,8 @@ class ProjectMemberStatusTests(TestCase):
         # Both lead2 and the member should now be WFH
         lead2_profile.refresh_from_db()
         self.profile1.refresh_from_db()
-        self.assertEqual(lead2_profile.status, EmployeeProfile.Status.WFH)
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)
+        self.assertEqual(lead2_profile.status, EmployeeProfile.Status.WFM)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFM)
 
     def test_patch_project_status(self):
         """
@@ -316,8 +302,8 @@ class ProjectMemberStatusTests(TestCase):
         # Both the team lead and the member should now revert to WFH
         self.lead_profile.refresh_from_db()
         self.profile1.refresh_from_db()
-        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFH)
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)
+        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFM)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFM)
 
     def test_status_busy_on_project_on_hold(self):
         """

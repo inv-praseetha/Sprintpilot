@@ -82,7 +82,7 @@ export default function ProjectForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[72vh] overflow-y-auto">
+    <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
       {/* Form Feedback */}
       {formError && (
@@ -472,19 +472,13 @@ export default function ProjectForm({
 
           {/* Dropdown Popover */}
           {showMemberDropdown && (
-            <>
-              <div
-                className="fixed inset-0 z-10 bg-transparent"
-                onClick={() => setShowMemberDropdown(false)}
-              />
-
-              <div
-                className={`absolute left-0 right-0 mt-2 p-3.5 rounded-2xl border shadow-xl z-20 flex flex-col gap-3 transition-all ${
-                  darkMode
-                    ? 'bg-slate-900 border-slate-800 text-white'
-                    : 'bg-white border-slate-200 text-slate-800'
-                }`}
-              >
+            <div
+              className={`mt-2 p-3.5 rounded-2xl border flex flex-col gap-3 transition-all ${
+                darkMode
+                  ? 'bg-slate-950/40 border-slate-800 text-white'
+                  : 'bg-slate-50/50 border-slate-200 text-slate-800'
+              }`}
+            >
                 {/* Search & Actions Panel */}
                 <div className="flex items-center justify-between gap-3 border-b pb-2.5 border-slate-100 dark:border-slate-800">
                   <div className="relative flex-1">
@@ -535,85 +529,69 @@ export default function ProjectForm({
                             e.stopPropagation();
                             toggleMemberSelection(empProfile.id);
                           }}
-                          className={`px-3 py-2 flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-orange-500 text-white font-semibold'
-                              : darkMode
-                                ? 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
-                                : 'bg-white hover:bg-slate-50 text-slate-700'
+                          className={`px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-all border-b last:border-0 border-slate-100/50 dark:border-slate-800/30 ${
+                            darkMode
+                              ? 'bg-slate-900/60 hover:bg-slate-850 text-slate-300'
+                              : 'bg-white hover:bg-slate-50 text-slate-700'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {/* Small checkbox indicator */}
-                            <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Checkbox */}
+                            <div className={`w-4 h-4 rounded-md flex items-center justify-center border shrink-0 transition-all ${
                               isSelected
-                                ? 'bg-white border-white text-orange-500'
-                                : (darkMode ? 'border-slate-700' : 'border-slate-300')
+                                ? 'bg-orange-500 border-orange-500 text-white'
+                                : (darkMode ? 'border-slate-700 hover:border-slate-600' : 'border-slate-300 hover:border-slate-400')
                             }`}>
-                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[4.5]" />}
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                             </div>
 
-                            {/* Employee Name */}
-                            <span className="text-xs font-bold truncate">
-                              {empProfile.user?.full_name}
-                            </span>
-
-                            {/* Divider Dot */}
-                            <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
-
-                            {/* Designation */}
-                            <span className={`text-[10px] truncate ${isSelected ? 'text-white font-extrabold' : 'text-slate-400'}`}>
-                              {empProfile.designation || 'Developer'}
-                            </span>
-
-                            {/* Divider Dot */}
-                            <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
-
-                            {/* Email */}
-                            <span className={`text-[10px] truncate max-w-[150px] ${isSelected ? 'text-white/90 font-medium' : 'text-slate-400'}`}>
-                              {empProfile.user?.email}
-                            </span>
-
-                            {/* Skills Matching */}
-                            {selectedSkills.length > 0 && empProfile.skills && (
-                              <>
-                                <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
-                                <div className="flex flex-wrap gap-1">
-                                  {empProfile.skills
-                                    .filter((s) => selectedSkills.some(skillId => String(skillId) === String(s.id)))
-                                    .map((s) => (
-                                      <span
-                                        key={s.id}
-                                        className={`px-1 rounded text-[7px] font-black uppercase border transition-colors ${
-                                          isSelected
-                                            ? 'bg-white/20 text-white border-white/30'
-                                            : darkMode
-                                              ? 'bg-slate-800 text-slate-400 border-slate-750'
-                                              : 'bg-slate-100 text-slate-550 border-slate-200'
-                                        }`}
-                                      >
-                                        {s.name}
-                                      </span>
-                                    ))}
-                                </div>
-                              </>
-                            )}
+                            {/* Info Column */}
+                            <div className="min-w-0 flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                                  {empProfile.user?.full_name}
+                                </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                  empProfile.status === 'BUSY'
+                                    ? (darkMode ? 'bg-amber-500/10 text-amber-500' : 'bg-amber-500/10 text-amber-655')
+                                    : empProfile.status === 'ACTIVE'
+                                      ? (darkMode ? 'bg-emerald-500/10 text-emerald-450' : 'bg-emerald-500/10 text-emerald-600')
+                                      : (darkMode ? 'bg-indigo-500/10 text-indigo-450' : 'bg-indigo-500/10 text-indigo-600')
+                                }`}>
+                                  {empProfile.status || 'ACTIVE'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-455 dark:text-slate-500 font-medium">
+                                <span className="truncate max-w-[120px] font-bold text-slate-450 dark:text-slate-400">
+                                  {empProfile.designation || 'Developer'}
+                                </span>
+                                <span>•</span>
+                                <span className="truncate max-w-[180px]">
+                                  {empProfile.user?.email}
+                                </span>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Small Status Badge */}
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                              isSelected
-                                ? 'bg-white/20 text-white'
-                                : empProfile.status === 'BUSY'
-                                  ? (darkMode ? 'bg-amber-500/10 text-amber-500' : 'bg-amber-500/10 text-amber-600')
-                                  : empProfile.status === 'ACTIVE'
-                                    ? (darkMode ? 'bg-emerald-500/10 text-emerald-450' : 'bg-emerald-500/10 text-emerald-600')
-                                    : (darkMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-500/10 text-indigo-600')
-                            }`}>
-                              {empProfile.status || 'ACTIVE'}
-                            </span>
-                          </div>
+                          {/* Skills Column */}
+                          {selectedSkills.length > 0 && empProfile.skills && (
+                            <div className="flex flex-wrap gap-1 max-w-[150px] justify-end shrink-0">
+                              {empProfile.skills
+                                .filter((s) => selectedSkills.some(skillId => String(skillId) === String(s.id)))
+                                .map((s) => (
+                                  <span
+                                    key={s.id}
+                                    className={`px-1 rounded text-[7px] font-black uppercase border transition-colors ${
+                                      darkMode
+                                        ? 'bg-slate-800 text-slate-450 border-slate-750'
+                                        : 'bg-slate-100 text-slate-550 border-slate-200'
+                                    }`}
+                                  >
+                                    {s.name}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -623,8 +601,7 @@ export default function ProjectForm({
                     </div>
                   )}
                 </div>
-              </div>
-            </>
+            </div>
           )}
         </div>
         {filteredEmployeesForSelection.length === 0 && (

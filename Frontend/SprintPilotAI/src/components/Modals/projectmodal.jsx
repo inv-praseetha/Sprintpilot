@@ -5,10 +5,10 @@ export default function ProjectModal({ show, onClose, darkMode, children }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-slate-950/40 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 md:p-8 bg-slate-950/40 backdrop-blur-md">
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden transform transition-all ${
+        className={`w-full max-w-2xl rounded-3xl border shadow-2xl my-auto transform transition-all ${
           darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-100'
         }`}
       >

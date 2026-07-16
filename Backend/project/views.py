@@ -39,6 +39,7 @@ class ProjectCreateView(APIView):
             "team_lead"
         ).prefetch_related(
             "members__employee_profile__user",
+            "members__employee_profile__employee_skill_relations__skill",
             "project_stack__skill"
         )
         # Apply filters based on query parameters
@@ -81,6 +82,7 @@ class ProjectCreateView(APIView):
             "team_lead"
         ).prefetch_related(
             "members__employee_profile__user", 
+            "members__employee_profile__employee_skill_relations__skill", 
             "project_stack__skill"
         ).get(id=created_project.id)
 
@@ -113,7 +115,10 @@ class EmployeeProfileListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        profiles = EmployeeProfile.objects.select_related("user").prefetch_related("skills").filter(user__is_active=True)
+        profiles = EmployeeProfile.objects.select_related("user").prefetch_related("employee_skill_relations__skill").filter(
+            user__is_active=True,
+            status__in=[EmployeeProfile.Status.ACTIVE, EmployeeProfile.Status.WFM]
+        )
         # Apply filters based on query parameters
         skill = request.query_params.get('skill')
         if skill:
@@ -143,6 +148,7 @@ class ProjectDetailView(APIView):
                 "team_lead"
             ).prefetch_related(
                 "members__employee_profile__user", 
+                "members__employee_profile__employee_skill_relations__skill", 
                 "project_stack__skill"
             ).get(pk=pk)
         except Project.DoesNotExist:
@@ -173,6 +179,7 @@ class ProjectDetailView(APIView):
             "team_lead"
         ).prefetch_related(
             "members__employee_profile__user", 
+            "members__employee_profile__employee_skill_relations__skill", 
             "project_stack__skill"
         ).get(id=updated_project.id)
 

@@ -249,6 +249,7 @@ export default function ProjectDetail() {
       // Create member UUID list to submit
       // Note: Backend expect profile UUIDs
       const requestData = {
+        project_id: project.project_id,
         name: project.name,
         description: project.description || null,
         status: project.status,
@@ -279,6 +280,7 @@ export default function ProjectDetail() {
   const handleChangeTeamLead = async (newTeamLeadUserId) => {
     try {
       const requestData = {
+        project_id: project.project_id,
         name: project.name,
         description: project.description || null,
         status: project.status,
@@ -321,6 +323,7 @@ export default function ProjectDetail() {
       const updatedMemberIds = updatedMembers.map(m => m.id);
 
       const requestData = {
+        project_id: project.project_id,
         name: project.name,
         description: project.description || null,
         status: project.status,
