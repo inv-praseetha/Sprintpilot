@@ -31,14 +31,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (idToken) => {
-    setLoading(true);
-    try {
-      const data = await AuthService.loginWithGoogle(idToken);
-      setUser(data.employee);
-      return data;
-    } finally {
-      setLoading(false);
-    }
+    const data = await AuthService.loginWithGoogle(idToken);
+    setUser(data.employee);
+    return data;
   };
 
   const logout = () => {

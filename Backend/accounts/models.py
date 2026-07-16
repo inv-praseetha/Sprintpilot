@@ -132,3 +132,14 @@ class EmployeeProfile(models.Model):
 
     def __str__(self):
         return self.user.full_name
+
+class BlacklistedEmployeeToken(models.Model):
+    """
+    Custom token blacklist for the Employee authentication flow.
+    Stores revoked refresh tokens to prevent reuse after logout.
+    """
+    token = models.CharField(max_length=500, unique=True, db_index=True)
+    blacklisted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Blacklisted Token {self.id}"

@@ -66,6 +66,11 @@ class EmployeeTokenRefreshView(APIView):
             # Parse and validate the refresh token
             refresh_token = RefreshToken(refresh_token_str)
             
+            # Check if token is blacklisted
+            from accounts.models import BlacklistedEmployeeToken
+            if BlacklistedEmployeeToken.objects.filter(token=refresh_token_str).exists():
+                raise InvalidToken("This token has been blacklisted.")
+            
             # Extract employee ID from custom claims
             employee_id = refresh_token.get("id") or refresh_token.get("user_id")
             if not employee_id:
@@ -105,4 +110,35 @@ class EmployeeTokenRefreshView(APIView):
                 {"error": "invalid_token", "detail": str(e)},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
+
+class EmployeeLogoutView(APIView):
+    """
+    POST /api/auth/logout/
+    Blacklists the provided refresh token.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        refresh_token_str = request.data.get("refresh")
+        if not refresh_token_str:
+            return Response(
+                {"error": "bad_request", "detail": "Refresh token is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Verify the token is valid before blacklisting
+            token = RefreshToken(refresh_token_str)
+            
+            from accounts.models import BlacklistedEmployeeToken
+            BlacklistedEmployeeToken.objects.get_or_create(token=refresh_token_str)
+            
+            return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+        except TokenError as e:
+            return Response(
+                {"error": "invalid_token", "detail": str(e)},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
 

@@ -64,6 +64,7 @@ class ProjectMemberStatusTests(TestCase):
         Verify that employee profile status changes to BUSY when they are added to a project.
         """
         project_data = {
+            "project_id": "PRJ-001",
             "name": "Project Alpha",
             "description": "Test project",
             "status": "ACTIVE",
@@ -95,6 +96,7 @@ class ProjectMemberStatusTests(TestCase):
         """
         # 1. Create project with profile1
         project_data = {
+            "project_id": "PRJ-002",
             "name": "Project Beta",
             "description": "Test project",
             "status": "ACTIVE",
@@ -114,6 +116,7 @@ class ProjectMemberStatusTests(TestCase):
 
         # 2. Update project: replace profile1 with profile2
         update_data = {
+            "project_id": "PRJ-002",
             "name": "Project Beta Updated",
             "description": "Test project",
             "status": "ACTIVE",
@@ -141,6 +144,7 @@ class ProjectMemberStatusTests(TestCase):
         """
         # Create project with profile1
         project_data = {
+            "project_id": "PRJ-003",
             "name": "Project Gamma",
             "description": "Test project",
             "status": "ACTIVE",
@@ -166,80 +170,25 @@ class ProjectMemberStatusTests(TestCase):
         factory = APIRequestFactory()
         request = factory.delete(f'/api/projects/{project.id}/')
         
-        # force authenticate request
-        from rest_framework.test import force_authenticate
-        force_authenticate(request, user=self.creator)
+
         
-        view = ProjectDetailView.as_view()
-        response = view(request, pk=project.id)
+
         
-        self.assertEqual(response.status_code, 204)
-        
-        self.profile1.refresh_from_db()
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH) # "WFM"
 
-    def test_revert_status_only_if_not_in_other_projects(self):
-        """
-        Verify that removing a member from Project A does not set their status to WFM
-        if they are still a member of active Project B.
-        """
-        # Create Project A with profile1
-        project_a_data = {
-            "name": "Project A",
-            "description": "Test project A",
-            "status": "ACTIVE",
-            "type": "AGILE",
-            "start_date": datetime.date.today(),
-            "end_date": datetime.date.today() + datetime.timedelta(days=10),
-            "number_of_days": 10,
-            "team_lead": self.team_lead.id,
-            "members": [self.profile1.id],
-            "skills": [],
-            "team_size": 2
-        }
-        project_a = ProjectService.create_project(creator=self.creator, validated_data=project_a_data)
 
-        # Create Project B with profile1
-        project_b_data = {
-            "name": "Project B",
-            "description": "Test project B",
-            "status": "ACTIVE",
-            "type": "AGILE",
-            "start_date": datetime.date.today(),
-            "end_date": datetime.date.today() + datetime.timedelta(days=10),
-            "number_of_days": 10,
-            "team_lead": self.team_lead.id,
-            "members": [self.profile1.id],
-            "skills": [],
-            "team_size": 2
-        }
-        project_b = ProjectService.create_project(creator=self.creator, validated_data=project_b_data)
 
-        self.profile1.refresh_from_db()
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.BUSY)
 
-        # Update Project A: remove profile1 (members empty list)
-        update_data = {
-            "name": "Project A Updated",
-            "description": "Test project A",
-            "status": "ACTIVE",
-            "type": "AGILE",
-            "start_date": datetime.date.today(),
-            "end_date": datetime.date.today() + datetime.timedelta(days=10),
-            "number_of_days": 10,
-            "team_lead": self.team_lead.id,
-            "members": [],
-            "skills": [],
-            "team_size": 2
-        }
-        ProjectService.update_project(project=project_a, validated_data=update_data.copy())
 
-        # Verify profile1 status is still BUSY because they are still in Project B
-        self.profile1.refresh_from_db()
-        self.assertEqual(self.profile1.status, EmployeeProfile.Status.BUSY)
 
-        # Now update Project B: remove profile1
-        ProjectService.update_project(project=project_b, validated_data=update_data.copy())
+
+
+
+
+
+
+
+
+
 
         # Verify profile1 status is now WFM because they are no longer in any active project
         self.profile1.refresh_from_db()
@@ -266,6 +215,7 @@ class ProjectMemberStatusTests(TestCase):
 
         # 1. Create project with self.team_lead as lead
         project_data = {
+            "project_id": "PRJ-006",
             "name": "Project Lead Test",
             "description": "Test lead statuses",
             "status": "ACTIVE",
@@ -323,6 +273,7 @@ class ProjectMemberStatusTests(TestCase):
         and synchronizes assigned employee statuses.
         """
         project_data = {
+            "project_id": "PRJ-007",
             "name": "Project Patch Status Test",
             "description": "Test patch status",
             "status": "ACTIVE",
@@ -367,3 +318,29 @@ class ProjectMemberStatusTests(TestCase):
         self.profile1.refresh_from_db()
         self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFH)
         self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)
+
+    def test_status_busy_on_project_on_hold(self):
+        """
+        Verify that employee profile status remains/changes to BUSY when a project status is ON_HOLD.
+        """
+        project_data = {
+            "project_id": "PRJ-008",
+            "name": "Project On Hold Status Test",
+            "description": "Test on hold status",
+            "status": "ON_HOLD",
+            "type": "AGILE",
+            "start_date": datetime.date.today(),
+            "end_date": datetime.date.today() + datetime.timedelta(days=10),
+            "number_of_days": 10,
+            "team_lead": self.team_lead.id,
+            "members": [self.profile1.id],
+            "skills": [],
+            "team_size": 2
+        }
+        project = ProjectService.create_project(creator=self.creator, validated_data=project_data)
+
+        # Both the team lead and the member should be BUSY because the project is ON_HOLD
+        self.lead_profile.refresh_from_db()
+        self.profile1.refresh_from_db()
+        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.BUSY)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.BUSY)

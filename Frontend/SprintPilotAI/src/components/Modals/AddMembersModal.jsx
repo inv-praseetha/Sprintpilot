@@ -52,16 +52,41 @@ export default function AddMembersModal({
   }, [employees, project, memberSearchQuery]);
 
   const toggleSelectNewMember = (profileId) => {
-    setSelectedNewMembers(prev =>
-      prev.includes(profileId)
-        ? prev.filter(id => id !== profileId)
-        : [...prev, profileId]
-    );
+    setSelectedNewMembers(prev => {
+      const isSelected = prev.includes(profileId);
+      if (isSelected) {
+        if (setModalError) setModalError(null);
+        return prev.filter(id => id !== profileId);
+      }
+      
+      const currentCount = (project.members || []).length;
+      const limit = project.team_size || 0;
+      if (currentCount + prev.length >= limit) {
+        if (setModalError) {
+          setModalError(`Cannot select more members. Team size limit of ${limit} reached.`);
+        }
+        return prev;
+      }
+      if (setModalError) setModalError(null);
+      return [...prev, profileId];
+    });
   };
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (selectedNewMembers.length === 0) return;
+    
+    const currentCount = (project.members || []).length;
+    const limit = project.team_size || 0;
+    const totalCount = currentCount + selectedNewMembers.length;
+    
+    if (totalCount > limit) {
+      if (setModalError) {
+        setModalError(`Cannot allocate more members than the project team size of ${limit}. You have ${currentCount} current members and selected ${selectedNewMembers.length} new members (total ${totalCount}).`);
+      }
+      return;
+    }
+    
     onAddMembers(selectedNewMembers, () => {
       // Success callback to reset local state
       setSelectedNewMembers([]);
@@ -114,6 +139,35 @@ export default function AddMembersModal({
               />
             </div>
 
+            {/* Selected Members Chips */}
+            {selectedNewMembers.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-3 rounded-2xl border border-dashed border-orange-500/30 bg-orange-500/[0.02] text-left">
+                {selectedNewMembers.map(id => {
+                  const emp = employees.find(e => e.id === id);
+                  if (!emp) return null;
+                  return (
+                    <div
+                      key={id}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20 text-[10px] font-black"
+                    >
+                      <span>{emp.user.full_name}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedNewMembers(prev => prev.filter(mid => mid !== id));
+                          if (setModalError) setModalError(null);
+                        }}
+                        className="hover:text-orange-700 dark:hover:text-orange-300 transition-colors bg-transparent border-none outline-none cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Select All Toggle */}
             <div className="flex items-center justify-between px-1">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -127,8 +181,26 @@ export default function AddMembersModal({
                     const allSelected = allIds.every(id => selectedNewMembers.includes(id));
                     if (allSelected) {
                       setSelectedNewMembers(prev => prev.filter(id => !allIds.includes(id)));
+                      if (setModalError) setModalError(null);
                     } else {
-                      setSelectedNewMembers(prev => Array.from(new Set([...prev, ...allIds])));
+                      const currentCount = (project.members || []).length;
+                      const limit = project.team_size || 0;
+                      const remaining = limit - currentCount;
+                      if (remaining <= 0) {
+                        if (setModalError) {
+                          setModalError(`Cannot select more members. Team size limit of ${limit} reached.`);
+                        }
+                        return;
+                      }
+                      const toSelect = allIds.filter(id => !selectedNewMembers.includes(id)).slice(0, remaining);
+                      if (toSelect.length < allIds.filter(id => !selectedNewMembers.includes(id)).length) {
+                        if (setModalError) {
+                          setModalError(`Selected only ${toSelect.length} member(s) to match the team size limit of ${limit}.`);
+                        }
+                      } else {
+                        if (setModalError) setModalError(null);
+                      }
+                      setSelectedNewMembers(prev => [...prev, ...toSelect]);
                     }
                   }}
                   className="text-[10px] font-bold text-orange-550 dark:text-orange-400 hover:underline cursor-pointer bg-transparent border-none outline-none"
