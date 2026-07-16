@@ -6,6 +6,8 @@ export default function ProjectForm({
   formError,
   calculateEndDate,
   darkMode,
+  projectId,
+  setProjectId,
   name,
   setName,
   description,
@@ -45,6 +47,7 @@ export default function ProjectForm({
     if (!memberSearchQuery) return filteredEmployeesForSelection;
     return filteredEmployeesForSelection.filter(emp =>
       emp.user?.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      emp.user?.email?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
       emp.designation?.toLowerCase().includes(memberSearchQuery.toLowerCase())
     );
   }, [filteredEmployeesForSelection, memberSearchQuery]);
@@ -89,34 +92,59 @@ export default function ProjectForm({
         </div>
       )}
 
-      {/* Name & Description */}
+      {/* ID, Name & Description */}
       <div className="space-y-4">
-        <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Project Name *</label>
-          <input
-            type="text"
-            required
-            placeholder="Enter project name..."
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
-                ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2 text-left sm:col-span-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project ID *</label>
+            <input
+              type="text"
+              required
+              disabled={!!editingProjectId}
+              placeholder="e.g. PRJ-001"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                editingProjectId
+                  ? darkMode
+                    ? 'bg-slate-950/40 border-slate-900 text-slate-500 opacity-60 cursor-not-allowed'
+                    : 'bg-slate-50/40 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                  : darkMode
+                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
+                    : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
               }`}
-          />
+            />
+          </div>
+
+          <div className="space-y-2 text-left sm:col-span-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Name *</label>
+            <input
+              type="text"
+              required
+              placeholder="Enter project name..."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                darkMode
+                  ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
+                  : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
+              }`}
+            />
+          </div>
         </div>
 
         <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Description</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description</label>
           <textarea
             rows="3"
             placeholder="Brief description of the project scope and deliverables..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none resize-none ${darkMode
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none resize-none ${
+              darkMode
                 ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                : 'bg-slate-50 border-slate-105 text-slate-800 focus:border-orange-500 focus:bg-white'
-              }`}
+                : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
+            }`}
           />
         </div>
       </div>
@@ -125,7 +153,7 @@ export default function ProjectForm({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {/* Type Selection */}
         <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Project Type *</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Type *</label>
           <div className="grid grid-cols-2 gap-3">
             {['AGILE', 'WATERFALL'].map((t) => {
               const isEditing = !!editingProjectId;
@@ -141,7 +169,7 @@ export default function ProjectForm({
                       ? isSelected
                         ? darkMode
                           ? 'bg-orange-500/10 border-orange-500/30 text-orange-500/70 opacity-80 cursor-not-allowed'
-                          : 'bg-orange-500/5 border-orange-500/20 text-orange-500/70 opacity-80 cursor-not-allowed'
+                          : 'bg-orange-50/5 border-orange-500/20 text-orange-500/70 opacity-80 cursor-not-allowed'
                         : darkMode
                           ? 'bg-slate-950/40 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
                           : 'bg-slate-50/40 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
@@ -149,7 +177,7 @@ export default function ProjectForm({
                         ? 'bg-orange-500/10 border-orange-500/40 text-orange-500 cursor-pointer'
                         : darkMode
                           ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-300 cursor-pointer'
-                          : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100 cursor-pointer'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 cursor-pointer'
                   }`}
                 >
                   {t}
@@ -161,14 +189,15 @@ export default function ProjectForm({
 
         {/* Status Selection */}
         <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Status</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Status</label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-bold transition-all outline-none ${darkMode
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-bold transition-all outline-none ${
+              darkMode
                 ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-              }`}
+                : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+            }`}
           >
             <option value="ACTIVE">Active</option>
             <option value="ON_HOLD">On Hold</option>
@@ -178,17 +207,18 @@ export default function ProjectForm({
 
         {/* Target Team Size */}
         <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Target Team Size</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Target Team Size</label>
           <input
             type="number"
             min="0"
             placeholder="0"
             value={teamSize}
             onChange={(e) => setTeamSize(e.target.value)}
-            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+            className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+              darkMode
                 ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-              }`}
+                : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+            }`}
           />
         </div>
       </div>
@@ -198,7 +228,7 @@ export default function ProjectForm({
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Start Date *
               </label>
               <input
@@ -206,15 +236,16 @@ export default function ProjectForm({
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                  darkMode
                     ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                  }`}
+                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+                }`}
               />
             </div>
 
             <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 End Date *
               </label>
               <input
@@ -222,10 +253,11 @@ export default function ProjectForm({
                 required
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                  darkMode
                     ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                  }`}
+                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+                }`}
               />
             </div>
           </div>
@@ -239,7 +271,7 @@ export default function ProjectForm({
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Start Date *
               </label>
               <input
@@ -247,25 +279,27 @@ export default function ProjectForm({
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                  darkMode
                     ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                  }`}
+                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+                }`}
               />
             </div>
 
             <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Duration (Days) *</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Duration (Days) *</label>
               <input
                 type="number"
                 required
                 placeholder="10"
                 value={numberOfDays}
                 onChange={(e) => setNumberOfDays(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                  darkMode
                     ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                  }`}
+                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+                }`}
               />
             </div>
           </div>
@@ -279,15 +313,16 @@ export default function ProjectForm({
 
       {/* Team Lead Selection */}
       <div className="space-y-2 text-left">
-        <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Team Lead *</label>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Team Lead *</label>
         <select
           required
           value={teamLead}
           onChange={(e) => setTeamLead(e.target.value)}
-          className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+          className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+            darkMode
               ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-              : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-            }`}
+              : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
+          }`}
         >
           <option value="">Select Team Lead...</option>
           {teamLeads.map((lead) => (
@@ -301,7 +336,7 @@ export default function ProjectForm({
       {/* Tech Stack / Skills Category Selector & Multi-Select */}
       <div className="space-y-3.5 text-left">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider flex items-center gap-1.5">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <Code className="w-4.5 h-4.5 text-slate-400" /> Technical Stack Required
           </label>
 
@@ -312,12 +347,13 @@ export default function ProjectForm({
                 type="button"
                 key={cat}
                 onClick={() => setSkillCategoryFilter(cat)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all border cursor-pointer ${skillCategoryFilter === cat
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all border cursor-pointer ${
+                  skillCategoryFilter === cat
                     ? 'bg-orange-500 text-white border-orange-500'
                     : darkMode
-                      ? 'bg-slate-950 border-slate-800 text-slate-450 hover:text-slate-300'
-                      : 'bg-white border-slate-150 text-slate-500 hover:bg-slate-50'
-                  }`}
+                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-350'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
               >
                 {cat}
               </button>
@@ -337,12 +373,13 @@ export default function ProjectForm({
                   toggleSkillSelection(skill.id);
                   setShowMemberDropdown(true);
                 }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isSelected
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isSelected
                     ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10'
                     : darkMode
                       ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
-                      : 'bg-white border border-slate-150 text-slate-600 hover:bg-slate-100'
-                  }`}
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
               >
                 <span>{skill.name}</span>
                 {isSelected && <Check className="w-3.5 h-3.5" />}
@@ -359,11 +396,11 @@ export default function ProjectForm({
       <div className="space-y-3.5 text-left relative">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex flex-wrap items-center gap-1.5">
-            <Users className="w-4.5 h-4.5 text-slate-400" /> 
+            <Users className="w-4.5 h-4.5 text-slate-400" />
             <span>Team Members Allocation ({selectedMembers.length}/{teamSize || 0})</span>
             <span className={`text-[11px] font-extrabold normal-case px-1.5 py-0.5 rounded-md ${
-              filteredEmployeesForSelection.length === 0 
-                ? 'text-rose-500 bg-rose-500/10' 
+              filteredEmployeesForSelection.length === 0
+                ? 'text-rose-500 bg-rose-500/10'
                 : darkMode ? 'text-slate-400 bg-slate-950 border border-slate-800' : 'text-slate-500 bg-slate-100 border border-slate-200'
             }`}>
               {filteredEmployeesForSelection.length} matching candidates available
@@ -375,7 +412,7 @@ export default function ProjectForm({
             </span>
           )}
         </div>
-        
+
         {teamSize && selectedMembers.length > parseInt(teamSize, 10) && (
           <div className="text-[10px] font-bold text-rose-500 flex items-center gap-1 pl-1">
             <AlertCircle className="w-3.5 h-3.5" />
@@ -411,7 +448,7 @@ export default function ProjectForm({
                       className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
                         darkMode
                           ? 'bg-orange-950/40 border-orange-500/30 text-orange-400 hover:bg-orange-900/30'
-                          : 'bg-orange-50 border-orange-200 text-orange-655 hover:bg-orange-100/50'
+                          : 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100/50'
                       }`}
                     >
                       {emp.user?.full_name}
@@ -445,7 +482,7 @@ export default function ProjectForm({
                 className={`absolute left-0 right-0 mt-2 p-3.5 rounded-2xl border shadow-xl z-20 flex flex-col gap-3 transition-all ${
                   darkMode
                     ? 'bg-slate-900 border-slate-800 text-white'
-                    : 'bg-white border-slate-150 text-slate-850'
+                    : 'bg-white border-slate-200 text-slate-800'
                 }`}
               >
                 {/* Search & Actions Panel */}
@@ -453,7 +490,7 @@ export default function ProjectForm({
                   <div className="relative flex-1">
                     <input
                       type="text"
-                      placeholder="Search candidates by name or designation..."
+                      placeholder="Search candidates by name, email, or designation..."
                       value={memberSearchQuery}
                       onChange={(e) => setMemberSearchQuery(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -487,7 +524,7 @@ export default function ProjectForm({
                 </div>
 
                 {/* Candidate Checklist */}
-                <div className="flex flex-col max-h-60 overflow-y-auto pr-1 divide-y divide-slate-100 dark:divide-slate-800 border border-slate-150 dark:border-slate-800 rounded-xl overflow-hidden">
+                <div className="flex flex-col max-h-60 overflow-y-auto pr-1 divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                   {displayedEmployees.length > 0 ? (
                     displayedEmployees.map((empProfile) => {
                       const isSelected = selectedMembers.includes(empProfile.id);
@@ -502,7 +539,7 @@ export default function ProjectForm({
                             isSelected
                               ? 'bg-orange-500 text-white font-semibold'
                               : darkMode
-                                ? 'bg-slate-900/60 hover:bg-slate-800 text-slate-350'
+                                ? 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
                                 : 'bg-white hover:bg-slate-50 text-slate-700'
                           }`}
                         >
@@ -515,24 +552,32 @@ export default function ProjectForm({
                             }`}>
                               {isSelected && <Check className="w-2.5 h-2.5 stroke-[4.5]" />}
                             </div>
-                            
+
                             {/* Employee Name */}
                             <span className="text-xs font-bold truncate">
                               {empProfile.user?.full_name}
                             </span>
-                            
+
                             {/* Divider Dot */}
                             <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
-                            
+
                             {/* Designation */}
-                            <span className={`text-[10px] truncate ${isSelected ? 'text-white/80' : 'text-slate-450'}`}>
+                            <span className={`text-[10px] truncate ${isSelected ? 'text-white font-extrabold' : 'text-slate-400'}`}>
                               {empProfile.designation || 'Developer'}
+                            </span>
+
+                            {/* Divider Dot */}
+                            <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
+
+                            {/* Email */}
+                            <span className={`text-[10px] truncate max-w-[150px] ${isSelected ? 'text-white/90 font-medium' : 'text-slate-400'}`}>
+                              {empProfile.user?.email}
                             </span>
 
                             {/* Skills Matching */}
                             {selectedSkills.length > 0 && empProfile.skills && (
                               <>
-                                <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-450'}`}>•</span>
+                                <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
                                 <div className="flex flex-wrap gap-1">
                                   {empProfile.skills
                                     .filter((s) => selectedSkills.some(skillId => String(skillId) === String(s.id)))
@@ -542,9 +587,9 @@ export default function ProjectForm({
                                         className={`px-1 rounded text-[7px] font-black uppercase border transition-colors ${
                                           isSelected
                                             ? 'bg-white/20 text-white border-white/30'
-                                            : darkMode 
-                                              ? 'bg-slate-800 text-slate-450 border-slate-750' 
-                                              : 'bg-slate-100 text-slate-500 border-slate-200'
+                                            : darkMode
+                                              ? 'bg-slate-800 text-slate-400 border-slate-750'
+                                              : 'bg-slate-100 text-slate-550 border-slate-200'
                                         }`}
                                       >
                                         {s.name}
@@ -563,7 +608,7 @@ export default function ProjectForm({
                                 : empProfile.status === 'BUSY'
                                   ? (darkMode ? 'bg-amber-500/10 text-amber-500' : 'bg-amber-500/10 text-amber-600')
                                   : empProfile.status === 'ACTIVE'
-                                    ? (darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-500/10 text-emerald-600')
+                                    ? (darkMode ? 'bg-emerald-500/10 text-emerald-450' : 'bg-emerald-500/10 text-emerald-600')
                                     : (darkMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-500/10 text-indigo-600')
                             }`}>
                               {empProfile.status || 'ACTIVE'}
@@ -573,7 +618,7 @@ export default function ProjectForm({
                       );
                     })
                   ) : (
-                    <div className="py-8 text-center text-slate-450 text-xs font-bold bg-white dark:bg-slate-900 col-span-2">
+                    <div className="py-8 text-center text-slate-400 text-xs font-bold bg-white dark:bg-slate-900 col-span-2">
                       No matching candidates found
                     </div>
                   )}
@@ -583,21 +628,22 @@ export default function ProjectForm({
           )}
         </div>
         {filteredEmployeesForSelection.length === 0 && (
-          <span className="text-xs text-slate-450 font-bold italic block py-4 pl-1">
+          <span className="text-xs text-slate-400 font-bold italic block py-4 pl-1">
             No matching employees found with selected skills.
           </span>
         )}
       </div>
 
       {/* Form Actions */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-850">
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
         <button
           type="button"
           onClick={onClose}
-          className={`px-5.5 py-3 rounded-2xl font-bold text-sm transition-all cursor-pointer ${darkMode
-              ? 'bg-slate-800 hover:bg-slate-700 text-slate-350'
-              : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
-            }`}
+          className={`px-5.5 py-3 rounded-2xl font-bold text-sm transition-all cursor-pointer ${
+            darkMode
+              ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              : 'bg-slate-50 hover:bg-slate-100 text-slate-655 font-bold'
+          }`}
         >
           Cancel
         </button>

@@ -94,6 +94,7 @@ export default function ProjectCreation() {
   const [hasPrevPage, setHasPrevPage] = useState(false);
 
   // Form Field States
+  const [projectId, setProjectId] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('ACTIVE');
@@ -114,12 +115,10 @@ export default function ProjectCreation() {
   const [metaError, setMetaError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Check if User is Project Manager
   const isProjectManager = useMemo(() => {
     return currentUser?.role === 'PROJECT_MANAGER';
   }, [currentUser]);
 
-  // Load Skills & Employee Profiles
   const fetchMetadata = async () => {
     setLoadingMeta(true);
     setMetaError(null);
@@ -132,7 +131,6 @@ export default function ProjectCreation() {
       // 2. Fetch Employee Profiles
       const employeesRes = await apiClient.get('projects/employees/');
       setEmployees(employeesRes.data);
-
     } catch (err) {
       console.error('[fetchMetadata] Error fetching metadata:', err);
       setMetaError(`Network connection error: ${err.message || 'Error fetching metadata'}`);
@@ -141,7 +139,6 @@ export default function ProjectCreation() {
     }
   };
 
-  // Load Projects List
   const fetchProjects = async (page = 1) => {
     setLoadingProjects(true);
     try {
@@ -239,13 +236,13 @@ export default function ProjectCreation() {
 
   // Dynamic filter: Show only employees who possess all of the selected skills.
   // If no skills are selected, show all active employees.
-    const filteredEmployeesForSelection = useMemo(() => {
-      const activeEmployees = employees.filter(emp => emp.status !== 'BUSY' || selectedMembers.includes(emp.id));
-      if (selectedSkills.length === 0) return activeEmployees;
-      return activeEmployees.filter(emp =>
-        emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId)))
-      );
-    }, [employees, selectedSkills, selectedMembers]);
+  const filteredEmployeesForSelection = useMemo(() => {
+    const activeEmployees = employees.filter(emp => emp.status !== 'BUSY' || selectedMembers.includes(emp.id));
+    if (selectedSkills.length === 0) return activeEmployees;
+    return activeEmployees.filter(emp =>
+      emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId)))
+    );
+  }, [employees, selectedSkills, selectedMembers]);
 
   // Handle Project Creation Submission
   const handleSubmit = async (e) => {
@@ -868,40 +865,6 @@ export default function ProjectCreation() {
           editingProjectId={editingProjectId}
         />
       </ProjectModal>
-
-      {/* DEVELOPMENT STATE DIAGNOSTICS
-      <section className={`mt-12 p-6 rounded-3xl border text-xs font-mono space-y-3 ${
-        darkMode ? 'bg-slate-905/40 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
-      }`}>
-        <h4 className="font-bold text-sm text-orange-500 uppercase tracking-wider">System Integration Diagnostics</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <span className="block text-slate-400 font-bold">User Authenticated:</span>
-            <span>{currentUser ? `${currentUser.full_name} (${currentUser.role})` : 'No'}</span>
-          </div>
-          <div>
-            <span className="block text-slate-400 font-bold">Total Skills Loaded:</span>
-            <span>{skills.length} (Filtered: {filteredSkills.length})</span>
-          </div>
-          <div>
-            <span className="block text-slate-400 font-bold">Total Profiles Loaded:</span>
-            <span>{employees.length}</span>
-          </div>
-          <div>
-            <span className="block text-slate-400 font-bold">Filtered Team Leads:</span>
-            <span>{teamLeads.length}</span>
-          </div>
-        </div>
-        <div className="flex gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => fetchMetadata()}
-            className="px-3 py-1 rounded bg-orange-500 text-white font-bold text-[10px] hover:bg-orange-600 transition-all cursor-pointer"
-          >
-            Force Sync Metadata
-          </button>
-        </div>
-      </section> */}
 
     </main>
   );

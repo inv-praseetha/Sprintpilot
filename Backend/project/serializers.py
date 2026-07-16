@@ -29,6 +29,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     """
     Serializer to validate Project creation input.
     """
+    project_id = serializers.CharField(required=True)
     team_lead = serializers.UUIDField(required=True)
     number_of_days = serializers.IntegerField(required=False, allow_null=True)
     team_size = serializers.IntegerField(required=False, default=0)
@@ -46,6 +47,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = [
+            "project_id",
             "name",
             "description",
             "status",
@@ -93,6 +95,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id",
+            "project_id",
             "name",
             "description",
             "created_by",
@@ -122,6 +125,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id",
+            "project_id",
             "name",
             "description",
             "created_by",

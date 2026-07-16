@@ -46,6 +46,7 @@ class Project(models.Model):
         AGILE = "AGILE", "Agile"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     created_by = models.ForeignKey(

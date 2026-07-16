@@ -102,6 +102,18 @@ export default function ProjectDetail() {
   // Sprints state
   const [sprints, setSprints] = useState([]);
 
+  // Team Roster Pagination State
+  const [rosterPage, setRosterPage] = useState(1);
+  const rosterPageSize = 5;
+
+  const paginatedMembers = useMemo(() => {
+    if (!project || !project.members) return [];
+    const startIndex = (rosterPage - 1) * rosterPageSize;
+    return project.members.slice(startIndex, startIndex + rosterPageSize);
+  }, [project, rosterPage]);
+
+  const totalRosterPages = project?.members ? Math.ceil(project.members.length / rosterPageSize) : 1;
+
   // Initialize and check authentication
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
@@ -686,8 +698,9 @@ export default function ProjectDetail() {
         {rosterExpanded && (
           <div className="p-6 border-t border-slate-100 dark:border-slate-850">
             {(project.team_lead || (project.members && project.members.length > 0)) ? (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs">
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs">
                   <thead>
                     <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'} uppercase font-black tracking-wider text-[10px]`}>
                       <th className="py-4 px-4 font-bold">Member</th>
@@ -756,7 +769,7 @@ export default function ProjectDetail() {
                     )}
 
                     {/* Members Rows */}
-                    {project.members && project.members.map((member) => (
+                    {paginatedMembers && paginatedMembers.map((member) => (
                       <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
@@ -823,6 +836,70 @@ export default function ProjectDetail() {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination Controls */}
+              {project.members && project.members.length > rosterPageSize && (
+                <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${
+                  darkMode ? 'border-slate-850 bg-slate-900/60' : 'border-slate-100 bg-slate-50/30'
+                }`}>
+                  <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{rosterPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{totalRosterPages}</span> ({project.members.length} members)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRosterPage(p => Math.max(1, p - 1))}
+                      disabled={rosterPage === 1}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${
+                        rosterPage > 1
+                          ? darkMode
+                            ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                            : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-705 cursor-pointer shadow-sm shadow-slate-100/50'
+                          : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                      }`}
+                    >
+                      Previous
+                    </button>
+
+                    {/* Dynamic Page Numbers */}
+                    {Array.from({ length: totalRosterPages }, (_, i) => i + 1).map((p) => {
+                      const isSelected = p === rosterPage;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setRosterPage(p)}
+                          className={`w-8 h-8 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
+                              : darkMode
+                                ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
+                                : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
+                      disabled={rosterPage === totalRosterPages}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${
+                        rosterPage < totalRosterPages
+                          ? darkMode
+                            ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                            : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-750 cursor-pointer shadow-sm shadow-slate-100/50'
+                          : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center">
                 <Users className="w-12 h-12 text-slate-300 dark:text-slate-750 mb-3" />
