@@ -146,7 +146,7 @@ class ProjectService:
     def sync_employee_statuses(profile_ids: list) -> None:
         """
         Synchronizes status of employee profiles based on project assignments.
-        Sets status to BUSY if they are team lead or member of any active project, WFM otherwise.
+        Sets status to BUSY if they are team lead or member of any active or on-hold project, WFH otherwise.
         """
         if not profile_ids:
             return
@@ -155,12 +155,12 @@ class ProjectService:
             is_member = ProjectMember.objects.filter(
                 employee_profile=profile,
                 project__is_deleted=False,
-                project__status=Project.Status.ACTIVE
+                project__status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]
             ).exists()
             is_lead = Project.objects.filter(
                 team_lead=profile.user,
                 is_deleted=False,
-                status=Project.Status.ACTIVE
+                status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]
             ).exists()
             
             new_status = EmployeeProfile.Status.BUSY if (is_member or is_lead) else EmployeeProfile.Status.WFH

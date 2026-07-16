@@ -50,12 +50,22 @@ export const AuthService = {
   /**
    * Clears tokens and redirects user to login page
    */
-  logout: () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    if (window.location.pathname !== '/') {
-      window.location.href = '/';
+  logout: async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        // Send a request to the backend to blacklist the token
+        await apiClient.post('auth/logout/', { refresh: refreshToken });
+      }
+    } catch (e) {
+      console.error('Logout error:', e);
+    } finally {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
     }
   },
 

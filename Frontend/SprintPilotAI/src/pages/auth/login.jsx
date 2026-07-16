@@ -30,12 +30,22 @@ export default function Login() {
         await login(idToken);
         navigate("/dashboard");
       } catch (err) {
-        console.error("[auth] Google auth error:", err);
-        setError(
-          err.response?.data?.detail ||
-            err.response?.data?.message ||
-            "Authentication failed. Please contact your administrator."
-        );
+        console.error("[auth] Google auth error caught:", err);
+        let errorMsg = "Authentication failed. Please contact your administrator.";
+        
+        if (err.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          errorMsg = err.response?.data?.detail || err.response?.data?.error || err.response?.data?.message || errorMsg;
+        } else if (err.request) {
+          // The request was made but no response was received
+          errorMsg = "Network error. Please check your connection and try again.";
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          errorMsg = err.message || errorMsg;
+        }
+        
+        setError(errorMsg);
       } finally {
         setLoading(false);
       }
