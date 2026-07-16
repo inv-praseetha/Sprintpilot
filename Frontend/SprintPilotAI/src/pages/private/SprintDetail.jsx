@@ -382,85 +382,57 @@ export default function SprintDetail() {
     fetchData();
   }, [sprintId]);
 
-  // AI Scheduling simulation sequence
-  useEffect(() => {
-    if (!isGenerating) return;
-
+  const handleStartGeneration = async () => {
+    setIsGenerating(true);
+    setLoadingText('Initializing connection to Gemini...');
+    
     const texts = [
       'Analyzing task sequences...',
       'Excluding weekends (Saturdays & Sundays)...',
       'Configuring employee timeline constraints...',
       'Rendering categorized Gantt dashboard...'
     ];
-
-    const simulatedReasons = [
-      "Highly skilled in React (9/10 proficiency) and fits sequence dependencies.",
-      "Assigned based on Django expertise (10/10) and available bandwidth.",
-      "Matches category requirement for UI/UX styling and Tailwind CSS.",
-      "Best available engineer for database optimization and testing.",
-      "Selected based on designation seniority and prior milestone delivery.",
-      "Experienced with Cypress/Jest test suites and testing automation."
-    ];
-
     let currentIndex = 0;
-    setLoadingText(texts[0]);
-
     const interval = setInterval(() => {
       currentIndex++;
       if (currentIndex < texts.length) {
         setLoadingText(texts[currentIndex]);
-      } else {
-        clearInterval(interval);
-        
-        // Simulating schedule generation: set default timelines if none exist
-        setTasks(prev => {
-          const updated = prev.map((t, idx) => {
-            if (t.planned_start_date && t.planned_end_date) return t;
+      }
+    }, 800);
 
-            // Generate dates within sprint range
-            const start = new Date(sprint.start_date);
-            const end = new Date(sprint.end_date);
-            
-            const taskStart = new Date(start);
-            taskStart.setDate(start.getDate() + (idx % 3) * 2);
-            if (taskStart > end) taskStart.setTime(start.getTime());
-
-            const taskEnd = new Date(taskStart);
-            taskEnd.setDate(taskStart.getDate() + 2);
-            if (taskEnd > end) taskEnd.setTime(end.getTime());
-
-            const formatDate = (date) => {
-              const y = date.getFullYear();
-              const m = String(date.getMonth() + 1).padStart(2, '0');
-              const d = String(date.getDate()).padStart(2, '0');
-              return `${y}-${m}-${d}`;
-            };
-
-            const modStart = formatDate(taskStart);
-            const modEnd = formatDate(taskEnd);
-
-            setModifiedTaskIds(old => new Set(old).add(t.id));
-
+    try {
+      const suggestions = await SprintServices.getAISuggestedSchedule(sprintId);
+      
+      clearInterval(interval);
+      
+      setTasks(prev => {
+        return prev.map(t => {
+          const sug = suggestions.find(s => s.task_id === t.id);
+          if (sug) {
             return {
               ...t,
-              planned_start_date: modStart,
-              planned_end_date: modEnd,
-              recommendation_reason: simulatedReasons[idx % simulatedReasons.length]
+              planned_start_date: sug.planned_start_date,
+              planned_end_date: sug.planned_end_date,
+              assigned_employee: sug.assigned_employee,
+              recommendation_reason: sug.reason
             };
-          });
-          return updated;
+          }
+          return t;
         });
+      });
 
-        setIsGenerating(false);
-        setIsEditing(true);
-      }
-    }, 850);
+      const updatedIds = suggestions.map(s => s.task_id);
+      setModifiedTaskIds(new Set(updatedIds));
 
-    return () => clearInterval(interval);
-  }, [isGenerating, sprint]);
-
-  const handleStartGeneration = () => {
-    setIsGenerating(true);
+      setIsGenerating(false);
+      setIsEditing(true);
+    } catch (err) {
+      clearInterval(interval);
+      setIsGenerating(false);
+      console.error('[SprintDetail] AI Suggestion failed:', err);
+      const errMsg = err.response?.data?.detail || err.message || 'Unknown error occurred.';
+      alert(`AI Generation Failed: ${errMsg}`);
+    }
   };
 
   // Toggle into Edit Mode
@@ -475,7 +447,7 @@ export default function SprintDetail() {
     setIsEditing(false);
   };
 
-  // Save modified tasks to backend database
+  // Save modified tasks to backend database via bulk import
   const handleSaveToBackend = async () => {
     if (modifiedTaskIds.size === 0) {
       setIsEditing(false);
@@ -484,29 +456,35 @@ export default function SprintDetail() {
 
     setIsSaving(true);
     try {
-      const updatePromises = Array.from(modifiedTaskIds).map(async (taskId) => {
+      const payload = Array.from(modifiedTaskIds).map(taskId => {
         const task = tasks.find(t => t.id === taskId);
-        if (!task) return;
-
-        // Prepare request body matching API
-        const taskData = {
-          assigned_employee_id: task.assigned_employee?.id || null,
-          planned_start_date: task.planned_start_date || null,
-          planned_end_date: task.planned_end_date || null
+        return {
+          task_id: taskId,
+          assigned_employee_id: task?.assigned_employee?.id || null,
+          planned_start_date: task?.planned_start_date || null,
+          planned_end_date: task?.planned_end_date || null
         };
-
-        await SprintServices.updateSprintTask(taskId, taskData);
       });
 
-      await Promise.all(updatePromises);
+      await SprintServices.importSchedule(sprintId, payload);
       
-      // Update original task list checkpoint
-      setOriginalTasks(JSON.parse(JSON.stringify(tasks)));
+      // Refresh task list from server to get updated computed story points and hours
+      const sprintData = await SprintServices.getSprintDetails(sprintId);
+      const rawTasks = sprintData.tasks || [];
+      const dbTasks = rawTasks.map(t => ({
+        ...t,
+        planned_start_date: (t.planned_start_date === 'None' || t.planned_start_date === 'null' || !t.planned_start_date) ? null : t.planned_start_date,
+        planned_end_date: (t.planned_end_date === 'None' || t.planned_end_date === 'null' || !t.planned_end_date) ? null : t.planned_end_date
+      }));
+
+      setTasks(dbTasks);
+      setOriginalTasks(JSON.parse(JSON.stringify(dbTasks)));
       setModifiedTaskIds(new Set());
       setIsEditing(false);
     } catch (err) {
       console.error('[SprintDetail] Error saving tasks:', err);
-      alert('Failed to save task schedules. Please verify date boundaries.');
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to save task schedules.';
+      alert(`Import Failed: ${errMsg}`);
     } finally {
       setIsSaving(false);
     }

@@ -84,3 +84,27 @@ class SprintTask(models.Model):
 
     def __str__(self):
         return self.title
+
+class TaskRecommendation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task = models.ForeignKey(SprintTask, on_delete=models.CASCADE, related_name='recommendations')
+    recommended_employee = models.ForeignKey(
+        EmployeeProfile, 
+        on_delete=models.CASCADE, 
+        related_name='task_recommendations',
+        null=True,
+        blank=True
+    )
+    confidence = models.DecimalField(max_digits=5, decimal_places=2)
+    matching_score = models.DecimalField(max_digits=5, decimal_places=2)
+    reason = models.TextField()
+    generated_at = models.DateTimeField(auto_now_add=True)
+    accepted = models.BooleanField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'task_recommendations'
+        ordering = ['-generated_at']
+
+    def __str__(self):
+        emp_name = self.recommended_employee.user.full_name if self.recommended_employee else "Unassigned"
+        return f"Recommendation for {self.task.title} -> {emp_name}"

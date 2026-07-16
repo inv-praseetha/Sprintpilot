@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from project.models import Project
-from accounts.models import EmployeeProfile
 from sprints.models import Sprint, SprintTask
 from sprints.serializers import SprintSerializer, SprintTaskSerializer
 
@@ -218,5 +217,63 @@ class SprintTaskUpdateView(APIView):
             task.save()
             serializer = SprintTaskSerializer(task)
             return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+# View endpoints delegated to services
+class SprintAISuggestScheduleView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from decouple import config
+        api_key = config('GEMINI_API_KEY', default=None) or os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            return Response(
+                {"detail": "GEMINI_API_KEY is not configured. Please add GEMINI_API_KEY to your backend .env file."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        tasks = sprint.tasks.all()
+        if not tasks.exists():
+            return Response(
+                {"detail": "No tasks found in this sprint to schedule."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from sprints.services.schedule_service import generate_and_persist_recommendations
+        try:
+            output_suggestions = generate_and_persist_recommendations(sprint, tasks, api_key)
+            return Response(output_suggestions, status=status.HTTP_200_OK)
+        except ImportError as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"AI Generation Failed: {str(e)}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+class SprintImportScheduleView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from sprints.services.schedule_service import import_schedule
+        try:
+            import_schedule(sprint, request.data)
+            return Response({"detail": "Schedule successfully imported and saved."}, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -24,6 +24,16 @@ export const SprintServices = {
   deleteSprint: async (sprintId) => {
     const response = await apiClient.delete(`sprints/${sprintId}/`);
     return response.data;
+  },
+
+  getAISuggestedSchedule: async (sprintId) => {
+    const response = await apiClient.post(`sprints/${sprintId}/ai-schedule/`);
+    return response.data;
+  },
+
+  importSchedule: async (sprintId, tasksData) => {
+    const response = await apiClient.post(`sprints/${sprintId}/import-schedule/`, tasksData);
+    return response.data;
   }
 };
 
