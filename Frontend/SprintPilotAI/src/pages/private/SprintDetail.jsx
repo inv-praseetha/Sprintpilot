@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
@@ -13,7 +13,9 @@ import {
   RefreshCw,
   Save,
   Edit3,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const categoryConfig = {
@@ -111,6 +113,211 @@ const generateTimelineDays = (startStr, endStr) => {
   return daysList;
 };
 
+// CustomDatePicker component
+function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const popoverRef = useRef(null);
+
+  // Initialize view date based on current value, minDate or today
+  const [viewDate, setViewDate] = useState(() => {
+    const initial = value || minDate || new Date().toISOString().split('T')[0];
+    const [y, m, d] = initial.split('-').map(Number);
+    return new Date(y, m - 1, 1);
+  });
+
+  // Keep viewDate updated if value changes and calendar is reopened
+  useEffect(() => {
+    if (isOpen) {
+      const initial = value || minDate || new Date().toISOString().split('T')[0];
+      const [y, m, d] = initial.split('-').map(Number);
+      setViewDate(new Date(y, m - 1, 1));
+    }
+  }, [isOpen, value]);
+
+  // Click outside to close handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+
+  const handlePrevMonth = (e) => {
+    e.stopPropagation();
+    setViewDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = (e) => {
+    e.stopPropagation();
+    setViewDate(new Date(year, month + 1, 1));
+  };
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const days = [];
+  // Fill empty leading slots
+  for (let i = 0; i < firstDayIndex; i++) {
+    days.push(null);
+  }
+  // Fill day numbers
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(d);
+  }
+
+  const getFormattedDateStr = (day) => {
+    if (!day) return '';
+    const mStr = String(month + 1).padStart(2, '0');
+    const dStr = String(day).padStart(2, '0');
+    return `${year}-${mStr}-${dStr}`;
+  };
+
+  const handleDayClick = (day, e) => {
+    e.stopPropagation();
+    if (!day) return;
+    const dateStr = getFormattedDateStr(day);
+    
+    // Check if weekend
+    const dObj = new Date(year, month, day);
+    const dayOfWeek = dObj.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    // Check bounds
+    const isOutOfRange = (minDate && dateStr < minDate) || (maxDate && dateStr > maxDate);
+
+    if (isWeekend || isOutOfRange) return;
+
+    onChange(dateStr);
+    setIsOpen(false);
+  };
+
+  const monthsList = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const formatDateDisplay = (dateStr) => {
+    if (!dateStr) return "Select date";
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  return (
+    <div className="relative w-full" ref={popoverRef}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`px-3 py-1.5 rounded-xl text-left text-[11px] border w-full font-extrabold flex items-center justify-between transition-colors focus:outline-none ${
+          darkMode
+            ? 'bg-slate-900 border-slate-750 text-white hover:bg-slate-800'
+            : 'bg-white border-slate-250 text-slate-800 hover:bg-slate-50'
+        }`}
+      >
+        <span>{formatDateDisplay(value)}</span>
+        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+      </button>
+
+      {/* Calendar Popover */}
+      {isOpen && (
+        <div
+          className={`absolute left-0 mt-1.5 p-3 w-60 rounded-2xl border shadow-xl z-55 animate-fadeIn ${
+            darkMode
+              ? 'bg-slate-950 border-slate-850 text-white'
+              : 'bg-white border-slate-205 text-slate-800'
+          }`}
+        >
+          {/* Header */}
+          <div className="flex justify-between items-center mb-2.5">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className={`p-1 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-slate-900 text-slate-400' : 'hover:bg-slate-100 text-slate-650'
+              }`}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[11px] font-black tracking-wide uppercase">
+              {monthsList[month]} {year}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className={`p-1 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-slate-900 text-slate-400' : 'hover:bg-slate-100 text-slate-650'
+              }`}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Weekday headers */}
+          <div className="grid grid-cols-7 gap-0.5 text-center font-black text-[9px] uppercase tracking-wider text-slate-450 mb-1.5">
+            <span>S</span>
+            <span>M</span>
+            <span>T</span>
+            <span>W</span>
+            <span>T</span>
+            <span>F</span>
+            <span>S</span>
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-0.5">
+            {days.map((day, idx) => {
+              if (day === null) {
+                return <div key={`empty-${idx}`} />;
+              }
+
+              const dateStr = getFormattedDateStr(day);
+              
+              // Validate constraints
+              const dObj = new Date(year, month, day);
+              const dayOfWeek = dObj.getDay();
+              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+              const isOutOfRange = (minDate && dateStr < minDate) || (maxDate && dateStr > maxDate);
+              const isDisabled = isWeekend || isOutOfRange;
+
+              const isSelected = value === dateStr;
+
+              let cellClass = `h-7 w-7 text-[10px] font-black rounded-lg flex items-center justify-center transition-all `;
+              if (isSelected) {
+                cellClass += " bg-orange-500 text-white font-bold shadow-md shadow-orange-500/20";
+              } else if (isDisabled) {
+                cellClass += darkMode
+                  ? " text-slate-800 opacity-20 cursor-not-allowed"
+                  : " text-slate-300 opacity-20 cursor-not-allowed";
+              } else {
+                cellClass += darkMode
+                  ? " text-slate-350 hover:bg-slate-900 cursor-pointer"
+                  : " text-slate-750 hover:bg-slate-100 cursor-pointer";
+              }
+
+              return (
+                <div
+                  key={`day-${day}`}
+                  onClick={(e) => !isDisabled && handleDayClick(day, e)}
+                  className={cellClass}
+                >
+                  {day}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SprintDetail() {
   const { projectId, sprintId } = useParams();
   const { darkMode } = useTheme();
@@ -186,6 +393,15 @@ export default function SprintDetail() {
       'Rendering categorized Gantt dashboard...'
     ];
 
+    const simulatedReasons = [
+      "Highly skilled in React (9/10 proficiency) and fits sequence dependencies.",
+      "Assigned based on Django expertise (10/10) and available bandwidth.",
+      "Matches category requirement for UI/UX styling and Tailwind CSS.",
+      "Best available engineer for database optimization and testing.",
+      "Selected based on designation seniority and prior milestone delivery.",
+      "Experienced with Cypress/Jest test suites and testing automation."
+    ];
+
     let currentIndex = 0;
     setLoadingText(texts[0]);
 
@@ -228,7 +444,8 @@ export default function SprintDetail() {
             return {
               ...t,
               planned_start_date: modStart,
-              planned_end_date: modEnd
+              planned_end_date: modEnd,
+              recommendation_reason: simulatedReasons[idx % simulatedReasons.length]
             };
           });
           return updated;
@@ -316,7 +533,40 @@ export default function SprintDetail() {
     setModifiedTaskIds(old => new Set(old).add(taskId));
   };
 
+  const isWeekendStr = (dateStr) => {
+    if (!dateStr) return false;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    const dayOfWeek = d.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6; // 0: Sunday, 6: Saturday
+  };
+
   const handleStartDateChange = (taskId, newDate) => {
+    if (!newDate) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, planned_start_date: null } : t));
+      setModifiedTaskIds(old => new Set(old).add(taskId));
+      return;
+    }
+
+    // 1. Sprint boundaries check
+    if (sprint && (newDate < sprint.start_date || newDate > sprint.end_date)) {
+      alert(`Invalid Start Date: Please choose a date within the sprint boundaries (${sprint.start_date} to ${sprint.end_date}).`);
+      return;
+    }
+
+    // 2. Weekend check
+    if (isWeekendStr(newDate)) {
+      alert("Invalid Start Date: Saturdays and Sundays cannot be selected as working days.");
+      return;
+    }
+
+    // 3. Compare with existing end date
+    const currentTask = tasks.find(t => t.id === taskId);
+    if (currentTask && currentTask.planned_end_date && newDate > currentTask.planned_end_date) {
+      alert("Invalid Start Date: The start date cannot be after the planned end date.");
+      return;
+    }
+
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
         return { ...t, planned_start_date: newDate };
@@ -327,6 +577,31 @@ export default function SprintDetail() {
   };
 
   const handleEndDateChange = (taskId, newDate) => {
+    if (!newDate) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, planned_end_date: null } : t));
+      setModifiedTaskIds(old => new Set(old).add(taskId));
+      return;
+    }
+
+    // 1. Sprint boundaries check
+    if (sprint && (newDate < sprint.start_date || newDate > sprint.end_date)) {
+      alert(`Invalid End Date: Please choose a date within the sprint boundaries (${sprint.start_date} to ${sprint.end_date}).`);
+      return;
+    }
+
+    // 2. Weekend check
+    if (isWeekendStr(newDate)) {
+      alert("Invalid End Date: Saturdays and Sundays cannot be selected as working days.");
+      return;
+    }
+
+    // 3. Compare with existing start date
+    const currentTask = tasks.find(t => t.id === taskId);
+    if (currentTask && currentTask.planned_start_date && newDate < currentTask.planned_start_date) {
+      alert("Invalid End Date: The end date cannot be before the planned start date.");
+      return;
+    }
+
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
         return { ...t, planned_end_date: newDate };
@@ -359,6 +634,8 @@ export default function SprintDetail() {
       </div>
     );
   }
+
+  const isUnscheduled = tasks.length > 0 && tasks.every(t => !t.planned_start_date && !t.planned_end_date);
 
   return (
     <div className={`p-6 sm:p-8 mx-auto min-h-screen ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'}`}>
@@ -401,10 +678,47 @@ export default function SprintDetail() {
       </div>
 
       <div className="space-y-6 animate-fadeIn">
-        {/* Info Banner */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 text-left transition-colors duration-300 ${
-          darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
-        }`}>
+        {isUnscheduled && !isEditing ? (
+          <div className="flex flex-col items-center justify-center py-16 px-6 max-w-xl mx-auto text-center space-y-6 animate-fadeIn">
+            <div className={`rounded-3xl border p-8 shadow-xl relative overflow-hidden w-full ${
+              darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+            }`}>
+              <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-orange-500/10 dark:bg-orange-500/5 blur-3xl" />
+              <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-amber-500/10 dark:bg-amber-500/5 blur-3xl" />
+              
+              <div className="space-y-6 relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20 dark:shadow-orange-500/10 mx-auto">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-xl font-extrabold tracking-tight">AI Scheduling Suggestions</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-md mx-auto">
+                    This milestone currently has no scheduled tasks. Click the button below to generate an optimized timeline and assign members based on skills and designations, respecting weekend constraints.
+                  </p>
+                </div>
+                
+                <button
+                  onClick={handleStartGeneration}
+                  disabled={isGenerating}
+                  className="px-6 py-3 text-xs font-black tracking-wider uppercase rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md shadow-orange-500/25 dark:shadow-orange-500/15 hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-98 cursor-pointer flex items-center gap-2 mx-auto disabled:opacity-50"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-white" />
+                  )}
+                  {isGenerating ? loadingText : 'Generate AI Schedule'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Info Banner */}
+            <div className={`p-4 rounded-2xl border flex items-center gap-3 text-left transition-colors duration-300 ${
+              darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
           {isGenerating ? (
             <Loader2 className="w-5 h-5 text-orange-500 shrink-0 animate-spin" />
           ) : (
@@ -455,23 +769,11 @@ export default function SprintDetail() {
                       ) : (
                         <Save className="w-3.5 h-3.5" />
                       )}
-                      Save Changes
+                      Import
                     </button>
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={handleStartGeneration}
-                      disabled={isGenerating}
-                      className="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-98"
-                    >
-                      {isGenerating ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                      ) : (
-                        <Sparkles className="w-3.5 h-3.5 text-white" />
-                      )}
-                      {isGenerating ? 'Generating...' : 'Suggest AI Schedule'}
-                    </button>
                     <button
                       onClick={handleSyncClick}
                       disabled={isSyncing}
@@ -532,7 +834,7 @@ export default function SprintDetail() {
                     <th className={`py-2.5 px-4 border-r ${
                       darkMode ? 'border-slate-800' : 'border-slate-200'
                     }`}>
-                      Remarks
+                      Recommendation Reason
                     </th>
                     
                     {/* Dynamic Week headers based on timeline list */}
@@ -593,7 +895,7 @@ export default function SprintDetail() {
                     }`}>END</th>
                     <th className={`py-2 px-4 border-r w-48 ${
                       darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>REMARKS</th>
+                    }`}>RECOMMENDATION REASON</th>
                     
                     {/* Dates */}
                     {timelineDaysList.map((day, idx) => {
@@ -770,15 +1072,12 @@ export default function SprintDetail() {
                                 darkMode ? 'border-slate-800' : 'border-slate-200'
                               }`}>
                                 {isEditing ? (
-                                  <input
-                                    type="date"
-                                    value={task.planned_start_date || ""}
-                                    onChange={(e) => handleStartDateChange(task.id, e.target.value)}
-                                    className={`p-1.5 rounded-lg text-[11px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
-                                      darkMode
-                                        ? 'bg-slate-900 border-slate-750 text-white'
-                                        : 'bg-white border-slate-250 text-slate-800'
-                                    }`}
+                                  <CustomDatePicker
+                                    value={task.planned_start_date}
+                                    minDate={sprint?.start_date}
+                                    maxDate={task.planned_end_date || sprint?.end_date}
+                                    onChange={(newDate) => handleStartDateChange(task.id, newDate)}
+                                    darkMode={darkMode}
                                   />
                                 ) : (
                                   <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
@@ -792,18 +1091,15 @@ export default function SprintDetail() {
                                 darkMode ? 'border-slate-800' : 'border-slate-200'
                               }`}>
                                 {isEditing ? (
-                                  <input
-                                    type="date"
-                                    value={task.planned_end_date || ""}
-                                    onChange={(e) => handleEndDateChange(task.id, e.target.value)}
-                                    className={`p-1.5 rounded-lg text-[11px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
-                                      darkMode
-                                        ? 'bg-slate-900 border-slate-750 text-white'
-                                        : 'bg-white border-slate-250 text-slate-800'
-                                    }`}
+                                  <CustomDatePicker
+                                    value={task.planned_end_date}
+                                    minDate={task.planned_start_date || sprint?.start_date}
+                                    maxDate={sprint?.end_date}
+                                    onChange={(newDate) => handleEndDateChange(task.id, newDate)}
+                                    darkMode={darkMode}
                                   />
                                 ) : (
-                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-550'}>
                                     {task.planned_end_date || <span className="opacity-30">-</span>}
                                   </span>
                                 )}
@@ -813,7 +1109,7 @@ export default function SprintDetail() {
                               <td className={`py-4 px-4 border-r align-middle text-[10px] text-left italic ${
                                 darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-550'
                               }`}>
-                                {task.jira_id || <span className="opacity-30">-</span>}
+                                {task.recommendation_reason || task.jira_id || <span className="opacity-30">-</span>}
                               </td>
 
                               {/* Timeline cells */}
@@ -872,8 +1168,9 @@ export default function SprintDetail() {
               </table>
             </div>
           </div>
-        </div>
-
-      </div>
+        </>
+      )}
+    </div>
+  </div>
     );
   }
