@@ -343,28 +343,21 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleImportSuccess = async ({ milestoneName, tasksWithDates, targetProjectKey }) => {
+  const handleImportSuccess = async ({ milestoneName, tasks, sprintStartDate, sprintEndDate, targetProjectKey }) => {
     try {
-      let startDate = new Date().toISOString().split('T')[0];
-      let endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      if (tasksWithDates.length > 0) {
-        if (tasksWithDates[0].startDate) startDate = tasksWithDates[0].startDate;
-        if (tasksWithDates[0].endDate) endDate = tasksWithDates[0].endDate;
-      }
-
       const sprintData = {
         name: milestoneName,
         goal: '',
-        start_date: startDate,
-        end_date: endDate,
+        start_date: sprintStartDate,
+        end_date: sprintEndDate,
         status: 'PLANNED',
-        tasks: tasksWithDates
+        tasks: tasks
       };
 
       await SprintServices.createSprint(projectId, sprintData);
       await fetchSprints();
 
-      setSuccessAlert(`Successfully imported Milestone "${milestoneName}" with ${tasksWithDates.length} tasks!`);
+      setSuccessAlert(`Successfully imported Milestone "${milestoneName}" with ${tasks.length} tasks!`);
       setTimeout(() => setSuccessAlert(null), 5000);
     } catch (err) {
       console.error('[ProjectDetail] Error creating sprint:', err);

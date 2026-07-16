@@ -115,6 +115,7 @@ class EmployeeProfile(models.Model):
 
     skills = models.ManyToManyField(
         'project.Skill',
+        through='EmployeeSkill',
         related_name="employee_profiles",
         blank=True
     )
@@ -143,3 +144,26 @@ class BlacklistedEmployeeToken(models.Model):
 
     def __str__(self):
         return f"Blacklisted Token {self.id}"
+
+
+class EmployeeSkill(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employee = models.ForeignKey(
+        'EmployeeProfile',
+        on_delete=models.CASCADE,
+        related_name='employee_skill_relations'
+    )
+    skill = models.ForeignKey(
+        'project.Skill',
+        on_delete=models.CASCADE,
+        related_name='employee_skill_relations'
+    )
+    proficiency_level = models.PositiveSmallIntegerField(default=1)  # 1-10
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'employee_skills'
+        unique_together = ('employee', 'skill')
+
+    def __str__(self):
+        return f"{self.employee.user.full_name} - {self.skill.name} (Level {self.proficiency_level})"
