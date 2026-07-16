@@ -163,7 +163,7 @@ class ProjectService:
                 status__in=[Project.Status.ACTIVE, Project.Status.ON_HOLD]
             ).exists()
             
-            new_status = EmployeeProfile.Status.BUSY if (is_member or is_lead) else EmployeeProfile.Status.WFH
+            new_status = EmployeeProfile.Status.BUSY if (is_member or is_lead) else EmployeeProfile.Status.WFM
             if profile.status != new_status:
                 profile.status = new_status
                 profile.save(update_fields=["status"])

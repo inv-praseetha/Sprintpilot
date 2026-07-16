@@ -46,8 +46,9 @@ export default function AddMembersModal({
           projectSkill.id === skill.parent
         )
       ));
+      const isAvailableStatus = emp.status === 'ACTIVE' || emp.status === 'WFM';
 
-      return !isLead && !isMember && matchesSearch && matchesSkills;
+      return !isLead && !isMember && matchesSearch && matchesSkills && isAvailableStatus;
     });
   }, [employees, project, memberSearchQuery]);
 

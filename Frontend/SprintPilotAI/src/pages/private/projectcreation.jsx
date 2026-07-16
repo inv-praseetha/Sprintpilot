@@ -25,7 +25,7 @@ import {
   Trash2
 } from 'lucide-react';
 
-export const calculateEndDate = (startDateStr, workingDaysStr) => {
+const calculateEndDate = (startDateStr, workingDaysStr) => {
   if (!startDateStr || !workingDaysStr) return '';
   const totalDays = parseInt(workingDaysStr, 10);
   if (isNaN(totalDays) || totalDays <= 0) return '';
@@ -237,7 +237,9 @@ export default function ProjectCreation() {
   // Dynamic filter: Show only employees who possess all of the selected skills.
   // If no skills are selected, show all active employees.
   const filteredEmployeesForSelection = useMemo(() => {
-    const activeEmployees = employees.filter(emp => emp.status !== 'BUSY' || selectedMembers.includes(emp.id));
+    const activeEmployees = employees.filter(emp => 
+      emp.status === 'ACTIVE' || emp.status === 'WFM' || selectedMembers.includes(emp.id)
+    );
     if (selectedSkills.length === 0) return activeEmployees;
     return activeEmployees.filter(emp =>
       emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId)))
