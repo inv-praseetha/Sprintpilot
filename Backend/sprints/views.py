@@ -1,4 +1,7 @@
 import os
+import copy
+import datetime
+import openpyxl
 from django.http import FileResponse
 from django.conf import settings
 from django.db import transaction
@@ -31,6 +34,184 @@ class SprintDownloadTemplateView(APIView):
         )
         response['Content-Disposition'] = 'attachment; filename="tasks_template.xlsx"'
         return response
+
+class SprintDownloadScheduleView(APIView):
+    """
+    API View to load the Excel gantt_template.xlsx, populate the sprint project info and tasks,
+    and return the styled Excel sheet with auto-updating formulas and conditional formatting.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, sprint_id, *args, **kwargs):
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        template_path = os.path.join(settings.BASE_DIR, 'templates', 'gantt_template.xlsx')
+        if not os.path.exists(template_path):
+            return Response(
+                {"detail": "Gantt template file not found on server."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            wb = openpyxl.load_workbook(template_path)
+            ws = wb.active
+            
+            # 1. Populate project header info
+            ws["B1"] = sprint.project.name
+            
+            start_date = sprint.start_date
+            if isinstance(start_date, str):
+                start_date = datetime.date.fromisoformat(start_date)
+            
+            # Write to E2 (Project Start) and E3 (Display Week) to align template formulas
+            ws["E2"] = start_date
+            ws["E3"] = 1 # Display Week is normally 1
+            
+            # 2. Gather tasks and group by category
+            tasks = sprint.tasks.all().order_by('created_at')
+            
+            # Categories in required order
+            category_mapping = [
+                ('UI', 'UI Development'),
+                ('Backend', 'Backend Development'),
+                ('INFRA', 'Infra Development'),
+                ('QA', 'QA Development')
+            ]
+            
+            # Save original styles from the template rows (B through G)
+            styles = {}
+            for cat_key, cat_name in category_mapping:
+                # Determine template row based on original cell positions
+                if cat_name == 'UI Development':
+                    template_row = 10
+                elif cat_name == 'Backend Development':
+                    template_row = 20
+                elif cat_name == 'Infra Development':
+                    template_row = 30
+                else: # QA Development / QA
+                    template_row = 35
+                    
+                styles[cat_name] = []
+                for col in range(2, 8): # columns B to G (2 to 7)
+                    cell = ws.cell(row=template_row, column=col)
+                    styles[cat_name].append({
+                        'fill': copy.copy(cell.fill) if cell.fill else None,
+                        'font': copy.copy(cell.font) if cell.font else None,
+                        'border': copy.copy(cell.border) if cell.border else None,
+                        'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                        'number_format': cell.number_format
+                    })
+                    
+            # Also save standard task row style (using Row 11)
+            styles['task'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=11, column=col)
+                styles['task'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+                
+            # 3. Clear schedule area columns B to G in rows 7 to 51
+            for r in range(7, 52):
+                for c in range(2, 8):
+                    cell = ws.cell(row=r, column=c)
+                    cell.value = None
+                    # Apply regular task style to clean up any old header formats in that row
+                    style_info = styles['task'][c - 2]
+                    if style_info['fill']: cell.fill = style_info['fill']
+                    if style_info['font']: cell.font = style_info['font']
+                    if style_info['border']: cell.border = style_info['border']
+                    if style_info['alignment']: cell.alignment = style_info['alignment']
+                    cell.number_format = style_info['number_format']
+            
+            # 4. Write data sequentially starting at Row 10
+            current_row = 10
+            for cat_key, cat_name in category_mapping:
+                cat_tasks = [t for t in tasks if t.category == cat_key]
+                
+                # Write Phase Header
+                style_list = styles[cat_name]
+                for col_idx in range(2, 8):
+                    cell = ws.cell(row=current_row, column=col_idx)
+                    style_info = style_list[col_idx - 2]
+                    if style_info['fill']: cell.fill = style_info['fill']
+                    if style_info['font']: cell.font = style_info['font']
+                    if style_info['border']: cell.border = style_info['border']
+                    if style_info['alignment']: cell.alignment = style_info['alignment']
+                    cell.number_format = style_info['number_format']
+                
+                ws.cell(row=current_row, column=2, value=cat_name) # Column B
+                current_row += 1
+                
+                # Write tasks under this phase
+                for task in cat_tasks:
+                    # Write values
+                    ws.cell(row=current_row, column=2, value=task.title) # Column B: Task Name
+                    
+                    # Column C: Assigned To
+                    assignee_name = ""
+                    if task.assigned_employee and task.assigned_employee.user:
+                        assignee_name = task.assigned_employee.user.full_name or ""
+                    ws.cell(row=current_row, column=3, value=assignee_name)
+                    
+                    # Column D: Progress
+                    progress_val = 0.0
+                    if task.status == 'DONE':
+                        progress_val = 1.0
+                    elif task.status == 'QA':
+                        progress_val = 0.90
+                    elif task.status == 'IN_REVIEW':
+                        progress_val = 0.80
+                    elif task.status == 'IN_PROGRESS':
+                        progress_val = 0.50
+                    ws.cell(row=current_row, column=4, value=progress_val)
+                    
+                    # Column E: Start Date
+                    t_start = task.planned_start_date
+                    if isinstance(t_start, str):
+                        t_start = datetime.date.fromisoformat(t_start)
+                    ws.cell(row=current_row, column=5, value=t_start)
+                    
+                    # Column F: End Date
+                    t_end = task.planned_end_date
+                    if isinstance(t_end, str):
+                        t_end = datetime.date.fromisoformat(t_end)
+                    ws.cell(row=current_row, column=6, value=t_end)
+                    
+                    # Column G: Remarks
+                    remarks = f"Priority: {task.priority}"
+                    if task.jira_id:
+                        remarks += f" ({task.jira_id})"
+                    ws.cell(row=current_row, column=7, value=remarks)
+                    
+                    current_row += 1
+            
+            import io
+            buffer = io.BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+            
+            clean_sprint_name = "".join([c if c.isalnum() else "_" for c in sprint.name])
+            filename = f"Schedule_{clean_sprint_name}.xlsx"
+            
+            response = FileResponse(
+                buffer, 
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+            
+        except Exception as e:
+            return Response(
+                {"detail": f"Excel generation failed: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class SprintListCreateView(APIView):
     """

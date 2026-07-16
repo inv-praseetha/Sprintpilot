@@ -15,7 +15,8 @@ import {
   Edit3,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 
 const categoryConfig = {
@@ -499,6 +500,35 @@ export default function SprintDetail() {
     }, 1000);
   };
 
+  const handleDownloadSchedule = async () => {
+    if (!sprint) return;
+    try {
+      const response = await apiClient.get(`sprints/${sprint.id}/download-schedule/`, {
+        responseType: 'blob'
+      });
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Schedule_${sprint.name.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+      if (contentDisposition) {
+        const matches = /filename="([^"]+)"/.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
+      }
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Failed to download schedule. Please try again.");
+    }
+  };
+
   // Handler helpers for inline fields edit
   const handleAssigneeChange = (taskId, employeeId) => {
     setTasks(prev => prev.map(t => {
@@ -752,6 +782,17 @@ export default function SprintDetail() {
                   </>
                 ) : (
                   <>
+                    <button
+                      onClick={handleDownloadSchedule}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors ${
+                        darkMode 
+                          ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-400" />
+                      Download
+                    </button>
                     <button
                       onClick={handleSyncClick}
                       disabled={isSyncing}
