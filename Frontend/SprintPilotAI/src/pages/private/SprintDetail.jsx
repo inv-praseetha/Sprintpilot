@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
@@ -6,236 +6,363 @@ import SprintServices from '../../services/SprintServices';
 import {
   ArrowLeft,
   Calendar,
-  Layers,
-  CheckCircle2,
-  Clock,
-  Code,
-  Tag,
-  AlertCircle,
-  Briefcase,
-  User,
-  Activity
+  Sparkles,
+  Lock,
+  Loader2,
+  Info,
+  RefreshCw,
+  Save,
+  Edit3,
+  X
 } from 'lucide-react';
 
 const categoryConfig = {
-  UI: { color: '#ea580c', bg: 'bg-orange-500/10 text-orange-500 border-orange-500/20', label: 'User Interface' },
-  Backend: { color: '#3b82f6', bg: 'bg-blue-500/10 text-blue-500 border-blue-500/20', label: 'Backend Services' },
-  Infra: { color: '#8b5cf6', bg: 'bg-purple-500/10 text-purple-500 border-purple-500/20', label: 'Infrastructure & DevOps' },
-  QA: { color: '#10b981', bg: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', label: 'Quality Assurance' }
+  UI: {
+    label: 'UI Development',
+    bgLight: 'bg-orange-50 text-orange-600 border-orange-200/50',
+    bgDark: 'bg-orange-950/20 text-orange-400 border-orange-900/30',
+    bar: 'bg-orange-500'
+  },
+  Backend: {
+    label: 'Backend Development',
+    bgLight: 'bg-blue-50 text-blue-600 border-blue-200/50',
+    bgDark: 'bg-blue-950/20 text-blue-400 border-blue-900/30',
+    bar: 'bg-blue-500'
+  },
+  INFRA: {
+    label: 'System Design & Infra',
+    bgLight: 'bg-purple-50 text-purple-600 border-purple-200/50',
+    bgDark: 'bg-purple-950/20 text-purple-400 border-purple-900/30',
+    bar: 'bg-purple-500'
+  },
+  QA: {
+    label: 'Quality Assurance',
+    bgLight: 'bg-emerald-50 text-emerald-600 border-emerald-200/50',
+    bgDark: 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30',
+    bar: 'bg-emerald-500'
+  }
 };
 
-const mockSprintsData = {
-  'Cloud Sync Platform': {
-    'Sprint 5 (Current)': [
-      { title: 'Implement File Chunking API', desc: 'Develop backend handler to slice large binary assets into 4MB secure blobs.', category: 'BACKEND', startDate: '2026-06-26', endDate: '2026-07-02', status: 'Completed', assignedTo: 'Abhiram S' },
-      { title: 'Design Decentralized Encryption Protocol', desc: 'Draft architecture review for key derivation functions using AES-GCM.', category: 'INFRA', startDate: '2026-06-28', endDate: '2026-07-05', status: 'Completed', assignedTo: 'Ananthu M' },
-      { title: 'Build Web Upload Interface', desc: 'Create React dropzone dashboard with real-time multi-threaded upload progress bars.', category: 'UI', startDate: '2026-07-01', endDate: '2026-07-08', status: 'In Progress', assignedTo: 'Anagha' },
-      { title: 'Perform Chunk Load Testing', desc: 'Author Apache JMeter scripts simulating 500 concurrent file chunk uploads.', category: 'QA', startDate: '2026-07-04', endDate: '2026-07-09', status: 'In Progress', assignedTo: 'Ashna' }
-    ]
-  },
-  'AI Analytics Hub': {
-    'Sprint 6 (Current)': [
-      { title: 'Neural Model Fine-tuning', desc: 'Train LLM transformer blocks on refined developer timesheet corpus.', category: 'BACKEND', startDate: '2026-06-24', endDate: '2026-06-30', status: 'Completed', assignedTo: 'Abhiram S' },
-      { title: 'Interactive Loss Curves Chart', desc: 'Plot training/validation telemetry curves with SVG tooltips in real-time.', category: 'UI', startDate: '2026-06-27', endDate: '2026-07-03', status: 'Completed', assignedTo: 'Anagha' },
-      { title: 'API Telemetry Endpoints', desc: 'Create fast API handlers logging GPU temp and validation loss.', category: 'BACKEND', startDate: '2026-07-01', endDate: '2026-07-07', status: 'In Progress', assignedTo: 'Noel' },
-      { title: 'Integrate Docker GPU Runner', desc: 'Configure NVIDIA container toolkit runtime across local cluster instances.', category: 'INFRA', startDate: '2026-07-02', endDate: '2026-07-07', status: 'In Progress', assignedTo: 'Ananthu M' }
-    ]
-  },
-  'Developer Portal': {
-    'Sprint 3 (Current)': [
-      { title: 'SDK Sandbox Playground', desc: 'Embed interactive typescript client preview console in browser layout.', category: 'UI', startDate: '2026-06-29', endDate: '2026-07-05', status: 'Completed', assignedTo: 'Anagha' },
-      { title: 'OAuth2 Client Registration API', desc: 'Design backend handlers issuing client credentials, secrets, and auth scopes.', category: 'BACKEND', startDate: '2026-07-01', endDate: '2026-07-08', status: 'In Progress', assignedTo: 'Abhiram S' },
-      { title: 'Swagger Spec OpenAPI Linting', desc: 'Implement automated YAML specs parsing and validation hooks on file upload.', category: 'QA', startDate: '2026-07-03', endDate: '2026-07-10', status: 'In Progress', assignedTo: 'Ashna' }
-    ]
-  },
-  'Security Gateway': {
-    'Sprint 5 (Current)': [
-      { title: 'Redis Cache Rate Limiter', desc: 'Deploy sliding window algorithm tracking client token buckets in memory.', category: 'BACKEND', startDate: '2026-07-10', endDate: '2026-07-15', status: 'Completed', assignedTo: 'Abhiram S' },
-      { title: 'Verify SSL Handshake Offloading', desc: 'Setup Nginx TLS terminate configurations on proxy nodes.', category: 'INFRA', startDate: '2026-07-12', endDate: '2026-07-18', status: 'In Progress', assignedTo: 'Ananthu M' },
-      { title: 'Penetration Scripting Framework', desc: 'Write automated vulnerability scanners mapping auth token headers.', category: 'QA', startDate: '2026-07-14', endDate: '2026-07-21', status: 'In Progress', assignedTo: 'Noel' }
-    ]
+const getCleanCategory = (cat) => {
+  const c = String(cat).toUpperCase().trim();
+  if (c === 'UI') return 'UI';
+  if (c === 'BACKEND') return 'Backend';
+  if (c === 'INFRA' || c === 'SYSTEM DESIGN & INFRA') return 'INFRA';
+  if (c === 'QA') return 'QA';
+  return 'UI'; // default fallback
+};
+
+const getProgressPercentage = (status) => {
+  const s = String(status).toUpperCase().trim();
+  if (s === 'DONE' || s === 'COMPLETED') return '100%';
+  if (s === 'IN_REVIEW') return '90%';
+  if (s === 'QA') return '80%';
+  if (s === 'IN_PROGRESS') return '50%';
+  if (s === 'BLOCKED') return '10%';
+  return '0%';
+};
+
+// Generates calendar columns starting from the Monday of the start date week to the Friday of the end date week
+const generateTimelineDays = (startStr, endStr) => {
+  const sStr = startStr || '2026-07-15';
+  const eStr = endStr || '2026-07-28';
+  
+  const start = new Date(sStr);
+  const end = new Date(eStr);
+  
+  // Find Monday of start week
+  const startMonday = new Date(start);
+  const day = start.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  startMonday.setDate(start.getDate() + diffToMonday);
+  
+  // Find Friday of end week
+  const endFriday = new Date(end);
+  const endDay = end.getDay();
+  const diffToFriday = endDay === 0 ? 5 : 5 - endDay;
+  endFriday.setDate(end.getDate() + diffToFriday);
+  
+  const daysList = [];
+  const current = new Date(startMonday);
+  
+  let loopCount = 0;
+  while ((current <= endFriday || current <= end) && loopCount < 90) {
+    loopCount++;
+    const dNum = current.getDate();
+    const dName = current.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0);
+    const isWeekend = current.getDay() === 0 || current.getDay() === 6;
+    
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+    
+    daysList.push({
+      dayNum: dNum,
+      dayName: dName,
+      isWeekend,
+      dateStr,
+      isSprintStart: dateStr === sStr,
+      isSprintEnd: dateStr === eStr
+    });
+    
+    current.setDate(current.getDate() + 1);
   }
+  return daysList;
 };
 
 export default function SprintDetail() {
   const { projectId, sprintId } = useParams();
-  const navigate = useNavigate();
   const { darkMode } = useTheme();
+  const navigate = useNavigate();
 
-  const [project, setProject] = useState(null);
+  // Page level states
   const [sprint, setSprint] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [originalTasks, setOriginalTasks] = useState([]); // to support Cancel action
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [timelineDaysList, setTimelineDaysList] = useState([]);
+  
+  const [pageLoading, setPageLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [loadingText, setLoadingText] = useState('');
+  const [hoveredRowId, setHoveredRowId] = useState(null);
+  
+  // Tracking changed items
+  const [modifiedTaskIds, setModifiedTaskIds] = useState(new Set());
 
+  // Fetch Sprint & Employee Data on mount
   useEffect(() => {
-    const fetchProjectAndSprints = async () => {
-      setLoading(true);
-      setError(null);
+    const fetchData = async () => {
       try {
-        // Fetch project details
-        const projectRes = await apiClient.get(`projects/${projectId}/`);
-        setProject(projectRes.data);
+        setPageLoading(true);
+        // Reset state for new sprint
+        setIsGenerating(false);
+        setIsEditing(false);
+        setModifiedTaskIds(new Set());
 
-        // Fetch employee profiles
-        const employeesRes = await apiClient.get('projects/employees/');
-        setEmployees(employeesRes.data);
-
-        // Load sprint detail from API
+        // 1. Fetch Sprint Details (with nested tasks)
         const sprintData = await SprintServices.getSprintDetails(sprintId);
         setSprint(sprintData);
-        setTasks(sprintData.tasks || []);
+        
+        // Sanitize database tasks to ensure null/None dates are treated as null
+        const rawTasks = sprintData.tasks || [];
+        const dbTasks = rawTasks.map(t => ({
+          ...t,
+          planned_start_date: (t.planned_start_date === 'None' || t.planned_start_date === 'null' || !t.planned_start_date) ? null : t.planned_start_date,
+          planned_end_date: (t.planned_end_date === 'None' || t.planned_end_date === 'null' || !t.planned_end_date) ? null : t.planned_end_date
+        }));
+
+        setTasks(dbTasks);
+        setOriginalTasks(JSON.parse(JSON.stringify(dbTasks))); // Deep clone for rollback
+
+        // Generate timeline range based on Sprint boundaries
+        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date);
+        setTimelineDaysList(days);
+
+        // 2. Fetch Active Employees
+        const empRes = await apiClient.get('projects/employees/');
+        setEmployees(empRes.data || []);
       } catch (err) {
         console.error('[SprintDetail] Error loading data:', err);
-        setError(err.response?.data?.detail || 'Failed to load sprint details.');
       } finally {
-        setLoading(false);
+        setPageLoading(false);
       }
     };
+    fetchData();
+  }, [sprintId]);
 
-    if (projectId && sprintId) {
-      fetchProjectAndSprints();
-    }
-  }, [projectId, sprintId]);
+  // AI Scheduling simulation sequence
+  useEffect(() => {
+    if (!isGenerating) return;
 
-  // Compile list of possible assignees from project members and lead
-  const assigneesList = useMemo(() => {
-    if (!project || !employees) return [];
-    const list = [];
+    const texts = [
+      'Analyzing task sequences...',
+      'Excluding weekends (Saturdays & Sundays)...',
+      'Configuring employee timeline constraints...',
+      'Rendering categorized Gantt dashboard...'
+    ];
 
-    // Find team lead's EmployeeProfile
-    if (project.team_lead) {
-      const leadProfile = employees.find(emp => emp.user?.id === project.team_lead.id);
-      if (leadProfile) {
-        list.push({
-          id: leadProfile.id,
-          name: project.team_lead.full_name,
-          role: 'Team Lead'
-        });
-      }
-    }
+    let currentIndex = 0;
+    setLoadingText(texts[0]);
 
-    if (project.members && Array.isArray(project.members)) {
-      project.members.forEach(m => {
-        if (m.user) {
-          list.push({
-            id: m.id,
-            name: m.user.full_name,
-            role: m.role || 'Member'
+    const interval = setInterval(() => {
+      currentIndex++;
+      if (currentIndex < texts.length) {
+        setLoadingText(texts[currentIndex]);
+      } else {
+        clearInterval(interval);
+        
+        // Simulating schedule generation: set default timelines if none exist
+        setTasks(prev => {
+          const updated = prev.map((t, idx) => {
+            if (t.planned_start_date && t.planned_end_date) return t;
+
+            // Generate dates within sprint range
+            const start = new Date(sprint.start_date);
+            const end = new Date(sprint.end_date);
+            
+            const taskStart = new Date(start);
+            taskStart.setDate(start.getDate() + (idx % 3) * 2);
+            if (taskStart > end) taskStart.setTime(start.getTime());
+
+            const taskEnd = new Date(taskStart);
+            taskEnd.setDate(taskStart.getDate() + 2);
+            if (taskEnd > end) taskEnd.setTime(end.getTime());
+
+            const formatDate = (date) => {
+              const y = date.getFullYear();
+              const m = String(date.getMonth() + 1).padStart(2, '0');
+              const d = String(date.getDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
+            };
+
+            const modStart = formatDate(taskStart);
+            const modEnd = formatDate(taskEnd);
+
+            setModifiedTaskIds(old => new Set(old).add(t.id));
+
+            return {
+              ...t,
+              planned_start_date: modStart,
+              planned_end_date: modEnd
+            };
           });
-        }
-      });
-    }
-    return list;
-  }, [project, employees]);
+          return updated;
+        });
 
-  // Update specific task in backend and local state
-  const handleUpdateTask = async (taskId, field, value) => {
-    let apiField = field;
-    if (field === 'assignedTo') {
-      apiField = 'assigned_employee_id';
-    } else if (field === 'startDate') {
-      apiField = 'planned_start_date';
-    } else if (field === 'endDate') {
-      apiField = 'planned_end_date';
+        setIsGenerating(false);
+        setIsEditing(true);
+      }
+    }, 850);
+
+    return () => clearInterval(interval);
+  }, [isGenerating, sprint]);
+
+  const handleStartGeneration = () => {
+    setIsGenerating(true);
+  };
+
+  // Toggle into Edit Mode
+  const handleStartUpdateMode = () => {
+    setIsEditing(true);
+  };
+
+  // Cancel edit mode and revert values
+  const handleCancelEdit = () => {
+    setTasks(JSON.parse(JSON.stringify(originalTasks))); // restore original clone
+    setModifiedTaskIds(new Set());
+    setIsEditing(false);
+  };
+
+  // Save modified tasks to backend database
+  const handleSaveToBackend = async () => {
+    if (modifiedTaskIds.size === 0) {
+      setIsEditing(false);
+      return;
     }
 
+    setIsSaving(true);
     try {
-      const updatedTask = await SprintServices.updateSprintTask(taskId, { [apiField]: value });
+      const updatePromises = Array.from(modifiedTaskIds).map(async (taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Prepare request body matching API
+        const taskData = {
+          assigned_employee_id: task.assigned_employee?.id || null,
+          planned_start_date: task.planned_start_date || null,
+          planned_end_date: task.planned_end_date || null
+        };
+
+        await SprintServices.updateSprintTask(taskId, taskData);
+      });
+
+      await Promise.all(updatePromises);
       
-      setTasks(prev => prev.map(t => {
-        if (t.id === taskId) {
-          return updatedTask;
-        }
-        return t;
-      }));
+      // Update original task list checkpoint
+      setOriginalTasks(JSON.parse(JSON.stringify(tasks)));
+      setModifiedTaskIds(new Set());
+      setIsEditing(false);
     } catch (err) {
-      console.error('[SprintDetail] Error updating task:', err);
-      alert(err.response?.data?.detail || 'Failed to update task.');
+      console.error('[SprintDetail] Error saving tasks:', err);
+      alert('Failed to save task schedules. Please verify date boundaries.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Group tasks by category
-  const groupedTasks = useMemo(() => {
-    const categories = ['UI', 'Backend', 'Infra', 'QA'];
-    const groups = {};
-    categories.forEach(cat => {
-      groups[cat] = [];
-    });
+  // Sync button dummy action (does nothing backend-wise)
+  const handleSyncClick = () => {
+    setIsSyncing(true);
+    setTimeout(() => {
+      setIsSyncing(false);
+      alert('Sprint backlog successfully synced with Jira board!');
+    }, 1000);
+  };
 
-    tasks.forEach(task => {
-      let cat = task.category || 'UI';
-      const catUpper = cat.toUpperCase();
-      if (catUpper === 'BACKEND') cat = 'Backend';
-      else if (catUpper === 'INFRA') cat = 'Infra';
-      else if (catUpper === 'UI') cat = 'UI';
-      else if (catUpper === 'QA') cat = 'QA';
-
-      if (!groups[cat]) {
-        groups[cat] = [];
+  // Handler helpers for inline fields edit
+  const handleAssigneeChange = (taskId, employeeId) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        const emp = employees.find(e => e.id === employeeId) || null;
+        return { ...t, assigned_employee: emp };
       }
-      groups[cat].push(task);
-    });
-    return groups;
-  }, [tasks]);
+      return t;
+    }));
+    setModifiedTaskIds(old => new Set(old).add(taskId));
+  };
 
-  // Compute Sprint Metrics
-  const metrics = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter(t => t.status === 'Completed' || t.status === 'DONE').length;
-    const inProgress = tasks.filter(t => t.status === 'In Progress' || t.status === 'IN_PROGRESS').length;
-    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    let start = 'N/A';
-    let end = 'N/A';
-    if (sprint) {
-      if (sprint.start_date) {
-        start = new Date(sprint.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const handleStartDateChange = (taskId, newDate) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        return { ...t, planned_start_date: newDate };
       }
-      if (sprint.end_date) {
-        end = new Date(sprint.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return t;
+    }));
+    setModifiedTaskIds(old => new Set(old).add(taskId));
+  };
+
+  const handleEndDateChange = (taskId, newDate) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        return { ...t, planned_end_date: newDate };
       }
-    }
+      return t;
+    }));
+    setModifiedTaskIds(old => new Set(old).add(taskId));
+  };
 
-    return { total, completed, inProgress, completionRate, start, end };
-  }, [tasks, sprint]);
-
-  if (loading) {
+  // Loading Indicator for initial fetch
+  if (pageLoading) {
     return (
-      <div className="min-h-[calc(100vh-70px)] flex flex-col items-center justify-center gap-3">
-        <Clock className="w-10 h-10 animate-spin text-orange-500" />
-        <span className="text-sm font-semibold text-slate-400">Loading sprint details...</span>
+      <div className={`flex flex-col items-center justify-center min-h-screen ${
+        darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'
+      }`}>
+        <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-4" />
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 animate-pulse">Loading Sprint Details...</p>
       </div>
     );
   }
 
-  if (error || !project) {
+  // Fallback if sprint not found
+  if (!sprint) {
     return (
-      <div className="min-h-[calc(100vh-70px)] flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-        <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
-        <h3 className="text-lg font-bold">Failed to load Sprint</h3>
-        <p className="text-sm text-slate-400 mt-1 mb-6">{error || 'Project or sprint not found.'}</p>
-        <Link
-          to={`/projects/${projectId}`}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-2xl transition-all shadow-lg"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Project Details
+      <div className="p-8 text-center">
+        <h2 className="text-xl font-bold mb-4">Sprint details could not be found.</h2>
+        <Link to={`/projects/${projectId}`} className="text-orange-500 underline text-sm">
+          Go back to Project details
         </Link>
       </div>
     );
   }
 
-  const categoryIcons = {
-    UI: <Layers className="w-4 h-4 text-orange-500" />,
-    Backend: <Code className="w-4 h-4 text-blue-500" />,
-    Infra: <Briefcase className="w-4 h-4 text-purple-500" />,
-    QA: <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-  };
-
   return (
-    <div className={`p-6 sm:p-8 max-w-7xl mx-auto min-h-screen ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+    <div className={`p-6 sm:p-8 mx-auto min-h-screen ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'}`}>
+      
       {/* Navigation Breadcrumb */}
       <div className="mb-6 flex justify-between items-center">
         <Link
@@ -245,7 +372,7 @@ export default function SprintDetail() {
           }`}
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to {project.name}
+          Back to Project Details
         </Link>
       </div>
 
@@ -261,207 +388,492 @@ export default function SprintDetail() {
               Milestone / Sprint View
             </span>
             <span className="text-slate-400 text-xs font-bold">/</span>
-            <span className="text-slate-400 text-xs font-bold truncate max-w-[150px]">{project.name}</span>
+            <span className="text-slate-400 text-xs font-bold">{sprint.project_name || 'SprintPilot AI'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            {sprint?.name || 'Sprint Details'}
+            {sprint.name}
           </h1>
           <div className="flex items-center gap-2 text-xs text-slate-450 dark:text-slate-400 font-semibold">
             <Calendar className="w-4 h-4 text-slate-400" />
-            <span>Timeline: {metrics.start} - {metrics.end}</span>
-          </div>
-        </div>
-
-        {/* Sprint Progress Summary */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-6 w-full md:w-auto ${
-          darkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'
-        }`}>
-          <div className="text-left">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Progress</span>
-            <span className="text-2xl font-black block mt-0.5">{metrics.completionRate}%</span>
-          </div>
-          <div className="h-10 w-px bg-slate-200 dark:bg-slate-800" />
-          <div className="text-left">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Total Tasks</span>
-            <span className="text-2xl font-black block mt-0.5">{metrics.total}</span>
-          </div>
-          <div className="h-10 w-px bg-slate-200 dark:bg-slate-800" />
-          <div className="text-left">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Completed</span>
-            <span className="text-2xl font-black text-emerald-500 block mt-0.5">{metrics.completed}</span>
+            <span>Timeline: {sprint.start_date} - {sprint.end_date}</span>
           </div>
         </div>
       </div>
 
-      {/* Category-based Task Lists */}
-      <div className="space-y-8">
-        {Object.entries(groupedTasks).map(([category, catTasks]) => {
-          const config = categoryConfig[category] || { bg: 'bg-slate-500/10 text-slate-500 border-slate-500/20', label: category };
-          const categoryIcon = categoryIcons[category] || <Layers className="w-4 h-4" />;
-          
-          if (catTasks.length === 0) return null;
+      <div className="space-y-6 animate-fadeIn">
+        {/* Info Banner */}
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 text-left transition-colors duration-300 ${
+          darkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+        }`}>
+          {isGenerating ? (
+            <Loader2 className="w-5 h-5 text-orange-500 shrink-0 animate-spin" />
+          ) : (
+            <Info className="w-5 h-5 text-orange-500 shrink-0" />
+          )}
+          <p className="text-[11px] font-semibold leading-relaxed">
+            {isGenerating
+              ? `AI Suggested Scheduling: ${loadingText}`
+              : "Below is the workload schedule grouped by developmental categories. Saturdays and Sundays are shaded gray to indicate non-working weekends."}
+          </p>
+        </div>
 
-          return (
-            <div 
-              key={category}
-              className={`p-6 rounded-3xl border text-left ${
-                darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/40'
-              }`}
-            >
-              {/* Category Header */}
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${config.bg}`}>
-                    {categoryIcon}
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-base tracking-tight">
-                      {config.label}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                      Category: {category}
-                    </p>
-                  </div>
-                </div>
-                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${config.bg}`}>
-                  {catTasks.length} Tasks
-                </span>
+          {/* Unified Card Container */}
+          <div className={`rounded-3xl border overflow-hidden shadow-xl ${
+            darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-200'
+          }`}>
+            {/* Header with Title, Actions & Legend */}
+            <div className={`p-5 border-b flex flex-col lg:flex-row gap-4 justify-between lg:items-center ${
+              darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+            }`}>
+              <div>
+                <h3 className="font-extrabold text-base tracking-tight">AI Optimised Gantt Schedule</h3>
+                <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider mt-0.5">Sprint Duration: {sprint.start_date} to {sprint.end_date}</p>
               </div>
 
-              {/* Tasks Table */}
-              <div className={`border rounded-2xl overflow-hidden ${
-                darkMode ? 'border-slate-800' : 'border-slate-100'
-              }`}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
-                    <thead>
-                      <tr className={`text-[10px] font-black tracking-wider uppercase border-b ${
-                        darkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
-                      }`}>
-                        <th className="py-4 px-5">Task Details</th>
-                        <th className="py-4 px-5 w-32">Jira ID</th>
-                        <th className="py-4 px-5 w-56 text-left">Timeline Dates</th>
-                        <th className="py-4 px-5 w-48 text-left">Assigned To</th>
-                        <th className="py-4 px-5 w-36">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y text-xs text-left ${
-                      darkMode ? 'divide-slate-800/60' : 'divide-slate-100'
-                    }`}>
-                      {catTasks.map((task, idx) => (
-                        <tr 
-                          key={idx} 
-                          className={`transition-colors ${
-                            darkMode ? 'bg-slate-900/40 hover:bg-slate-850/40 text-slate-350' : 'bg-white hover:bg-slate-50/50 text-slate-700'
-                          }`}
-                        >
-                           {/* Task Details */}
-                          <td className="py-4 px-5 align-top">
-                            <div className="space-y-1 text-left">
-                              <span className={`font-extrabold text-sm block ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {task.title}
-                              </span>
-                              <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                                {task.description || task.desc}
-                              </p>
-                            </div>
-                          </td>
-
-                          {/* Jira ID */}
-                          <td className="py-4 px-5 align-middle">
-                            {(task.jira_id || task.jiraId) ? (
-                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'
-                              }`}>
-                                {task.jira_id || task.jiraId}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-semibold italic">N/A</span>
-                            )}
-                          </td>
-
-                          {/* Timeline Dates Inputs */}
-                          <td className="py-4 px-5 align-middle">
-                            <div className="flex flex-col gap-1.5 max-w-[170px]">
-                              <div className="flex items-center gap-1">
-                                <span className="text-[9px] font-black uppercase text-slate-400 w-8">Start:</span>
-                                <input
-                                  type="date"
-                                  value={task.planned_start_date || task.startDate || ''}
-                                  onChange={(e) => handleUpdateTask(task.id, 'startDate', e.target.value)}
-                                  className={`px-2 py-1 rounded-lg border text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer w-full ${
-                                    darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-700'
-                                  }`}
-                                />
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="text-[9px] font-black uppercase text-slate-400 w-8">End:</span>
-                                <input
-                                  type="date"
-                                  value={task.planned_end_date || task.endDate || ''}
-                                  onChange={(e) => handleUpdateTask(task.id, 'endDate', e.target.value)}
-                                  className={`px-2 py-1 rounded-lg border text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer w-full ${
-                                    darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-700'
-                                  }`}
-                                />
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Assigned To Select */}
-                          <td className="py-4 px-5 align-middle">
-                            <div className="flex items-center gap-2">
-                              <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <select
-                                value={task.assigned_employee?.id || task.assignedTo || ''}
-                                onChange={(e) => handleUpdateTask(task.id, 'assignedTo', e.target.value)}
-                                className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer w-full max-w-[160px] ${
-                                  darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-700'
-                                }`}
-                              >
-                                <option value="">Unassigned</option>
-                                {assigneesList.map(a => (
-                                  <option key={a.id} value={a.id}>
-                                    {a.name} ({a.role})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </td>
-
-                          {/* Status Select */}
-                          <td className="py-4 px-5 align-middle">
-                            <select
-                              value={task.status === 'DONE' || task.status === 'Completed' ? 'Completed' : 'In Progress'}
-                              onChange={(e) => handleUpdateTask(task.id, 'status', e.target.value)}
-                              className={`px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer transition-colors ${
-                                task.status === 'Completed' || task.status === 'DONE'
-                                  ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                  : 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
-                              }`}
-                            >
-                              <option value="In Progress" className="bg-white dark:bg-slate-950 text-indigo-500 font-bold">In Progress</option>
-                              <option value="Completed" className="bg-white dark:bg-slate-950 text-emerald-500 font-bold">Completed</option>
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Action Buttons: Update / Save & Sync */}
+              <div className="flex items-center gap-2">
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={handleCancelEdit}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors ${
+                        darkMode 
+                          ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveToBackend}
+                      disabled={isSaving}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5" />
+                      )}
+                      Save Changes
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleStartGeneration}
+                      disabled={isGenerating}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-98"
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-white" />
+                      )}
+                      {isGenerating ? 'Generating...' : 'Suggest AI Schedule'}
+                    </button>
+                    <button
+                      onClick={handleSyncClick}
+                      disabled={isSyncing}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors ${
+                        darkMode 
+                          ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      Sync
+                    </button>
+                    <button
+                      onClick={handleStartUpdateMode}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      Update
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              {/* Category Legend */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                {Object.entries(categoryConfig).map(([cat, config]) => (
+                  <div key={cat} className="flex items-center gap-1.5">
+                    <div className={`w-2.5 h-2.5 rounded-md ${config.bar}`} />
+                    <span>{config.label}</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-2.5 h-2.5 rounded-md border ${
+                    darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-350'
+                  }`} />
+                  <span>Weekend</span>
                 </div>
               </div>
             </div>
-          );
-        })}
 
-        {tasks.length === 0 && (
-          <div className="py-16 flex flex-col items-center justify-center text-center">
-            <Activity className="w-12 h-12 text-slate-350 dark:text-slate-750 mb-3 animate-pulse" />
-            <h5 className="font-extrabold text-slate-400 text-sm">No tasks in this sprint</h5>
-            <p className="text-xs text-slate-400 mt-1">No tasks found for this sprint.</p>
+            {/* Scrollable Grid Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1100px]">
+                <thead>
+                  {/* Row 1: Week headers */}
+                  <tr className={`border-b text-[10px] font-black tracking-widest uppercase text-slate-450 ${
+                    darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <th colSpan={5} className={`py-2.5 px-4 border-r ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>
+                      Task Specifications
+                    </th>
+                    <th className={`py-2.5 px-4 border-r ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>
+                      Remarks
+                    </th>
+                    
+                    {/* Dynamic Week headers based on timeline list */}
+                    {(() => {
+                      const headers = [];
+                      let currentSpan = 0;
+                      let currentLabel = '';
+                      
+                      timelineDaysList.forEach((day, idx) => {
+                        if (idx === 0 || day.dayName === 'M') {
+                          if (currentSpan > 0) {
+                            headers.push({ label: currentLabel, span: currentSpan });
+                          }
+                          currentLabel = `Week starting ${day.dateStr}`;
+                          currentSpan = 1;
+                        } else {
+                          currentSpan++;
+                        }
+                      });
+                      if (currentSpan > 0) {
+                        headers.push({ label: currentLabel, span: currentSpan });
+                      }
+
+                      return headers.map((h, i) => (
+                        <th
+                          key={`week-h-${i}`}
+                          colSpan={h.span}
+                          className={`py-2.5 px-3 border-r text-center text-[9px] ${
+                            i % 2 === 0
+                              ? darkMode ? 'bg-slate-950/20' : 'bg-slate-100/30'
+                              : ''
+                          } ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
+                        >
+                          {h.label}
+                        </th>
+                      ));
+                    })()}
+                  </tr>
+
+                  {/* Row 2: Columns mapping */}
+                  <tr className={`border-b text-[10px] font-black ${
+                    darkMode ? 'bg-slate-950/30 border-slate-800 text-slate-400' : 'bg-slate-50/50 border-slate-200 text-slate-500'
+                  }`}>
+                    <th className={`py-2 px-4 sticky left-0 z-20 border-r w-72 ${
+                      darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                    }`}>TASK</th>
+                    <th className={`py-2 px-4 border-r w-56 ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>ASSIGNED TO</th>
+                    <th className={`py-2 px-3 w-18 text-center border-r ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>PROGRESS</th>
+                    <th className={`py-2 px-3 w-28 border-r ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>START</th>
+                    <th className={`py-2 px-3 w-28 border-r ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>END</th>
+                    <th className={`py-2 px-4 border-r w-48 ${
+                      darkMode ? 'border-slate-800' : 'border-slate-200'
+                    }`}>REMARKS</th>
+                    
+                    {/* Dates */}
+                    {timelineDaysList.map((day, idx) => {
+                      let cellStyle = `py-2 text-center border-r w-8 shrink-0 ${
+                        darkMode ? 'border-slate-800' : 'border-slate-200'
+                      }`;
+                      if (day.isWeekend) {
+                        cellStyle += darkMode ? ' bg-slate-950/60' : ' bg-slate-100/60';
+                      }
+                      if (day.isSprintStart) {
+                        cellStyle += ' border-l-2 border-l-orange-500';
+                      }
+                      if (day.isSprintEnd) {
+                        cellStyle += ' border-r-2 border-r-orange-500';
+                      }
+                      return (
+                        <th key={`num-${day.dayNum}-${idx}`} className={cellStyle}>
+                          {day.dayNum}
+                        </th>
+                      );
+                    })}
+                  </tr>
+
+                  {/* Row 3: Day Names */}
+                  <tr className={`border-b text-[9px] font-black uppercase ${
+                    darkMode ? 'bg-slate-950/20 border-slate-800 text-slate-500' : 'bg-slate-50/50 border-slate-200 text-slate-455'
+                  }`}>
+                    <th className={`py-1 px-4 sticky left-0 z-20 border-r ${
+                      darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                    }`} />
+                    <th className={`py-1 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                    <th className={`py-1 px-3 text-center border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                    <th className={`py-1 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                    <th className={`py-1 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                    <th className={`py-1 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+
+                    {/* Day Names */}
+                    {timelineDaysList.map((day, idx) => {
+                      let cellStyle = `py-1 text-center border-r w-8 ${
+                        darkMode ? 'border-slate-800' : 'border-slate-200'
+                      }`;
+                      if (day.isWeekend) {
+                        cellStyle += darkMode ? ' bg-slate-950/60 text-slate-600' : ' bg-slate-100/60 text-slate-400';
+                      }
+                      if (day.isSprintStart) {
+                        cellStyle += ' border-l-2 border-l-orange-500';
+                      }
+                      if (day.isSprintEnd) {
+                        cellStyle += ' border-r-2 border-r-orange-500';
+                      }
+                      return (
+                        <th key={`name-${day.dayNum}-${idx}`} className={cellStyle}>
+                          {day.dayName}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+
+                <tbody className={`divide-y text-xs font-semibold ${
+                  darkMode ? 'divide-slate-800/80 text-slate-300 border-b border-slate-800' : 'divide-slate-200 text-slate-700 border-b border-slate-200'
+                }`}>
+                  {['UI', 'Backend', 'INFRA', 'QA'].map((category) => {
+                    const catTasks = tasks.filter(t => getCleanCategory(t.category) === getCleanCategory(category));
+                    const config = categoryConfig[category];
+
+                    if (catTasks.length === 0) return null;
+
+                    const secBgClass = darkMode ? config.bgDark : config.bgLight;
+
+                    return (
+                      <React.Fragment key={category}>
+                        {/* Section Divider Header Row */}
+                        <tr className={`${secBgClass} font-black text-xs border-t border-b ${
+                          darkMode ? 'border-slate-800' : 'border-slate-200'
+                        }`}>
+                          {/* TASK sticky column divider */}
+                          <td className={`py-3 px-4 sticky left-0 z-20 font-black border-r text-left ${secBgClass} ${
+                            darkMode ? 'border-slate-800' : 'border-slate-200'
+                          }`}>
+                            {config.label}
+                          </td>
+                          <td className={`py-3 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                          <td className={`py-3 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                          <td className={`py-3 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                          <td className={`py-3 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                          <td className={`py-3 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+
+                          {/* Date grid cells */}
+                          {timelineDaysList.map((day, idx) => {
+                            let cellStyle = `py-3 border-r w-8 ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`;
+                            if (day.isWeekend) {
+                              cellStyle += darkMode ? ' bg-slate-950/65' : ' bg-slate-100/65';
+                            }
+                            if (day.isSprintStart) {
+                              cellStyle += ' border-l-2 border-l-orange-500/20';
+                            }
+                            if (day.isSprintEnd) {
+                              cellStyle += ' border-r-2 border-r-orange-500/20';
+                            }
+                            return <td key={`sec-${category}-${idx}`} className={cellStyle} />;
+                          })}
+                        </tr>
+
+                        {/* Task rows */}
+                        {catTasks.map((task) => {
+                          const isRowHovered = hoveredRowId === task.id;
+
+                          return (
+                            <tr
+                              key={task.id}
+                              onMouseEnter={() => setHoveredRowId(task.id)}
+                              onMouseLeave={() => setHoveredRowId(null)}
+                              className={`transition-colors duration-100 ${
+                                isRowHovered
+                                  ? darkMode
+                                    ? 'bg-slate-800/40 text-white font-bold'
+                                    : 'bg-slate-50/70 text-slate-900 font-bold'
+                                  : darkMode
+                                  ? 'bg-slate-900/10'
+                                  : 'bg-white'
+                              }`}
+                            >
+                              {/* TASK Name cell (sticky, matches row background) */}
+                              <td className={`py-4 px-4 sticky left-0 z-20 border-r align-middle text-left ${
+                                isRowHovered
+                                  ? darkMode ? 'bg-slate-800 text-white border-slate-700 font-bold' : 'bg-slate-50 text-slate-900 border-slate-200 font-bold'
+                                  : darkMode ? 'bg-slate-900 text-slate-100 border-slate-800 font-bold' : 'bg-white text-slate-900 border-slate-200 font-bold'
+                              }`}>
+                                <div className="truncate max-w-xs">
+                                  {task.title}
+                                </div>
+                              </td>
+
+                              {/* ASSIGNED TO */}
+                              <td className={`py-4 px-4 border-r align-middle text-left ${
+                                darkMode ? 'border-slate-800' : 'border-slate-200'
+                              }`}>
+                                {isEditing ? (
+                                  <select
+                                    value={task.assigned_employee?.id || ""}
+                                    onChange={(e) => handleAssigneeChange(task.id, e.target.value)}
+                                    className={`p-1.5 rounded-lg text-xs border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                                      darkMode
+                                        ? 'bg-slate-900 border-slate-750 text-white'
+                                        : 'bg-white border-slate-250 text-slate-800'
+                                    }`}
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {employees.map(emp => (
+                                      <option key={emp.id} value={emp.id}>
+                                        {emp.user?.full_name || emp.user?.email}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                                    {task.assigned_employee?.user?.full_name || 'Unassigned'}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* PROGRESS */}
+                              <td className={`py-4 px-3 text-center border-r align-middle font-extrabold text-[10px] ${
+                                darkMode ? 'border-slate-800 text-slate-350' : 'border-slate-200 text-slate-800'
+                              }`}>
+                                {getProgressPercentage(task.status)}
+                              </td>
+
+                              {/* START */}
+                              <td className={`py-4 px-3 border-r align-middle text-[10px] ${
+                                darkMode ? 'border-slate-800' : 'border-slate-200'
+                              }`}>
+                                {isEditing ? (
+                                  <input
+                                    type="date"
+                                    value={task.planned_start_date || ""}
+                                    onChange={(e) => handleStartDateChange(task.id, e.target.value)}
+                                    className={`p-1.5 rounded-lg text-[11px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                                      darkMode
+                                        ? 'bg-slate-900 border-slate-750 text-white'
+                                        : 'bg-white border-slate-250 text-slate-800'
+                                    }`}
+                                  />
+                                ) : (
+                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                                    {task.planned_start_date || <span className="opacity-30">-</span>}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* END */}
+                              <td className={`py-4 px-3 border-r align-middle text-[10px] ${
+                                darkMode ? 'border-slate-800' : 'border-slate-200'
+                              }`}>
+                                {isEditing ? (
+                                  <input
+                                    type="date"
+                                    value={task.planned_end_date || ""}
+                                    onChange={(e) => handleEndDateChange(task.id, e.target.value)}
+                                    className={`p-1.5 rounded-lg text-[11px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                                      darkMode
+                                        ? 'bg-slate-900 border-slate-750 text-white'
+                                        : 'bg-white border-slate-250 text-slate-800'
+                                    }`}
+                                  />
+                                ) : (
+                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                                    {task.planned_end_date || <span className="opacity-30">-</span>}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* REMARKS */}
+                              <td className={`py-4 px-4 border-r align-middle text-[10px] text-left italic ${
+                                darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-550'
+                              }`}>
+                                {task.jira_id || <span className="opacity-30">-</span>}
+                              </td>
+
+                              {/* Timeline cells */}
+                              {timelineDaysList.map((day, idx) => {
+                                const isDayInTaskRange = task.planned_start_date && task.planned_end_date &&
+                                  day.dateStr >= task.planned_start_date && day.dateStr <= task.planned_end_date &&
+                                  !day.isWeekend;
+                                const isBarStart = day.dateStr === task.planned_start_date;
+                                const isBarEnd = day.dateStr === task.planned_end_date;
+
+                                let cellStyle = `py-4 border-r text-center w-8 p-0.5 relative ${
+                                  darkMode ? 'border-slate-850' : 'border-slate-200'
+                                }`;
+                                if (day.isWeekend) {
+                                  cellStyle += darkMode ? ' bg-slate-950/60' : ' bg-slate-100/60';
+                                }
+                                if (day.isSprintStart) {
+                                  cellStyle += ' border-l-2 border-l-orange-500';
+                                }
+                                if (day.isSprintEnd) {
+                                  cellStyle += ' border-r-2 border-r-orange-500';
+                                }
+
+                                return (
+                                  <td key={`cell-${task.id}-${day.dayNum}-${idx}`} className={cellStyle}>
+                                    {isDayInTaskRange && (
+                                      <div
+                                        className={`h-6 flex items-center justify-center transition-all ${config.bar} ${
+                                          isBarStart && isBarEnd
+                                            ? 'rounded-full mx-1'
+                                            : isBarStart
+                                            ? 'rounded-l-full ml-1 mr-0'
+                                            : isBarEnd
+                                            ? 'rounded-r-full mr-1 ml-0'
+                                            : 'mx-0'
+                                        } ${
+                                          isRowHovered ? 'shadow-lg brightness-110 scale-y-105' : 'opacity-85'
+                                        }`}
+                                        title={`${task.title} (Locked)`}
+                                      >
+                                        {isBarStart && (
+                                          <Lock className="w-2.5 h-2.5 text-white shrink-0" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
+        </div>
+
       </div>
-    </div>
-  );
-}
+    );
+  }

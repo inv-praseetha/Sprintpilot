@@ -160,18 +160,11 @@ export default function TaskUploadModal({
           const cat = catVal.toString().toUpperCase().trim();
           const validCats = ['UI', 'BACKEND', 'INFRA', 'QA'];
 
-          const todayStr = new Date().toISOString().split('T')[0];
-          const nextWeek = new Date();
-          nextWeek.setDate(nextWeek.getDate() + 7);
-          const nextWeekStr = nextWeek.toISOString().split('T')[0];
-
           parsedRows.push({
             title: (titleVal || 'Untitled Task').toString().trim(),
             desc: (descVal || 'No description provided.').toString().trim(),
             category: validCats.includes(cat) ? cat : 'UI',
-            startDate: todayStr,
-            endDate: nextWeekStr,
-            status: 'In Progress',
+            status: 'TODO',
             jiraId: jiraVal.toString().trim()
           });
         }
@@ -218,18 +211,14 @@ export default function TaskUploadModal({
       return;
     }
 
-    const tasksWithDates = excelData.map(task => ({
-      ...task,
-      startDate: sprintStartDate,
-      endDate: finalEndDate
-    }));
-
     const targetProjectKey = parsedProjectInfo.matchedKey || activeProject;
     
     // Call parent handler
     onImportSuccess({
       milestoneName,
-      tasksWithDates,
+      tasks: excelData,
+      sprintStartDate,
+      sprintEndDate: finalEndDate,
       targetProjectKey
     });
 

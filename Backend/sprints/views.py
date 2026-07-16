@@ -129,8 +129,8 @@ class SprintListCreateView(APIView):
                         status=status_val,
                         story_points=task_item.get('story_points') or task_item.get('storyPoints') or None,
                         estimated_hours=task_item.get('estimated_hours') or task_item.get('estimatedHours') or None,
-                        planned_start_date=task_item.get('planned_start_date') or sprint.start_date,
-                        planned_end_date=task_item.get('planned_end_date') or sprint.end_date,
+                        planned_start_date=task_item.get('planned_start_date') or None,
+                        planned_end_date=task_item.get('planned_end_date') or None,
                         backlog_task_id=task_item.get('backlog_task_id') or ''
                     )
 
