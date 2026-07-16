@@ -410,11 +410,13 @@ export default function SprintDetail() {
         return prev.map(t => {
           const sug = suggestions.find(s => s.task_id === t.id);
           if (sug) {
+            const empId = sug.assigned_employee?.id || sug.assigned_employee_id;
+            const emp = employees.find(e => e.id === empId) || sug.assigned_employee || null;
             return {
               ...t,
               planned_start_date: sug.planned_start_date,
               planned_end_date: sug.planned_end_date,
-              assigned_employee: sug.assigned_employee,
+              assigned_employee: emp,
               recommendation_reason: sug.reason
             };
           }

@@ -117,7 +117,7 @@ class EmployeeProfileListView(APIView):
     def get(self, request, *args, **kwargs):
         profiles = EmployeeProfile.objects.select_related("user").prefetch_related("employee_skill_relations__skill").filter(
             user__is_active=True,
-            status__in=[EmployeeProfile.Status.ACTIVE, EmployeeProfile.Status.WFM]
+            status__in=[EmployeeProfile.Status.ACTIVE, EmployeeProfile.Status.WFM, EmployeeProfile.Status.BUSY]
         )
         # Apply filters based on query parameters
         skill = request.query_params.get('skill')
