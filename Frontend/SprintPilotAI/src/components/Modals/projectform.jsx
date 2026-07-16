@@ -252,7 +252,7 @@ export default function ProjectForm({
 
           {/* Category Selection Filter */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            {['ALL', 'UI', 'QA', 'INFRA', 'BACKEND'].map((cat) => (
+            {['ALL', 'UI', 'BACKEND'].map((cat) => (
               <button
                 type="button"
                 key={cat}
@@ -272,7 +272,7 @@ export default function ProjectForm({
 
         {/* Skills Checklist grid */}
         <div className="flex flex-wrap gap-2 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/60 max-h-40 overflow-y-auto">
-          {filteredSkills.map((skill) => {
+          {filteredSkills.filter((s) => !s.parent).map((skill) => {
             const isSelected = selectedSkills.includes(skill.id);
             return (
               <button
@@ -291,7 +291,7 @@ export default function ProjectForm({
               </button>
             );
           })}
-          {filteredSkills.length === 0 && (
+          {filteredSkills.filter((s) => !s.parent).length === 0 && (
             <span className="text-xs text-slate-400 font-semibold italic">No skills available in this category</span>
           )}
         </div>

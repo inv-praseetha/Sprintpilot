@@ -35,7 +35,19 @@ export default function AddMembersModal({
       const isMember = currentMemberUserIds.includes(emp.user.id);
       const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
         emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
-      return !isLead && !isMember && matchesSearch;
+
+      // Only show employees with matching skills if project has required skills
+      const projectSkills = project.skills || [];
+      const hasSkills = projectSkills.length > 0;
+      const matchesSkills = !hasSkills || (emp.skills && emp.skills.some(skill =>
+        projectSkills.some(projectSkill =>
+          projectSkill.id === skill.id ||
+          projectSkill.parent === skill.id ||
+          projectSkill.id === skill.parent
+        )
+      ));
+
+      return !isLead && !isMember && matchesSearch && matchesSkills;
     });
   }, [employees, project, memberSearchQuery]);
 
@@ -96,8 +108,8 @@ export default function AddMembersModal({
                 value={memberSearchQuery}
                 onChange={(e) => setMemberSearchQuery(e.target.value)}
                 className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-orange-500 transition-colors ${darkMode
-                    ? 'bg-slate-950 border-slate-800 text-white'
-                    : 'bg-white border-slate-200 text-slate-800'
+                  ? 'bg-slate-950 border-slate-800 text-white'
+                  : 'bg-white border-slate-200 text-slate-800'
                   }`}
               />
             </div>
@@ -136,16 +148,16 @@ export default function AddMembersModal({
                       key={emp.id}
                       onClick={() => toggleSelectNewMember(emp.id)}
                       className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isSelected
-                          ? 'border-orange-500 bg-orange-500/5'
-                          : darkMode
-                            ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
-                            : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
+                        ? 'border-orange-500 bg-orange-500/5'
+                        : darkMode
+                          ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                          : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
                         }`}
                     >
                       <div className="flex items-center gap-3 text-left">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs border transition-colors ${isSelected
-                            ? 'bg-orange-500/20 border-orange-500/30 text-orange-600 dark:text-orange-400'
-                            : 'bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800/80'
+                          ? 'bg-orange-500/20 border-orange-500/30 text-orange-600 dark:text-orange-400'
+                          : 'bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800/80'
                           }`}>
                           {getInitials(emp.user.full_name)}
                         </div>
@@ -157,13 +169,12 @@ export default function AddMembersModal({
                             <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                               {emp.designation}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                              emp.status === 'BUSY'
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
-                                : emp.status === 'ACTIVE'
-                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                  : 'bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 border border-indigo-500/20'
-                            }`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${emp.status === 'BUSY'
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
+                              : emp.status === 'ACTIVE'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                : 'bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 border border-indigo-500/20'
+                              }`}>
                               {emp.status || 'ACTIVE'}
                             </span>
                             {project.skills && project.skills.length > 0 && emp.skills && (
@@ -186,8 +197,8 @@ export default function AddMembersModal({
 
                       {/* Selected Check Indicator */}
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${isSelected
-                          ? 'bg-orange-500 border-orange-500 text-white'
-                          : 'border-slate-300 dark:border-slate-700'
+                        ? 'bg-orange-500 border-orange-500 text-white'
+                        : 'border-slate-300 dark:border-slate-700'
                         }`}>
                         {isSelected && <Check className="w-3 h-3" />}
                       </div>
@@ -212,7 +223,7 @@ export default function AddMembersModal({
           )}
 
           {/* Footer */}
-          <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
+          <div className="p-6 border-t border-slate-100 dark:border-slate-150 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-100/30">
             <button
               type="button"
               onClick={handleClose}

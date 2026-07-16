@@ -12,10 +12,17 @@ class SkillSerializer(serializers.ModelSerializer):
     """
     Serializer for Skill model.
     """
+    sub_skills = serializers.SerializerMethodField()
+
     class Meta:
         model = Skill
-        fields = ["id", "name", "category"]
+        fields = ["id", "name", "category", "parent", "sub_skills"]
         read_only_fields = fields
+
+    def get_sub_skills(self, obj):
+        if obj.parent_id is None:
+            return SkillSerializer(obj.sub_skills.all(), many=True).data
+        return []
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):

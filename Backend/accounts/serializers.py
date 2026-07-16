@@ -53,7 +53,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
 
     def get_skills(self, obj):
         return [
-            {"id": s.id, "name": s.name, "category": s.category}
+            {"id": s.id, "name": s.name, "category": s.category, "parent": s.parent_id}
             for s in obj.skills.all()
         ]
 

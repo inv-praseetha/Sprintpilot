@@ -154,11 +154,13 @@ class ProjectService:
         for profile in profiles:
             is_member = ProjectMember.objects.filter(
                 employee_profile=profile,
-                project__is_deleted=False
+                project__is_deleted=False,
+                project__status=Project.Status.ACTIVE
             ).exists()
             is_lead = Project.objects.filter(
                 team_lead=profile.user,
-                is_deleted=False
+                is_deleted=False,
+                status=Project.Status.ACTIVE
             ).exists()
             
             new_status = EmployeeProfile.Status.BUSY if (is_member or is_lead) else EmployeeProfile.Status.WFH

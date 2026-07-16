@@ -166,6 +166,9 @@ export default function ProjectCreation() {
       }
     } catch (err) {
       console.error('Error fetching projects:', err);
+      if (err.response?.status === 404 && page > 1) {
+        fetchProjects(1);
+      }
     } finally {
       setLoadingProjects(false);
     }
@@ -227,10 +230,11 @@ export default function ProjectCreation() {
     }
   }, [teamLeads, teamLead]);
 
-  // Filter Skills by selected Category
+  // Filter Skills by selected Category (Show UI and BACKEND only)
   const filteredSkills = useMemo(() => {
-    if (skillCategoryFilter === 'ALL') return skills;
-    return skills.filter(skill => skill.category === skillCategoryFilter);
+    const allowedSkills = skills.filter(skill => skill.category === 'UI' || skill.category === 'BACKEND');
+    if (skillCategoryFilter === 'ALL') return allowedSkills;
+    return allowedSkills.filter(skill => skill.category === skillCategoryFilter);
   }, [skills, skillCategoryFilter]);
 
   // Dynamic filter: Show only employees who possess all of the selected skills.
@@ -340,7 +344,7 @@ export default function ProjectCreation() {
         ? await apiClient.put(`projects/${editingProjectId}/`, requestData) 
         : await apiClient.post('projects/', requestData);
 
-      fetchProjects();
+      fetchProjects(editingProjectId ? currentPage : 1);
       fetchMetadata();
       setShowModal(false);
       resetForm();
@@ -387,13 +391,24 @@ export default function ProjectCreation() {
     setShowModal(true);
   };
 
+  const handleStatusChange = async (projectId, newStatus) => {
+    try {
+      await apiClient.patch(`projects/${projectId}/`, { status: newStatus });
+      fetchProjects(currentPage);
+      fetchMetadata();
+    } catch (err) {
+      console.error("Error changing project status:", err);
+      alert(err.response?.data?.detail || "Failed to update project status.");
+    }
+  };
+
   const handleDeleteProject = async (projectId) => {
     if (!window.confirm("Are you sure you want to delete this project?")) {
       return;
     }
     try {
       await apiClient.delete(`projects/${projectId}/`);
-      fetchProjects();
+      fetchProjects(currentPage);
       fetchMetadata();
     } catch (err) {
       console.error("Error deleting project:", err);
@@ -402,7 +417,7 @@ export default function ProjectCreation() {
   };
 
   const handleRowClick = (e, projectId) => {
-    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('svg')) {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('svg') || e.target.closest('select')) {
       return;
     }
     navigate(`/projects/${projectId}`);
@@ -517,7 +532,7 @@ export default function ProjectCreation() {
           <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
           <span className="text-sm font-bold text-slate-400">Loading project portfolio...</span>
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : totalCount === 0 ? (
         <div className={`p-16 rounded-3xl border-2 border-dashed text-center space-y-5 ${
           darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-slate-50/50 border-slate-200'
         }`}>
@@ -594,17 +609,35 @@ export default function ProjectCreation() {
                       </span>
                     </td>
 
-                    {/* Status Badge */}
-                    <td className="py-5 px-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                        project.status === 'ACTIVE'
-                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                          : project.status === 'ON_HOLD'
-                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                            : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
-                      }`}>
-                        {project.status.replace('_', ' ')}
-                      </span>
+                     {/* Status Badge / Dropdown */}
+                    <td className="py-5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {isProjectManager ? (
+                        <select
+                          value={project.status}
+                          onChange={(e) => handleStatusChange(project.id, e.target.value)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer transition-all outline-none ${
+                            project.status === 'ACTIVE'
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20'
+                              : project.status === 'ON_HOLD'
+                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/25 hover:bg-amber-500/20'
+                                : 'bg-slate-500/10 text-slate-655 border-slate-500/25 hover:bg-slate-500/20'
+                          }`}
+                        >
+                          <option value="ACTIVE" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">ACTIVE</option>
+                          <option value="ON_HOLD" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">ON HOLD</option>
+                          <option value="COMPLETED" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">COMPLETED</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                          project.status === 'ACTIVE'
+                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                            : project.status === 'ON_HOLD'
+                              ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                              : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
+                        }`}>
+                          {project.status.replace('_', ' ')}
+                        </span>
+                      )}
                     </td>
 
                     {/* Timeline & Duration */}
@@ -750,7 +783,7 @@ export default function ProjectCreation() {
                     onClick={() => fetchProjects(p)}
                     className={`w-8.5 h-8.5 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-500 border-blue-500 text-white shadow-md shadow-blue-500/15'
+                        ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
                         : darkMode
                           ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
                           : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'

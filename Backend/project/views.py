@@ -132,7 +132,7 @@ class ProjectDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method in ['PUT', 'DELETE']:
+        if self.request.method in ['PUT', 'PATCH', 'DELETE']:
             return [IsAuthenticated(), IsProjectManager()]
         return super().get_permissions()
 
@@ -176,6 +176,36 @@ class ProjectDetailView(APIView):
             "project_stack__skill"
         ).get(id=updated_project.id)
 
+        detail_serializer = ProjectDetailSerializer(refreshed_project)
+        return Response(detail_serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk, *args, **kwargs):
+        project = self.get_object(pk)
+        if not project:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        status_value = request.data.get("status")
+        if status_value:
+            if status_value not in Project.Status.values:
+                return Response({"detail": f"Invalid status: {status_value}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Collect profiles to sync before saving
+            member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))
+            profile_ids = [p.id for p in member_profiles]
+            if project.team_lead:
+                try:
+                    lead_profile = EmployeeProfile.objects.get(user=project.team_lead)
+                    profile_ids.append(lead_profile.id)
+                except EmployeeProfile.DoesNotExist:
+                    pass
+
+            project.status = status_value
+            project.save()
+
+            # Sync profiles to update status (e.g. active to inactive or vice versa)
+            ProjectService.sync_employee_statuses(profile_ids)
+
+        refreshed_project = self.get_object(pk)
         detail_serializer = ProjectDetailSerializer(refreshed_project)
         return Response(detail_serializer.data, status=status.HTTP_200_OK)
 

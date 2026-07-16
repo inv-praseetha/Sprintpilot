@@ -316,3 +316,54 @@ class ProjectMemberStatusTests(TestCase):
         self.profile1.refresh_from_db()
         self.assertEqual(lead2_profile.status, EmployeeProfile.Status.WFH)
         self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)
+
+    def test_patch_project_status(self):
+        """
+        Verify that PATCH method on ProjectDetailView updates the status of the project,
+        and synchronizes assigned employee statuses.
+        """
+        project_data = {
+            "name": "Project Patch Status Test",
+            "description": "Test patch status",
+            "status": "ACTIVE",
+            "type": "AGILE",
+            "start_date": datetime.date.today(),
+            "end_date": datetime.date.today() + datetime.timedelta(days=10),
+            "number_of_days": 10,
+            "team_lead": self.team_lead.id,
+            "members": [self.profile1.id],
+            "skills": [],
+            "team_size": 2
+        }
+        project = ProjectService.create_project(creator=self.creator, validated_data=project_data)
+
+        # Both the team lead and the member should be BUSY initially
+        self.lead_profile.refresh_from_db()
+        self.profile1.refresh_from_db()
+        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.BUSY)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.BUSY)
+
+        # Now PATCH the project status to COMPLETED
+        from rest_framework.test import APIRequestFactory
+        from project.views import ProjectDetailView
+        from rest_framework.test import force_authenticate
+        
+        factory = APIRequestFactory()
+        request = factory.patch(f'/api/projects/{project.id}/', {"status": "COMPLETED"}, format="json")
+        force_authenticate(request, user=self.creator)
+        
+        view = ProjectDetailView.as_view()
+        response = view(request, pk=project.id)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "COMPLETED")
+
+        # Verify project is COMPLETED in DB
+        project.refresh_from_db()
+        self.assertEqual(project.status, "COMPLETED")
+
+        # Both the team lead and the member should now revert to WFH
+        self.lead_profile.refresh_from_db()
+        self.profile1.refresh_from_db()
+        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFH)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)

@@ -16,7 +16,13 @@ class Skill(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
     category = models.CharField(max_length=30, choices=Category.choices)
-    
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sub_skills'
+    )
 
     class Meta:
         db_table = "skills"

@@ -335,7 +335,19 @@ export default function ProjectDetail() {
       const isMember = currentMemberUserIds.includes(emp.user.id);
       const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
                             emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
-      return !isLead && !isMember && matchesSearch;
+
+      // Only show employees with matching skills if project has required skills
+      const projectSkills = project.skills || [];
+      const hasSkills = projectSkills.length > 0;
+      const matchesSkills = !hasSkills || (emp.skills && emp.skills.some(skill =>
+        projectSkills.some(projectSkill =>
+          projectSkill.id === skill.id ||
+          projectSkill.parent === skill.id ||
+          projectSkill.id === skill.parent
+        )
+      ));
+
+      return !isLead && !isMember && matchesSearch && matchesSkills;
     });
   }, [employees, project, memberSearchQuery]);
 
