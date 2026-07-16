@@ -252,7 +252,7 @@ export default function ProjectForm({
 
           {/* Category Selection Filter */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            {['ALL', 'UI', 'QA', 'INFRA', 'BACKEND'].map((cat) => (
+            {['ALL', 'UI', 'BACKEND'].map((cat) => (
               <button
                 type="button"
                 key={cat}
@@ -272,7 +272,7 @@ export default function ProjectForm({
 
         {/* Skills Checklist grid */}
         <div className="flex flex-wrap gap-2 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/60 max-h-40 overflow-y-auto">
-          {filteredSkills.map((skill) => {
+          {filteredSkills.filter((s) => !s.parent).map((skill) => {
             const isSelected = selectedSkills.includes(skill.id);
             return (
               <button
@@ -291,7 +291,7 @@ export default function ProjectForm({
               </button>
             );
           })}
-          {filteredSkills.length === 0 && (
+          {filteredSkills.filter((s) => !s.parent).length === 0 && (
             <span className="text-xs text-slate-400 font-semibold italic">No skills available in this category</span>
           )}
         </div>
@@ -341,6 +341,15 @@ export default function ProjectForm({
                     <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       <span className="text-[9px] text-slate-400 block font-bold truncate">
                         {empProfile.designation || 'Developer'}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                        empProfile.status === 'BUSY'
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
+                          : empProfile.status === 'ACTIVE'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
+                            : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                      }`}>
+                        {empProfile.status || 'ACTIVE'}
                       </span>
                       {selectedSkills.length > 0 && empProfile.skills && (
                         <div className="flex flex-wrap gap-1">

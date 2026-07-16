@@ -51,6 +51,13 @@ class ProjectService:
             ]
             ProjectMember.objects.bulk_create(member_instances)
 
+        # Sync statuses of all involved profiles (members and team lead)
+        profiles_to_sync = list(member_ids)
+        lead_profile = EmployeeProfile.objects.filter(user=team_lead).first()
+        if lead_profile:
+            profiles_to_sync.append(lead_profile.id)
+        ProjectService.sync_employee_statuses(profiles_to_sync)
+
         # 3. Bulk create Project Skills (Stack)
         if skill_ids:
             skills = Skill.objects.filter(id__in=skill_ids)
@@ -88,6 +95,10 @@ class ProjectService:
             end = validated_data.get("end_date")
             validated_data["number_of_days"] = (end - start).days
 
+        # Capture previous state
+        previous_team_lead = project.team_lead
+        previous_member_ids = list(project.members.values_list('employee_profile_id', flat=True))
+
         # Update Project fields
         project.team_lead = team_lead
         project.team_size = team_size
@@ -96,6 +107,7 @@ class ProjectService:
         project.save()
 
         # Update Members: delete old and create new
+
         ProjectMember.objects.filter(project=project).delete()
         if member_ids:
             profiles = EmployeeProfile.objects.filter(id__in=member_ids)
@@ -104,6 +116,17 @@ class ProjectService:
                 for prof in profiles
             ]
             ProjectMember.objects.bulk_create(member_instances)
+
+        # Gather all profiles to sync (previous members, current members, previous team lead, new team lead)
+        profiles_to_sync = set(previous_member_ids) | set(member_ids)
+        if previous_team_lead:
+            prev_lead_profile = EmployeeProfile.objects.filter(user=previous_team_lead).first()
+            if prev_lead_profile:
+                profiles_to_sync.add(prev_lead_profile.id)
+        if team_lead:
+            new_lead_profile = EmployeeProfile.objects.filter(user=team_lead).first()
+            if new_lead_profile:
+                profiles_to_sync.add(new_lead_profile.id)
 
         # Update Skills: delete old and create new
         ProjectStack.objects.filter(project=project).delete()
@@ -115,6 +138,34 @@ class ProjectService:
             ]
             ProjectStack.objects.bulk_create(stack_instances)
 
+        ProjectService.sync_employee_statuses(list(profiles_to_sync))
+
         return project
+
+    @staticmethod
+    def sync_employee_statuses(profile_ids: list) -> None:
+        """
+        Synchronizes status of employee profiles based on project assignments.
+        Sets status to BUSY if they are team lead or member of any active project, WFM otherwise.
+        """
+        if not profile_ids:
+            return
+        profiles = EmployeeProfile.objects.filter(id__in=profile_ids).select_related("user")
+        for profile in profiles:
+            is_member = ProjectMember.objects.filter(
+                employee_profile=profile,
+                project__is_deleted=False,
+                project__status=Project.Status.ACTIVE
+            ).exists()
+            is_lead = Project.objects.filter(
+                team_lead=profile.user,
+                is_deleted=False,
+                status=Project.Status.ACTIVE
+            ).exists()
+            
+            new_status = EmployeeProfile.Status.BUSY if (is_member or is_lead) else EmployeeProfile.Status.WFH
+            if profile.status != new_status:
+                profile.status = new_status
+                profile.save(update_fields=["status"])
 
 

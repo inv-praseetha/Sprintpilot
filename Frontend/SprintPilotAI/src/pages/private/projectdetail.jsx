@@ -119,6 +119,15 @@ export default function ProjectDetail() {
     return currentUser?.role === 'PROJECT_MANAGER';
   }, [currentUser]);
 
+  const fetchEmployees = async () => {
+    try {
+      const employeesRes = await apiClient.get('projects/employees/');
+      setEmployees(employeesRes.data);
+    } catch (err) {
+      console.error('[ProjectDetail] Error fetching employees:', err);
+    }
+  };
+
   // Fetch Project Details & All Employees
   const fetchProjectData = async () => {
     setLoading(true);
@@ -129,8 +138,7 @@ export default function ProjectDetail() {
       setProject(projectRes.data);
 
       // 2. Fetch all active employees (to select from when adding members)
-      const employeesRes = await apiClient.get('projects/employees/');
-      setEmployees(employeesRes.data);
+      await fetchEmployees();
     } catch (err) {
       console.error('[ProjectDetail] Error fetching project details:', err);
       setError(err.response?.data?.detail || 'Failed to load project details.');
@@ -236,6 +244,7 @@ export default function ProjectDetail() {
 
       const res = await apiClient.put(`projects/${projectId}/`, requestData);
       setProject(res.data);
+      await fetchEmployees();
       setShowAddMembersModal(false);
       if (onSuccessCallback) onSuccessCallback();
     } catch (err) {
@@ -275,11 +284,12 @@ export default function ProjectDetail() {
         team_lead: project.team_lead?.id || null,
         members: updatedMemberIds,
         skills: project.skills.map(s => s.id),
-        team_size: updatedMemberIds.length
+        team_size: project.team_size
       };
 
       const res = await apiClient.put(`projects/${projectId}/`, requestData);
       setProject(res.data);
+      await fetchEmployees();
     } catch (err) {
       console.error('[ProjectDetail] Error removing member:', err);
       alert(err.response?.data?.detail || 'Failed to remove member.');
@@ -325,7 +335,19 @@ export default function ProjectDetail() {
       const isMember = currentMemberUserIds.includes(emp.user.id);
       const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
                             emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
-      return !isLead && !isMember && matchesSearch;
+
+      // Only show employees with matching skills if project has required skills
+      const projectSkills = project.skills || [];
+      const hasSkills = projectSkills.length > 0;
+      const matchesSkills = !hasSkills || (emp.skills && emp.skills.some(skill =>
+        projectSkills.some(projectSkill =>
+          projectSkill.id === skill.id ||
+          projectSkill.parent === skill.id ||
+          projectSkill.id === skill.parent
+        )
+      ));
+
+      return !isLead && !isMember && matchesSearch && matchesSkills;
     });
   }, [employees, project, memberSearchQuery]);
 
@@ -527,11 +549,11 @@ export default function ProjectDetail() {
                     <div className="space-y-3">
                       {/* Unique Categories */}
                       {uniqueCats.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pl-7">
+                        <div className="flex flex-wrap gap-1.5 pl-7 max-h-16 overflow-y-auto pr-2 custom-scrollbar">
                           {uniqueCats.map((cat) => (
                             <span
                               key={cat}
-                              className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-500/10 rounded-md text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
+                              className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-orange-500/10 rounded-md text-orange-500 border border-orange-500/20"
                             >
                               {cat}
                             </span>
@@ -540,13 +562,13 @@ export default function ProjectDetail() {
                       )}
 
                       <div className="flex items-start gap-3">
-                        <Code className="w-4 h-4 text-slate-400 mt-0.5" />
-                        <div className="flex flex-wrap gap-2">
+                        <Code className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                           {effectiveSkills.length > 0 ? (
                             effectiveSkills.map((skill) => (
                               <span
                                 key={skill.id}
-                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-blue-500/10 rounded-lg text-blue-650 dark:text-blue-400 border border-blue-500/20"
+                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-orange-500/10 rounded-lg text-orange-550 border border-orange-500/20"
                               >
                                 {skill.name}
                               </span>
@@ -657,7 +679,7 @@ export default function ProjectDetail() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-sm">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-sm">
                     {getInitials(member.user.full_name)}
                   </div>
                   <div>
@@ -670,6 +692,15 @@ export default function ProjectDetail() {
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                         {member.designation || 'Team Member'}
                       </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                        member.status === 'BUSY'
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                          : member.status === 'ACTIVE'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                            : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                      }`}>
+                        {member.status || 'ACTIVE'}
+                      </span>
                       {project.skills && project.skills.length > 0 && member.skills && (
                         <div className="flex flex-wrap gap-1">
                           {member.skills
@@ -677,7 +708,7 @@ export default function ProjectDetail() {
                             .map((s) => (
                               <span
                                 key={s.id}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20"
                               >
                                 {s.name}
                               </span>
@@ -871,6 +902,30 @@ export default function ProjectDetail() {
                   </div>
                 )}
 
+                {/* Select All Toggle */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Available Candidates ({availableEmployees.length})
+                  </span>
+                  {availableEmployees.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allIds = availableEmployees.map(e => e.id);
+                        const allSelected = allIds.every(id => selectedNewMembers.includes(id));
+                        if (allSelected) {
+                          setSelectedNewMembers(prev => prev.filter(id => !allIds.includes(id)));
+                        } else {
+                          setSelectedNewMembers(prev => Array.from(new Set([...prev, ...allIds])));
+                        }
+                      }}
+                      className="text-[10px] font-bold text-orange-500 dark:text-orange-400 hover:underline cursor-pointer bg-transparent border-none outline-none"
+                    >
+                      {availableEmployees.every(e => selectedNewMembers.includes(e.id)) ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+
                 {/* Employees List */}
                 <div className="space-y-2">
                   {availableEmployees.length > 0 ? (
@@ -882,7 +937,7 @@ export default function ProjectDetail() {
                           onClick={() => toggleSelectNewMember(emp.id)}
                           className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
                             isSelected
-                              ? 'border-indigo-500 bg-indigo-500/5'
+                              ? 'border-orange-500 bg-orange-500/5'
                               : darkMode
                                 ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
                                 : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
@@ -904,6 +959,15 @@ export default function ProjectDetail() {
                                 <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                   {emp.designation}
                                 </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                  emp.status === 'BUSY'
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                                    : emp.status === 'ACTIVE'
+                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                      : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                                }`}>
+                                  {emp.status || 'ACTIVE'}
+                                </span>
                                 {project.skills && project.skills.length > 0 && emp.skills && (
                                   <div className="flex flex-wrap gap-1">
                                     {emp.skills
@@ -911,7 +975,7 @@ export default function ProjectDetail() {
                                       .map((s) => (
                                         <span
                                           key={s.id}
-                                          className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20"
+                                          className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20"
                                         >
                                           {s.name}
                                         </span>
@@ -925,7 +989,7 @@ export default function ProjectDetail() {
                           {/* Selected Check Indicator */}
                           <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
                             isSelected
-                              ? 'bg-indigo-500 border-indigo-500 text-white'
+                              ? 'bg-orange-500 border-orange-500 text-white'
                               : 'border-slate-300 dark:border-slate-700'
                           }`}>
                             {isSelected && <Check className="w-3 h-3" />}
@@ -960,7 +1024,7 @@ export default function ProjectDetail() {
                 <button
                   type="submit"
                   disabled={updatingMembers || selectedNewMembers.length === 0}
-                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                  className="px-5 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-orange-500/10"
                 >
                   {updatingMembers ? (
                     <div className="flex items-center gap-1">
