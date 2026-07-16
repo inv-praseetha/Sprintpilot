@@ -240,11 +240,12 @@ export default function ProjectCreation() {
   // Dynamic filter: Show only employees who possess all of the selected skills.
   // If no skills are selected, show all active employees.
     const filteredEmployeesForSelection = useMemo(() => {
-      if (selectedSkills.length === 0) return employees;
-      return employees.filter(emp =>
-        emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => empSkill.id === skillId))
+      const activeEmployees = employees.filter(emp => emp.status !== 'BUSY' || selectedMembers.includes(emp.id));
+      if (selectedSkills.length === 0) return activeEmployees;
+      return activeEmployees.filter(emp =>
+        emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId)))
       );
-    }, [employees, selectedSkills]);
+    }, [employees, selectedSkills, selectedMembers]);
 
   // Handle Project Creation Submission
   const handleSubmit = async (e) => {
@@ -725,13 +726,23 @@ export default function ProjectCreation() {
                     {isProjectManager && (
                       <td className="py-5 px-6 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleEditProject(project)}
-                            className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border border-blue-500/20 transition-all cursor-pointer"
-                            title="Edit Project"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                          {project.status === 'COMPLETED' ? (
+                            <button
+                              disabled
+                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700/80 opacity-50 cursor-not-allowed"
+                              title="Completed projects cannot be edited"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleEditProject(project)}
+                              className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border border-blue-500/20 transition-all cursor-pointer"
+                              title="Edit Project"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteProject(project.id)}
                             className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
@@ -849,6 +860,7 @@ export default function ProjectCreation() {
           selectedSkills={selectedSkills}
           toggleSkillSelection={toggleSkillSelection}
           filteredEmployeesForSelection={filteredEmployeesForSelection}
+          employees={employees}
           selectedMembers={selectedMembers}
           toggleMemberSelection={toggleMemberSelection}
           onClose={() => setShowModal(false)}

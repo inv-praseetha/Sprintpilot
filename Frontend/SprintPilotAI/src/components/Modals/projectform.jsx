@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertCircle, Code, Check, Users, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { AlertCircle, Code, Check, Users, Loader2, X } from 'lucide-react';
 
 export default function ProjectForm({
   handleSubmit,
@@ -31,12 +31,53 @@ export default function ProjectForm({
   selectedSkills,
   toggleSkillSelection,
   filteredEmployeesForSelection,
+  employees = [],
   selectedMembers,
   toggleMemberSelection,
   onClose,
   submitting,
   editingProjectId
 }) {
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+
+  const displayedEmployees = useMemo(() => {
+    if (!memberSearchQuery) return filteredEmployeesForSelection;
+    return filteredEmployeesForSelection.filter(emp =>
+      emp.user?.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      emp.designation?.toLowerCase().includes(memberSearchQuery.toLowerCase())
+    );
+  }, [filteredEmployeesForSelection, memberSearchQuery]);
+
+  const handleSelectAll = () => {
+    const allIds = displayedEmployees.map(e => e.id);
+    const allSelected = allIds.every(id => selectedMembers.includes(id));
+    if (allSelected) {
+      allIds.forEach(id => {
+        if (selectedMembers.includes(id)) {
+          toggleMemberSelection(id);
+        }
+      });
+    } else {
+      const limit = parseInt(teamSize, 10) || 0;
+      const currentCount = selectedMembers.length;
+      const remaining = limit - currentCount;
+      if (limit > 0 && remaining <= 0) {
+        alert(`Cannot select more members. Team size limit of ${limit} reached.`);
+        return;
+      }
+      let count = 0;
+      displayedEmployees.forEach(emp => {
+        if (!selectedMembers.includes(emp.id)) {
+          if (limit === 0 || count < remaining) {
+            toggleMemberSelection(emp.id);
+            count++;
+          }
+        }
+      });
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[72vh] overflow-y-auto">
 
@@ -86,21 +127,35 @@ export default function ProjectForm({
         <div className="space-y-2 text-left">
           <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Project Type *</label>
           <div className="grid grid-cols-2 gap-3">
-            {['AGILE', 'WATERFALL'].map((t) => (
-              <button
-                type="button"
-                key={t}
-                onClick={() => setType(t)}
-                className={`py-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${type === t
-                    ? 'bg-orange-500/10 border-orange-500/40 text-orange-500'
-                    : darkMode
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-300'
-                      : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'
+            {['AGILE', 'WATERFALL'].map((t) => {
+              const isEditing = !!editingProjectId;
+              const isSelected = type === t;
+              return (
+                <button
+                  type="button"
+                  key={t}
+                  disabled={isEditing}
+                  onClick={() => !isEditing && setType(t)}
+                  className={`py-3.5 rounded-2xl border text-xs font-bold transition-all ${
+                    isEditing
+                      ? isSelected
+                        ? darkMode
+                          ? 'bg-orange-500/10 border-orange-500/30 text-orange-500/70 opacity-80 cursor-not-allowed'
+                          : 'bg-orange-500/5 border-orange-500/20 text-orange-500/70 opacity-80 cursor-not-allowed'
+                        : darkMode
+                          ? 'bg-slate-950/40 border-slate-900 text-slate-600 opacity-50 cursor-not-allowed'
+                          : 'bg-slate-50/40 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                      : isSelected
+                        ? 'bg-orange-500/10 border-orange-500/40 text-orange-500 cursor-pointer'
+                        : darkMode
+                          ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-300 cursor-pointer'
+                          : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100 cursor-pointer'
                   }`}
-              >
-                {t}
-              </button>
-            ))}
+                >
+                  {t}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -247,7 +302,7 @@ export default function ProjectForm({
       <div className="space-y-3.5 text-left">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <label className="text-xs font-bold text-slate-455 uppercase tracking-wider flex items-center gap-1.5">
-            <Code className="w-4.5 h-4.5 text-slate-400" /> Technical Skills Required
+            <Code className="w-4.5 h-4.5 text-slate-400" /> Technical Stack Required
           </label>
 
           {/* Category Selection Filter */}
@@ -273,12 +328,15 @@ export default function ProjectForm({
         {/* Skills Checklist grid */}
         <div className="flex flex-wrap gap-2 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/60 max-h-40 overflow-y-auto">
           {filteredSkills.filter((s) => !s.parent).map((skill) => {
-            const isSelected = selectedSkills.includes(skill.id);
+            const isSelected = selectedSkills.some(id => String(id) === String(skill.id));
             return (
               <button
                 type="button"
                 key={skill.id}
-                onClick={() => toggleSkillSelection(skill.id)}
+                onClick={() => {
+                  toggleSkillSelection(skill.id);
+                  setShowMemberDropdown(true);
+                }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${isSelected
                     ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10'
                     : darkMode
@@ -298,10 +356,18 @@ export default function ProjectForm({
       </div>
 
       {/* Members Selection Checklist (Dynamically filtered by selected skills) */}
-      <div className="space-y-2 text-left">
+      <div className="space-y-3.5 text-left relative">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-          <label className="text-xs font-bold text-slate-455 uppercase tracking-wider flex items-center gap-1.5">
-            <Users className="w-4.5 h-4.5 text-slate-400" /> Team Members Allocation ({selectedMembers.length}/{teamSize || 0})
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex flex-wrap items-center gap-1.5">
+            <Users className="w-4.5 h-4.5 text-slate-400" /> 
+            <span>Team Members Allocation ({selectedMembers.length}/{teamSize || 0})</span>
+            <span className={`text-[11px] font-extrabold normal-case px-1.5 py-0.5 rounded-md ${
+              filteredEmployeesForSelection.length === 0 
+                ? 'text-rose-500 bg-rose-500/10' 
+                : darkMode ? 'text-slate-400 bg-slate-950 border border-slate-800' : 'text-slate-500 bg-slate-100 border border-slate-200'
+            }`}>
+              {filteredEmployeesForSelection.length} matching candidates available
+            </span>
           </label>
           {selectedSkills.length > 0 && (
             <span className="text-[10px] text-orange-500 font-bold bg-orange-500/10 px-2 py-0.5 rounded-md">
@@ -309,6 +375,7 @@ export default function ProjectForm({
             </span>
           )}
         </div>
+        
         {teamSize && selectedMembers.length > parseInt(teamSize, 10) && (
           <div className="text-[10px] font-bold text-rose-500 flex items-center gap-1 pl-1">
             <AlertCircle className="w-3.5 h-3.5" />
@@ -316,76 +383,210 @@ export default function ProjectForm({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-52 overflow-y-auto p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/60">
-          {filteredEmployeesForSelection.map((empProfile) => {
-            const isSelected = selectedMembers.includes(empProfile.id);
-            return (
-              <div
-                key={empProfile.id}
-                onClick={() => toggleMemberSelection(empProfile.id)}
-                className={`p-3 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isSelected
-                    ? 'border-orange-500/40 bg-orange-500/[0.04]'
-                    : darkMode
-                      ? 'border-slate-850 hover:bg-slate-900 bg-slate-900/60'
-                      : 'border-slate-150 hover:bg-slate-50 bg-white'
-                  }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7.5 h-7.5 rounded-full bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold text-xs border border-slate-200 dark:border-slate-800">
-                    {empProfile.user?.full_name ? empProfile.user.full_name.charAt(0) : '?'}
-                  </div>
-                  <div className="min-w-0 text-left">
-                    <span className="text-xs font-bold block text-slate-500 dark:text-slate-300 truncate">
-                      {empProfile.user?.full_name}
+        {/* Dropdown Container */}
+        <div className="relative">
+          {/* Dropdown Trigger */}
+          <div
+            onClick={() => setShowMemberDropdown(!showMemberDropdown)}
+            className={`w-full min-h-[42px] px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all ${
+              darkMode
+                ? 'bg-slate-950 border-slate-800 hover:border-slate-700 text-white'
+                : 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
+            } ${showMemberDropdown ? 'border-orange-500 ring-2 ring-orange-500/15' : ''}`}
+          >
+            <div className="flex flex-wrap gap-1.5 items-center min-w-0 pr-6">
+              {selectedMembers.length === 0 ? (
+                <span className="text-xs text-slate-400 font-medium">Select team members...</span>
+              ) : (
+                selectedMembers.map(id => {
+                  const emp = employees.find(e => e.id === id) || filteredEmployeesForSelection.find(e => e.id === id);
+                  if (!emp) return null;
+                  return (
+                    <span
+                      key={id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMemberSelection(id);
+                      }}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                        darkMode
+                          ? 'bg-orange-950/40 border-orange-500/30 text-orange-400 hover:bg-orange-900/30'
+                          : 'bg-orange-50 border-orange-200 text-orange-655 hover:bg-orange-100/50'
+                      }`}
+                    >
+                      {emp.user?.full_name}
+                      <X className="w-2.5 h-2.5 cursor-pointer" />
                     </span>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-slate-400 block font-bold truncate">
-                        {empProfile.designation || 'Developer'}
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                        empProfile.status === 'BUSY'
-                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
-                          : empProfile.status === 'ACTIVE'
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
-                            : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                      }`}>
-                        {empProfile.status || 'ACTIVE'}
-                      </span>
-                      {selectedSkills.length > 0 && empProfile.skills && (
-                        <div className="flex flex-wrap gap-1">
-                          {empProfile.skills
-                            .filter((s) => selectedSkills.includes(s.id))
-                            .map((s) => (
-                              <span
-                                key={s.id}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-                              >
-                                {s.name}
-                              </span>
-                            ))}
-                        </div>
-                      )}
-                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+              <svg
+                className={`w-4 h-4 text-slate-400 transition-transform ${showMemberDropdown ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Dropdown Popover */}
+          {showMemberDropdown && (
+            <>
+              <div
+                className="fixed inset-0 z-10 bg-transparent"
+                onClick={() => setShowMemberDropdown(false)}
+              />
+
+              <div
+                className={`absolute left-0 right-0 mt-2 p-3.5 rounded-2xl border shadow-xl z-20 flex flex-col gap-3 transition-all ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800 text-white'
+                    : 'bg-white border-slate-150 text-slate-850'
+                }`}
+              >
+                {/* Search & Actions Panel */}
+                <div className="flex items-center justify-between gap-3 border-b pb-2.5 border-slate-100 dark:border-slate-800">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Search candidates by name or designation..."
+                      value={memberSearchQuery}
+                      onChange={(e) => setMemberSearchQuery(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`w-full px-3 py-1.5 pl-8 rounded-xl border text-xs font-semibold outline-none focus:border-orange-500 transition-colors ${
+                        darkMode
+                          ? 'bg-slate-950 border-slate-800 text-white'
+                          : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    />
+                    <svg
+                      className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                   </div>
+                  {displayedEmployees.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAll();
+                      }}
+                      className="text-[10px] font-bold text-orange-500 dark:text-orange-400 hover:underline cursor-pointer bg-transparent border-none outline-none shrink-0"
+                    >
+                      {displayedEmployees.every(e => selectedMembers.includes(e.id)) ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
                 </div>
 
-                <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${isSelected
-                    ? 'bg-orange-500 border-orange-500 text-white'
-                    : darkMode
-                      ? 'border-slate-800 bg-slate-950'
-                      : 'border-slate-200 bg-white'
-                  }`}>
-                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                {/* Candidate Checklist */}
+                <div className="flex flex-col max-h-60 overflow-y-auto pr-1 divide-y divide-slate-100 dark:divide-slate-800 border border-slate-150 dark:border-slate-800 rounded-xl overflow-hidden">
+                  {displayedEmployees.length > 0 ? (
+                    displayedEmployees.map((empProfile) => {
+                      const isSelected = selectedMembers.includes(empProfile.id);
+                      return (
+                        <div
+                          key={empProfile.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleMemberSelection(empProfile.id);
+                          }}
+                          className={`px-3 py-2 flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-orange-500 text-white font-semibold'
+                              : darkMode
+                                ? 'bg-slate-900/60 hover:bg-slate-800 text-slate-350'
+                                : 'bg-white hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {/* Small checkbox indicator */}
+                            <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
+                              isSelected
+                                ? 'bg-white border-white text-orange-500'
+                                : (darkMode ? 'border-slate-700' : 'border-slate-300')
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[4.5]" />}
+                            </div>
+                            
+                            {/* Employee Name */}
+                            <span className="text-xs font-bold truncate">
+                              {empProfile.user?.full_name}
+                            </span>
+                            
+                            {/* Divider Dot */}
+                            <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>•</span>
+                            
+                            {/* Designation */}
+                            <span className={`text-[10px] truncate ${isSelected ? 'text-white/80' : 'text-slate-450'}`}>
+                              {empProfile.designation || 'Developer'}
+                            </span>
+
+                            {/* Skills Matching */}
+                            {selectedSkills.length > 0 && empProfile.skills && (
+                              <>
+                                <span className={`text-[10px] ${isSelected ? 'text-white/50' : 'text-slate-450'}`}>•</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {empProfile.skills
+                                    .filter((s) => selectedSkills.some(skillId => String(skillId) === String(s.id)))
+                                    .map((s) => (
+                                      <span
+                                        key={s.id}
+                                        className={`px-1 rounded text-[7px] font-black uppercase border transition-colors ${
+                                          isSelected
+                                            ? 'bg-white/20 text-white border-white/30'
+                                            : darkMode 
+                                              ? 'bg-slate-800 text-slate-450 border-slate-750' 
+                                              : 'bg-slate-100 text-slate-500 border-slate-200'
+                                        }`}
+                                      >
+                                        {s.name}
+                                      </span>
+                                    ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Small Status Badge */}
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                              isSelected
+                                ? 'bg-white/20 text-white'
+                                : empProfile.status === 'BUSY'
+                                  ? (darkMode ? 'bg-amber-500/10 text-amber-500' : 'bg-amber-500/10 text-amber-600')
+                                  : empProfile.status === 'ACTIVE'
+                                    ? (darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-500/10 text-emerald-600')
+                                    : (darkMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-500/10 text-indigo-600')
+                            }`}>
+                              {empProfile.status || 'ACTIVE'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-8 text-center text-slate-450 text-xs font-bold bg-white dark:bg-slate-900 col-span-2">
+                      No matching candidates found
+                    </div>
+                  )}
                 </div>
               </div>
-            );
-          })}
-          {filteredEmployeesForSelection.length === 0 && (
-            <span className="text-xs text-slate-455 font-bold italic col-span-2 py-4">
-              No matching employees found with selected skills.
-            </span>
+            </>
           )}
         </div>
+        {filteredEmployeesForSelection.length === 0 && (
+          <span className="text-xs text-slate-450 font-bold italic block py-4 pl-1">
+            No matching employees found with selected skills.
+          </span>
+        )}
       </div>
 
       {/* Form Actions */}

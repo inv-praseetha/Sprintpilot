@@ -367,3 +367,28 @@ class ProjectMemberStatusTests(TestCase):
         self.profile1.refresh_from_db()
         self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.WFH)
         self.assertEqual(self.profile1.status, EmployeeProfile.Status.WFH)
+
+    def test_status_busy_on_project_on_hold(self):
+        """
+        Verify that employee profile status remains/changes to BUSY when a project status is ON_HOLD.
+        """
+        project_data = {
+            "name": "Project On Hold Status Test",
+            "description": "Test on hold status",
+            "status": "ON_HOLD",
+            "type": "AGILE",
+            "start_date": datetime.date.today(),
+            "end_date": datetime.date.today() + datetime.timedelta(days=10),
+            "number_of_days": 10,
+            "team_lead": self.team_lead.id,
+            "members": [self.profile1.id],
+            "skills": [],
+            "team_size": 2
+        }
+        project = ProjectService.create_project(creator=self.creator, validated_data=project_data)
+
+        # Both the team lead and the member should be BUSY because the project is ON_HOLD
+        self.lead_profile.refresh_from_db()
+        self.profile1.refresh_from_db()
+        self.assertEqual(self.lead_profile.status, EmployeeProfile.Status.BUSY)
+        self.assertEqual(self.profile1.status, EmployeeProfile.Status.BUSY)

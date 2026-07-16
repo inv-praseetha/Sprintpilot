@@ -25,7 +25,8 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pencil
 } from 'lucide-react';
 
 const mockSprintsData = {
@@ -84,8 +85,10 @@ export default function ProjectDetail() {
 
   // UI Toggle States
   const [detailsExpanded, setDetailsExpanded] = useState(true);
+  const [rosterExpanded, setRosterExpanded] = useState(true);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
+  const [showEditLeadModal, setShowEditLeadModal] = useState(false);
 
   // Add Member State
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
@@ -118,6 +121,10 @@ export default function ProjectDetail() {
   const isProjectManager = useMemo(() => {
     return currentUser?.role === 'PROJECT_MANAGER';
   }, [currentUser]);
+
+  const teamLeads = useMemo(() => {
+    return employees.filter(emp => emp.user?.role === 'TEAM_LEAD');
+  }, [employees]);
 
   const fetchEmployees = async () => {
     try {
@@ -218,8 +225,9 @@ export default function ProjectDetail() {
     const currentMemberIds = project.members.map(m => m.id);
     const updatedMemberIds = [...currentMemberIds, ...selectedIds];
 
-    if (project.team_size && updatedMemberIds.length > project.team_size) {
-      setModalError(`Cannot allocate more members than the project team size of ${project.team_size}. You have ${currentMemberIds.length} current members and selected ${selectedIds.length} new members (total ${updatedMemberIds.length}).`);
+    const limit = project.team_size || 0;
+    if (updatedMemberIds.length > limit) {
+      setModalError(`Cannot allocate more members than the project team size of ${limit}. You have ${currentMemberIds.length} current members and selected ${selectedIds.length} new members (total ${updatedMemberIds.length}).`);
       return;
     }
 
@@ -252,6 +260,33 @@ export default function ProjectDetail() {
       alert(err.response?.data?.detail || 'Failed to add members.');
     } finally {
       setUpdatingMembers(false);
+    }
+  };
+
+  // Change project Team Lead
+  const handleChangeTeamLead = async (newTeamLeadUserId) => {
+    try {
+      const requestData = {
+        name: project.name,
+        description: project.description || null,
+        status: project.status,
+        type: project.type,
+        start_date: project.start_date || null,
+        end_date: project.end_date || null,
+        number_of_days: project.number_of_days,
+        team_lead: newTeamLeadUserId,
+        members: project.members.map(m => m.id),
+        skills: project.skills.map(s => s.id),
+        team_size: project.team_size
+      };
+
+      const res = await apiClient.put(`projects/${projectId}/`, requestData);
+      setProject(res.data);
+      await fetchEmployees();
+      setShowEditLeadModal(false);
+    } catch (err) {
+      console.error('[ProjectDetail] Error changing team lead:', err);
+      alert(err.response?.data?.detail || 'Failed to change team lead.');
     }
   };
 
@@ -352,11 +387,22 @@ export default function ProjectDetail() {
   }, [employees, project, memberSearchQuery]);
 
   const toggleSelectNewMember = (profileId) => {
-    setSelectedNewMembers(prev => 
-      prev.includes(profileId) 
-        ? prev.filter(id => id !== profileId) 
-        : [...prev, profileId]
-    );
+    setSelectedNewMembers(prev => {
+      const isSelected = prev.includes(profileId);
+      if (isSelected) {
+        setModalError(null);
+        return prev.filter(id => id !== profileId);
+      }
+      
+      const currentCount = (project.members || []).length;
+      const limit = project.team_size || 0;
+      if (currentCount + prev.length >= limit) {
+        setModalError(`Cannot select more members. Team size limit of ${limit} reached.`);
+        return prev;
+      }
+      setModalError(null);
+      return [...prev, profileId];
+    });
   };
 
   if (loading) {
@@ -616,137 +662,182 @@ export default function ProjectDetail() {
       </div>
 
       {/* 2. TEAM MEMBERS ACTIVE ROSTER */}
-      <div className={`p-6 sm:p-8 rounded-3xl border ${
+      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${
         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
       }`}>
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-2.5">
-            <Users className="w-5 h-5 text-indigo-500" />
+        <button
+          onClick={() => setRosterExpanded(!rosterExpanded)}
+          className={`w-full p-6 flex justify-between items-center transition-colors ${
+            darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <Users className="w-5 h-5 text-orange-500" />
             <h3 className="font-extrabold text-base tracking-tight">Active Team Roster</h3>
           </div>
-          <span className="text-xs text-slate-400 font-bold">
-            {project.members?.length || 0} Members assigned
-          </span>
-        </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-bold hidden sm:inline">
+              {(project.team_lead ? 1 : 0) + (project.members?.length || 0)} Member(s) assigned
+            </span>
+            {rosterExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+        </button>
 
-        {(project.team_lead || (project.members && project.members.length > 0)) ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
-            {/* Prepend Team Lead if exists */}
-            {project.team_lead && (
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between transition-all group ${
-                  darkMode 
-                    ? 'bg-slate-900/60 border-slate-800' 
-                    : 'bg-white border-slate-100 shadow-sm shadow-slate-100/50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-sm">
-                    {getInitials(project.team_lead.full_name)}
-                  </div>
-                  <div>
-                    <h5 className={`font-extrabold text-sm flex items-center gap-1.5 ${
-                      darkMode ? 'text-white' : 'text-slate-800'
-                    }`}>
-                      {project.team_lead.full_name}
-                      <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                        Lead
-                      </span>
-                    </h5>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-1">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                        Team Lead
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-400 block font-medium">
-                      {project.team_lead.email}
-                    </span>
-                  </div>
-                </div>
-                {/* Empty container to align layout with members who have a remove button */}
-                <div />
-              </div>
-            )}
-
-            {/* Render Members */}
-            {project.members && project.members.map((member) => (
-              <div
-                key={member.id}
-                className={`p-4 rounded-2xl border flex items-center justify-between transition-all group ${
-                  darkMode 
-                    ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700' 
-                    : 'bg-white border-slate-100 hover:shadow-lg hover:shadow-slate-100/50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-sm">
-                    {getInitials(member.user.full_name)}
-                  </div>
-                  <div>
-                    <h5 className={`font-extrabold text-sm ${
-                      darkMode ? 'text-white' : 'text-slate-800'
-                    }`}>
-                      {member.user.full_name}
-                    </h5>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-1">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                        {member.designation || 'Team Member'}
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                        member.status === 'BUSY'
-                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                          : member.status === 'ACTIVE'
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                            : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                      }`}>
-                        {member.status || 'ACTIVE'}
-                      </span>
-                      {project.skills && project.skills.length > 0 && member.skills && (
-                        <div className="flex flex-wrap gap-1">
-                          {member.skills
-                            .filter((s) => project.skills.some((ps) => ps.id === s.id))
-                            .map((s) => (
-                              <span
-                                key={s.id}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20"
-                              >
-                                {s.name}
+        {rosterExpanded && (
+          <div className="p-6 border-t border-slate-100 dark:border-slate-850">
+            {(project.team_lead || (project.members && project.members.length > 0)) ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'} uppercase font-black tracking-wider text-[10px]`}>
+                      <th className="py-4 px-4 font-bold">Member</th>
+                      <th className="py-4 px-4 font-bold">Role</th>
+                      <th className="py-4 px-4 font-bold">Status</th>
+                      <th className="py-4 px-4 font-bold">Matching Skills</th>
+                      {isProjectManager && <th className="py-4 px-4 text-right font-bold">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${darkMode ? 'divide-slate-850' : 'divide-slate-50'}`}>
+                    {/* Team Lead Row */}
+                    {project.team_lead && (
+                      <tr className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
+                              {getInitials(project.team_lead.full_name)}
+                            </div>
+                            <div>
+                              <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                {project.team_lead.full_name}
                               </span>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-400 block font-medium">
-                      {member.user.email}
-                    </span>
-                  </div>
-                </div>
+                              <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                                {project.team_lead.email}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                            Team Lead
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {(() => {
+                            const leadProfile = employees.find(emp => emp.user.id === project.team_lead?.id);
+                            const leadStatus = leadProfile?.status || 'ACTIVE';
+                            return (
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                                leadStatus === 'BUSY'
+                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                                  : leadStatus === 'ACTIVE'
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                    : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                              }`}>
+                                {leadStatus}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-slate-400 font-bold">—</span>
+                        </td>
+                        {isProjectManager && (
+                          <td className="py-4 px-4 text-right">
+                            <button
+                              onClick={() => setShowEditLeadModal(true)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
+                              title="Edit Team Lead"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    )}
 
+                    {/* Members Rows */}
+                    {project.members && project.members.map((member) => (
+                      <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
+                              {getInitials(member.user.full_name)}
+                            </div>
+                            <div>
+                              <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                {member.user.full_name}
+                              </span>
+                              <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                                {member.user.email}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350">
+                            {member.designation || 'Team Member'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                            member.status === 'BUSY'
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                              : member.status === 'ACTIVE'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                          }`}>
+                            {member.status || 'ACTIVE'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {project.skills && project.skills.length > 0 && member.skills && member.skills.some(s => project.skills.some(ps => ps.id === s.id)) ? (
+                            <div className="flex flex-wrap gap-1">
+                              {member.skills
+                                .filter((s) => project.skills.some((ps) => ps.id === s.id))
+                                .map((s) => (
+                                  <span
+                                    key={s.id}
+                                    className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
+                                  >
+                                    {s.name}
+                                  </span>
+                                ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400">—</span>
+                          )}
+                        </td>
+                        {isProjectManager && (
+                          <td className="py-4 px-4 text-right">
+                            <button
+                              onClick={() => handleRemoveMember(member.id)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                              title="Remove Member"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-12 flex flex-col items-center justify-center text-center">
+                <Users className="w-12 h-12 text-slate-300 dark:text-slate-750 mb-3" />
+                <h5 className="font-extrabold text-slate-400 text-sm">No Members Added Yet</h5>
+                <p className="text-xs text-slate-400 mt-1 mb-4">Add members to start collaborating on this project.</p>
                 {isProjectManager && (
                   <button
-                    onClick={() => handleRemoveMember(member.id)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    title="Remove Member"
+                    onClick={() => setShowAddMembersModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <UserPlus className="w-4 h-4" />
+                    Add First Member
                   </button>
                 )}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 flex flex-col items-center justify-center text-center">
-            <Users className="w-12 h-12 text-slate-300 dark:text-slate-750 mb-3" />
-            <h5 className="font-extrabold text-slate-400 text-sm">No Members Added Yet</h5>
-            <p className="text-xs text-slate-400 mt-1 mb-4">Add members to start collaborating on this project.</p>
-            {isProjectManager && (
-              <button
-                onClick={() => setShowAddMembersModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
-              >
-                <UserPlus className="w-4 h-4" />
-                Add First Member
-              </button>
             )}
           </div>
         )}
@@ -894,6 +985,35 @@ export default function ProjectDetail() {
                   />
                 </div>
 
+                {/* Selected Members Chips */}
+                {selectedNewMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 rounded-2xl border border-dashed border-orange-500/30 bg-orange-500/[0.02] text-left">
+                    {selectedNewMembers.map(id => {
+                      const emp = employees.find(e => e.id === id);
+                      if (!emp) return null;
+                      return (
+                        <div
+                          key={id}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20 text-[10px] font-black"
+                        >
+                          <span>{emp.user.full_name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedNewMembers(prev => prev.filter(mid => mid !== id));
+                              setModalError(null);
+                            }}
+                            className="hover:text-orange-700 dark:hover:text-orange-300 transition-colors bg-transparent border-none outline-none cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Error Banner */}
                 {modalError && (
                   <div className="p-3.5 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold text-left flex items-start gap-2">
@@ -915,8 +1035,22 @@ export default function ProjectDetail() {
                         const allSelected = allIds.every(id => selectedNewMembers.includes(id));
                         if (allSelected) {
                           setSelectedNewMembers(prev => prev.filter(id => !allIds.includes(id)));
+                          setModalError(null);
                         } else {
-                          setSelectedNewMembers(prev => Array.from(new Set([...prev, ...allIds])));
+                          const currentCount = (project.members || []).length;
+                          const limit = project.team_size || 0;
+                          const remaining = limit - currentCount;
+                          if (remaining <= 0) {
+                            setModalError(`Cannot select more members. Team size limit of ${limit} reached.`);
+                            return;
+                          }
+                          const toSelect = allIds.filter(id => !selectedNewMembers.includes(id)).slice(0, remaining);
+                          if (toSelect.length < allIds.filter(id => !selectedNewMembers.includes(id)).length) {
+                            setModalError(`Selected only ${toSelect.length} member(s) to match the team size limit of ${limit}.`);
+                          } else {
+                            setModalError(null);
+                          }
+                          setSelectedNewMembers(prev => [...prev, ...toSelect]);
                         }
                       }}
                       className="text-[10px] font-bold text-orange-500 dark:text-orange-400 hover:underline cursor-pointer bg-transparent border-none outline-none"
@@ -1069,6 +1203,71 @@ export default function ProjectDetail() {
           onImportSuccess={handleImportSuccess}
           projectType={project.type}
         />
+      )}
+
+      {/* 4. MODAL: EDIT TEAM LEAD */}
+      {showEditLeadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
+              <div className="text-left">
+                <h3 className="font-extrabold text-base tracking-tight">Edit Project Team Lead</h3>
+                <p className="text-xs text-slate-400">Select a new team lead for this project</p>
+              </div>
+              <button
+                onClick={() => setShowEditLeadModal(false)}
+                className={`p-2 rounded-xl transition-colors ${
+                  darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                }`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Select Team Lead *</label>
+                <select
+                  value={project.team_lead?.id || ''}
+                  onChange={(e) => {
+                    const newLeadId = e.target.value;
+                    if (newLeadId) {
+                      handleChangeTeamLead(newLeadId);
+                    }
+                  }}
+                  className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                    darkMode
+                      ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
+                      : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
+                  }`}
+                >
+                  <option value="">Select Team Lead...</option>
+                  {teamLeads.map((lead) => (
+                    <option key={lead.user?.id} value={lead.user?.id}>
+                      {lead.user?.full_name} ({lead.user?.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end bg-slate-50/50 dark:bg-slate-100/30">
+              <button
+                onClick={() => setShowEditLeadModal(false)}
+                className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                  darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
