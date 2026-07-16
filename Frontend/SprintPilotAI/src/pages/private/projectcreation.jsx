@@ -324,6 +324,7 @@ export default function ProjectCreation() {
     }
 
     const requestData = {
+      project_id: projectId.trim() || null,
       name,
       description: description.trim() || null,
       status,
@@ -355,6 +356,7 @@ export default function ProjectCreation() {
   };
 
   const resetForm = () => {
+    setProjectId('');
     setName('');
     setDescription('');
     setStatus('ACTIVE');
@@ -374,6 +376,7 @@ export default function ProjectCreation() {
 
   const handleEditProject = (project) => {
     setEditingProjectId(project.id);
+    setProjectId(project.project_id || '');
     setName(project.name || '');
     setDescription(project.description || '');
     setStatus(project.status || 'ACTIVE');
@@ -832,6 +835,8 @@ export default function ProjectCreation() {
           formError={formError}
           calculateEndDate={calculateEndDate}
           darkMode={darkMode}
+          projectId={projectId}
+          setProjectId={setProjectId}
           name={name}
           setName={setName}
           description={description}
