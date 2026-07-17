@@ -351,7 +351,7 @@ export default function ProjectForm({
                   skillCategoryFilter === cat
                     ? 'bg-orange-500 text-white border-orange-500'
                     : darkMode
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-350'
+                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-300'
                       : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                 }`}
               >
@@ -531,7 +531,7 @@ export default function ProjectForm({
                           }}
                           className={`px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-all border-b last:border-0 border-slate-100/50 dark:border-slate-800/30 ${
                             darkMode
-                              ? 'bg-slate-900/60 hover:bg-slate-850 text-slate-300'
+                              ? 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
                               : 'bg-white hover:bg-slate-50 text-slate-700'
                           }`}
                         >
@@ -548,21 +548,21 @@ export default function ProjectForm({
                             {/* Info Column */}
                             <div className="min-w-0 flex flex-col gap-0.5">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                                <span className="text-xs font-bold text-black dark:text-white truncate" style={{ color: darkMode ? 'white' : 'black' }}>
                                   {empProfile.user?.full_name}
                                 </span>
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                                   empProfile.status === 'BUSY'
-                                    ? (darkMode ? 'bg-amber-500/10 text-amber-500' : 'bg-amber-500/10 text-amber-655')
+                                    ? (darkMode ? 'bg-amber-500/10 text-amber-500' : 'bg-amber-500/10 text-amber-600')
                                     : empProfile.status === 'ACTIVE'
-                                      ? (darkMode ? 'bg-emerald-500/10 text-emerald-450' : 'bg-emerald-500/10 text-emerald-600')
-                                      : (darkMode ? 'bg-indigo-500/10 text-indigo-450' : 'bg-indigo-500/10 text-indigo-600')
+                                      ? (darkMode ? 'bg-emerald-500/10 text-emerald-500' : 'bg-emerald-500/10 text-emerald-600')
+                                      : (darkMode ? 'bg-indigo-500/10 text-indigo-500' : 'bg-indigo-500/10 text-indigo-600')
                                 }`}>
                                   {empProfile.status || 'ACTIVE'}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5 text-[10px] text-slate-455 dark:text-slate-500 font-medium">
-                                <span className="truncate max-w-[120px] font-bold text-slate-450 dark:text-slate-400">
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-500 font-medium">
+                                <span className="truncate max-w-[120px] font-bold text-slate-500 dark:text-slate-400">
                                   {empProfile.designation || 'Developer'}
                                 </span>
                                 <span>•</span>
@@ -583,8 +583,8 @@ export default function ProjectForm({
                                     key={s.id}
                                     className={`px-1 rounded text-[7px] font-black uppercase border transition-colors ${
                                       darkMode
-                                        ? 'bg-slate-800 text-slate-450 border-slate-750'
-                                        : 'bg-slate-100 text-slate-550 border-slate-200'
+                                        ? 'bg-slate-800 text-slate-400 border-slate-700'
+                                        : 'bg-slate-100 text-slate-600 border-slate-200'
                                     }`}
                                   >
                                     {s.name}
@@ -619,7 +619,7 @@ export default function ProjectForm({
           className={`px-5.5 py-3 rounded-2xl font-bold text-sm transition-all cursor-pointer ${
             darkMode
               ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-              : 'bg-slate-50 hover:bg-slate-100 text-slate-655 font-bold'
+              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold'
           }`}
         >
           Cancel

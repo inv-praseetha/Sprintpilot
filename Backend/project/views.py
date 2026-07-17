@@ -166,6 +166,17 @@ class ProjectDetailView(APIView):
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Prevent adding new members if the project is already COMPLETED
+        if project.status == 'COMPLETED':
+            new_members = request.data.get("members", [])
+            current_members = [str(pm.employee_profile_id) for pm in project.members.all()]
+            added_members = set([str(m) for m in new_members]) - set(current_members)
+            if added_members:
+                return Response(
+                    {"detail": "Cannot add members to a completed project."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         serializer = ProjectCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
