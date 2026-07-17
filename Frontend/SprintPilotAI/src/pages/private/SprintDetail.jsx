@@ -729,10 +729,18 @@ export default function SprintDetail() {
             <span className="text-slate-400 text-xs font-bold">/</span>
             <span className="text-slate-400 text-xs font-bold">{sprint.project_name || 'SprintPilot AI'}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            {sprint.name}
-          </h1>
-          <div className="flex items-center gap-2 text-xs text-slate-450 dark:text-slate-400 font-semibold">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              {sprint.name}
+            </h1>
+            {sprint.project_status === 'COMPLETED' && (
+              <span className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                Project Completed
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-450 dark:text-slate-400 font-semibold mt-1">
             <Calendar className="w-4 h-4 text-slate-400" />
             <span>Timeline: {sprint.start_date} - {sprint.end_date}</span>
           </div>
@@ -762,8 +770,8 @@ export default function SprintDetail() {
                 
                 <button
                   onClick={handleStartGeneration}
-                  disabled={isGenerating}
-                  className="px-6 py-3 text-xs font-black tracking-wider uppercase rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md shadow-orange-500/25 dark:shadow-orange-500/15 hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-98 cursor-pointer flex items-center gap-2 mx-auto disabled:opacity-50"
+                  disabled={isGenerating || sprint?.project_status === 'COMPLETED'}
+                  className="px-6 py-3 text-xs font-black tracking-wider uppercase rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md shadow-orange-500/25 dark:shadow-orange-500/15 hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-98 cursor-pointer flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? (
                     <Loader2 className="w-4 h-4 text-white animate-spin" />
@@ -823,8 +831,8 @@ export default function SprintDetail() {
                     </button>
                     <button
                       onClick={handleSaveToBackend}
-                      disabled={isSaving}
-                      className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+                      disabled={isSaving || sprint?.project_status === 'COMPLETED'}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSaving ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -849,8 +857,8 @@ export default function SprintDetail() {
                     </button>
                     <button
                       onClick={handleSyncClick}
-                      disabled={isSyncing}
-                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors ${
+                      disabled={isSyncing || sprint?.project_status === 'COMPLETED'}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                         darkMode 
                           ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
                           : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -865,7 +873,8 @@ export default function SprintDetail() {
                     </button>
                     <button
                       onClick={handleStartUpdateMode}
-                      className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5"
+                      disabled={sprint?.project_status === 'COMPLETED'}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                       Update

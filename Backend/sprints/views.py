@@ -273,6 +273,12 @@ class SprintListCreateView(APIView):
         except Project.DoesNotExist:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        if project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot create sprints in a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         data = request.data
         name = data.get('name')
         start_date = data.get('start_date')
@@ -391,6 +397,12 @@ class SprintTaskUpdateView(APIView):
         except SprintTask.DoesNotExist:
             return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        if task.sprint.project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot update tasks in a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         data = request.data
 
         if 'status' in data:
@@ -447,6 +459,12 @@ class SprintAISuggestScheduleView(APIView):
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        if sprint.project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot generate AI schedule for a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         from decouple import config
         api_key = config('GEMINI_API_KEY', default=None) or os.environ.get("GEMINI_API_KEY")
         if not api_key:
@@ -485,6 +503,12 @@ class SprintImportScheduleView(APIView):
             sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if sprint.project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot import schedule for a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         from sprints.services.schedule_service import import_schedule
         try:

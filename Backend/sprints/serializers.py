@@ -50,12 +50,14 @@ class SprintTaskSerializer(serializers.ModelSerializer):
 
 class SprintSerializer(serializers.ModelSerializer):
     tasks = SprintTaskSerializer(many=True, read_only=True)
+    project_status = serializers.CharField(source='project.status', read_only=True)
 
     class Meta:
         model = Sprint
         fields = [
             'id',
             'project',
+            'project_status',
             'name',
             'goal',
             'start_date',
