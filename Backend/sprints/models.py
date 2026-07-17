@@ -12,8 +12,7 @@ class Sprint(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='sprints')
-    name = models.CharField(max_length=150)
-    goal = models.TextField(null=True, blank=True)
+    milestone = models.CharField(max_length=150)
     start_date = models.DateField()
     end_date = models.DateField()
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PLANNED)
@@ -32,7 +31,7 @@ class Sprint(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.project.name} - {self.name}"
+        return f"{self.project.name} - {self.milestone}"
 
 class SprintTask(models.Model):
     class Priority(models.TextChoices):
@@ -48,12 +47,10 @@ class SprintTask(models.Model):
         INFRA = 'INFRA', 'INFRA'
 
     class Status(models.TextChoices):
-        TODO = 'TODO', 'TODO'
+        OPEN = 'OPEN', 'OPEN'
         IN_PROGRESS = 'IN_PROGRESS', 'IN_PROGRESS'
-        IN_REVIEW = 'IN_REVIEW', 'IN_REVIEW'
-        QA = 'QA', 'QA'
-        DONE = 'DONE', 'DONE'
-        BLOCKED = 'BLOCKED', 'BLOCKED'
+        RESOLVED='RESOLVED','RESOLVED'
+        CLOSED='CLOSED','CLOSED'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sprint = models.ForeignKey(Sprint, on_delete=models.CASCADE, related_name='tasks')
@@ -64,7 +61,7 @@ class SprintTask(models.Model):
     story_points = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
     estimated_hours = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     category = models.CharField(max_length=20, choices=Category.choices, default=Category.UI)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     assigned_employee = models.ForeignKey(
         EmployeeProfile, 
         on_delete=models.SET_NULL, 

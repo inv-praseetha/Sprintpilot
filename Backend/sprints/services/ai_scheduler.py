@@ -65,7 +65,7 @@ def get_schedule_suggestions(sprint, tasks, api_key):
     
     prompt = f"""
 You are an expert Agile project manager and workload scheduling AI.
-Your task is to assign members and schedule tasks for the sprint: "{sprint.name}".
+Your task is to assign members and schedule tasks for the sprint: "{sprint.milestone}".
 
 Sprint Details:
 - Start Date: {sprint.start_date} (inclusive)

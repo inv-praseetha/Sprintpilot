@@ -212,7 +212,7 @@ export default function ProjectDetail() {
       
       return {
         id: sprint.id,
-        name: sprint.name,
+        name: sprint.milestone || sprint.name,
         totalTasks,
         startDate,
         endDate
@@ -982,7 +982,7 @@ export default function ProjectDetail() {
                       <td className={`py-4 px-5 font-extrabold text-sm ${
                         darkMode ? 'text-white' : 'text-slate-800'
                       }`}>
-                        {sprint.name}
+                        {sprint.milestone || sprint.name}
                       </td>
 
                       {/* Total Tasks */}

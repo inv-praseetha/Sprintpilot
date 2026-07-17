@@ -234,7 +234,7 @@ class SprintDownloadScheduleView(APIView):
             wb.save(buffer)
             buffer.seek(0)
             
-            clean_sprint_name = "".join([c if c.isalnum() else "_" for c in sprint.name])
+            clean_sprint_name = "".join([c if c.isalnum() else "_" for c in sprint.milestone])
             filename = f"Schedule_{clean_sprint_name}.xlsx"
             
             response = FileResponse(
@@ -281,13 +281,13 @@ class SprintListCreateView(APIView):
             )
 
         data = request.data
-        name = data.get('name')
+        milestone = data.get('milestone') or data.get('name')
         start_date = data.get('start_date')
         end_date = data.get('end_date')
 
-        if not name or not start_date or not end_date:
+        if not milestone or not start_date or not end_date:
             return Response(
-                {"detail": "Sprint name, start_date, and end_date are required."}, 
+                {"detail": "Sprint milestone, start_date, and end_date are required."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -295,8 +295,7 @@ class SprintListCreateView(APIView):
             with transaction.atomic():
                 sprint = Sprint.objects.create(
                     project=project,
-                    name=name,
-                    goal=data.get('goal') or '',
+                    milestone=milestone,
                     start_date=start_date,
                     end_date=end_date,
                     status=data.get('status') or 'PLANNED'
@@ -411,16 +410,12 @@ class SprintTaskUpdateView(APIView):
             status_val_clean = str(status_val).upper().replace(' ', '_').strip()
             if status_val_clean == 'IN_PROGRESS':
                 task.status = 'IN_PROGRESS'
-            elif status_val_clean == 'COMPLETED' or status_val_clean == 'DONE':
-                task.status = 'DONE'
-            elif status_val_clean == 'TODO':
-                task.status = 'TODO'
-            elif status_val_clean == 'IN_REVIEW':
-                task.status = 'IN_REVIEW'
-            elif status_val_clean == 'QA':
-                task.status = 'QA'
-            elif status_val_clean == 'BLOCKED':
-                task.status = 'BLOCKED'
+            elif status_val_clean in ('COMPLETED', 'DONE', 'CLOSED'):
+                task.status = 'CLOSED'
+            elif status_val_clean in ('TODO', 'OPEN'):
+                task.status = 'OPEN'
+            elif status_val_clean in ('IN_REVIEW', 'QA', 'RESOLVED'):
+                task.status = 'RESOLVED'
             else:
                 task.status = status_val
 

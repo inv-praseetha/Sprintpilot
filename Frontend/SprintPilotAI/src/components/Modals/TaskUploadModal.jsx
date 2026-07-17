@@ -164,7 +164,7 @@ export default function TaskUploadModal({
             title: (titleVal || 'Untitled Task').toString().trim(),
             desc: (descVal || 'No description provided.').toString().trim(),
             category: validCats.includes(cat) ? cat : 'UI',
-            status: 'TODO',
+            status: 'OPEN',
             jiraId: jiraVal.toString().trim()
           });
         }

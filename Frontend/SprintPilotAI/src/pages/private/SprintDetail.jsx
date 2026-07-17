@@ -58,11 +58,12 @@ const getCleanCategory = (cat) => {
 
 const getProgressPercentage = (status) => {
   const s = String(status).toUpperCase().trim();
-  if (s === 'DONE' || s === 'COMPLETED') return '100%';
-  if (s === 'IN_REVIEW') return '90%';
+  if (s === 'DONE' || s === 'COMPLETED' || s === 'CLOSED') return '100%';
+  if (s === 'IN_REVIEW' || s === 'RESOLVED') return '90%';
   if (s === 'QA') return '80%';
   if (s === 'IN_PROGRESS') return '50%';
   if (s === 'BLOCKED') return '10%';
+  if (s === 'OPEN' || s === 'TODO') return '0%';
   return '0%';
 };
 
@@ -562,7 +563,7 @@ export default function SprintDetail() {
       });
       
       const contentDisposition = response.headers['content-disposition'];
-      let filename = `Schedule_${sprint.name.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+      let filename = `Schedule_${(sprint.milestone || sprint.name || 'sprint').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
       if (contentDisposition) {
         const matches = /filename="([^"]+)"/.exec(contentDisposition);
         if (matches && matches[1]) {
@@ -731,7 +732,7 @@ export default function SprintDetail() {
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              {sprint.name}
+              {sprint.milestone || sprint.name}
             </h1>
             {sprint.project_status === 'COMPLETED' && (
               <span className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center gap-1">
