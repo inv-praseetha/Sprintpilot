@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
@@ -115,9 +116,54 @@ const generateTimelineDays = (startStr, endStr) => {
 };
 
 // CustomDatePicker component
-function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
+function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode, onOpen, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const containerRef = useRef(null);
   const popoverRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (onOpen) onOpen();
+    } else {
+      if (onClose) onClose();
+    }
+  }, [isOpen, onOpen, onClose]);
+
+  // Click outside to close handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedContainer = containerRef.current && containerRef.current.contains(event.target);
+      const clickedPopover = popoverRef.current && popoverRef.current.contains(event.target);
+      if (!clickedContainer && !clickedPopover) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close calendar on scroll
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScroll = () => {
+      setIsOpen(false);
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [isOpen]);
+
+  const toggleOpen = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY + 6,
+        left: rect.left + window.scrollX
+      });
+    }
+    setIsOpen(!isOpen);
+  };
 
   // Initialize view date based on current value, minDate or today
   const [viewDate, setViewDate] = useState(() => {
@@ -132,19 +178,17 @@ function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
       const initial = value || minDate || new Date().toISOString().split('T')[0];
       const [y, m, d] = initial.split('-').map(Number);
       setViewDate(new Date(y, m - 1, 1));
+      
+      // Refresh coordinates in case of layout changes
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom + window.scrollY + 6,
+          left: rect.left + window.scrollX
+        });
+      }
     }
   }, [isOpen, value]);
-
-  // Click outside to close handler
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -163,11 +207,9 @@ function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
   const firstDayIndex = new Date(year, month, 1).getDay();
 
   const days = [];
-  // Fill empty leading slots
   for (let i = 0; i < firstDayIndex; i++) {
     days.push(null);
   }
-  // Fill day numbers
   for (let d = 1; d <= daysInMonth; d++) {
     days.push(d);
   }
@@ -211,11 +253,12 @@ function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
   };
 
   return (
-    <div className="relative w-full" ref={popoverRef}>
+    <div className="relative w-full" ref={containerRef}>
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={toggleOpen}
         className={`px-3 py-1.5 rounded-xl text-left text-[11px] border w-full font-extrabold flex items-center justify-between transition-colors focus:outline-none ${
           darkMode
             ? 'bg-slate-900 border-slate-750 text-white hover:bg-slate-800'
@@ -226,10 +269,17 @@ function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
         <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
       </button>
 
-      {/* Calendar Popover */}
-      {isOpen && (
+      {/* Calendar Popover (Rendered at Body Level) */}
+      {isOpen && createPortal(
         <div
-          className={`absolute left-0 mt-1.5 p-3 w-60 rounded-2xl border shadow-xl z-55 animate-fadeIn ${
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            zIndex: 999999
+          }}
+          className={`p-3 w-60 rounded-2xl border shadow-xl animate-fadeIn ${
             darkMode
               ? 'bg-slate-950 border-slate-850 text-white'
               : 'bg-white border-slate-205 text-slate-800'
@@ -313,7 +363,8 @@ function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode }) {
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -338,6 +389,7 @@ export default function SprintDetail() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [loadingText, setLoadingText] = useState('');
   const [hoveredRowId, setHoveredRowId] = useState(null);
+  const [activeDatePickerId, setActiveDatePickerId] = useState(null);
   
   // Tracking changed items
   const [modifiedTaskIds, setModifiedTaskIds] = useState(new Set());
@@ -840,21 +892,29 @@ export default function SprintDetail() {
             </div>
 
             {/* Scrollable Grid Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[1100px]">
+            <div className="overflow-auto max-h-[600px] relative custom-scrollbar">
+              <table
+                className="w-full text-left border-collapse"
+                style={{ minWidth: `${820 + timelineDaysList.length * 32}px` }}
+              >
                 <thead>
                   {/* Row 1: Week headers */}
-                  <tr className={`border-b text-[10px] font-black tracking-widest uppercase text-slate-450 ${
-                    darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <th colSpan={5} className={`py-2.5 px-4 border-r ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>
+                  <tr className={`border-b text-[10px] font-black tracking-widest uppercase text-slate-450`}>
+                    <th
+                      colSpan={5}
+                      className={`py-2.5 px-4 border-r sticky left-0 top-0 z-40 ${
+                        darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}
+                      style={{ minWidth: '610px', maxWidth: '610px', width: '610px' }}
+                    >
                       Task Specifications
                     </th>
-                    <th className={`py-2.5 px-4 border-r ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>
+                    <th
+                      className={`py-2.5 px-4 border-r sticky left-[610px] top-0 z-40 ${
+                        darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}
+                      style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                    >
                       Recommendation Reason
                     </th>
                     
@@ -883,10 +943,10 @@ export default function SprintDetail() {
                         <th
                           key={`week-h-${i}`}
                           colSpan={h.span}
-                          className={`py-2.5 px-3 border-r text-center text-[9px] ${
+                          className={`py-2.5 px-3 border-r text-center text-[9px] sticky top-0 z-30 ${
                             i % 2 === 0
-                              ? darkMode ? 'bg-slate-950/20' : 'bg-slate-100/30'
-                              : ''
+                              ? darkMode ? 'bg-slate-950' : 'bg-slate-100'
+                              : darkMode ? 'bg-slate-900' : 'bg-slate-50'
                           } ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
                         >
                           {h.label}
@@ -896,35 +956,65 @@ export default function SprintDetail() {
                   </tr>
 
                   {/* Row 2: Columns mapping */}
-                  <tr className={`border-b text-[10px] font-black ${
-                    darkMode ? 'bg-slate-950/30 border-slate-800 text-slate-400' : 'bg-slate-50/50 border-slate-200 text-slate-500'
-                  }`}>
-                    <th className={`py-2 px-4 sticky left-0 z-20 border-r w-72 ${
-                      darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                    }`}>TASK</th>
-                    <th className={`py-2 px-4 border-r w-56 ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>ASSIGNED TO</th>
-                    <th className={`py-2 px-3 w-18 text-center border-r ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>PROGRESS</th>
-                    <th className={`py-2 px-3 w-28 border-r ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>START</th>
-                    <th className={`py-2 px-3 w-28 border-r ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>END</th>
-                    <th className={`py-2 px-4 border-r w-48 ${
-                      darkMode ? 'border-slate-800' : 'border-slate-200'
-                    }`}>RECOMMENDATION REASON</th>
+                  <tr className={`border-b text-[10px] font-black`}>
+                    <th
+                      className={`py-2 px-4 sticky left-0 top-[36px] z-40 border-r w-56 ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
+                    >
+                      TASK
+                    </th>
+                    <th
+                      className={`py-2 px-4 sticky left-[220px] top-[36px] z-40 border-r w-36 ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
+                    >
+                      ASSIGNED TO
+                    </th>
+                    <th
+                      className={`py-2 px-3 sticky left-[370px] top-[36px] z-40 w-14 text-center border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                    >
+                      PROGRESS
+                    </th>
+                    <th
+                      className={`py-2 px-3 sticky left-[430px] top-[36px] z-40 w-24 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                    >
+                      START
+                    </th>
+                    <th
+                      className={`py-2 px-3 sticky left-[520px] top-[36px] z-40 w-24 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                    >
+                      END
+                    </th>
+                    <th
+                      className={`py-2 px-4 sticky left-[610px] top-[36px] z-40 border-r w-52 ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                    >
+                      RECOMMENDATION REASON
+                    </th>
                     
                     {/* Dates */}
                     {timelineDaysList.map((day, idx) => {
-                      let cellStyle = `py-2 text-center border-r w-8 shrink-0 ${
-                        darkMode ? 'border-slate-800' : 'border-slate-200'
+                      let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 ${
+                        darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'
                       }`;
                       if (day.isWeekend) {
-                        cellStyle += darkMode ? ' bg-slate-950/60' : ' bg-slate-100/60';
+                        cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 ${
+                          darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-500'
+                        }`;
                       }
                       if (day.isSprintStart) {
                         cellStyle += ' border-l-2 border-l-orange-500';
@@ -941,25 +1031,53 @@ export default function SprintDetail() {
                   </tr>
 
                   {/* Row 3: Day Names */}
-                  <tr className={`border-b text-[9px] font-black uppercase ${
-                    darkMode ? 'bg-slate-950/20 border-slate-800 text-slate-500' : 'bg-slate-50/50 border-slate-200 text-slate-455'
-                  }`}>
-                    <th className={`py-1 px-4 sticky left-0 z-20 border-r ${
-                      darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-                    }`} />
-                    <th className={`py-1 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                    <th className={`py-1 px-3 text-center border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                    <th className={`py-1 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                    <th className={`py-1 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                    <th className={`py-1 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                  <tr className={`border-b text-[9px] font-black uppercase`}>
+                    <th
+                      className={`py-1 px-4 sticky left-0 top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
+                    />
+                    <th
+                      className={`py-1 px-4 sticky left-[220px] top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
+                    />
+                    <th
+                      className={`py-1 px-3 sticky left-[370px] top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                    />
+                    <th
+                      className={`py-1 px-3 sticky left-[430px] top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                    />
+                    <th
+                      className={`py-1 px-3 sticky left-[520px] top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                    />
+                    <th
+                      className={`py-1 px-4 sticky left-[610px] top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                    />
 
                     {/* Day Names */}
                     {timelineDaysList.map((day, idx) => {
-                      let cellStyle = `py-1 text-center border-r w-8 ${
-                        darkMode ? 'border-slate-800' : 'border-slate-200'
+                      let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 ${
+                        darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-455'
                       }`;
                       if (day.isWeekend) {
-                        cellStyle += darkMode ? ' bg-slate-950/60 text-slate-600' : ' bg-slate-100/60 text-slate-400';
+                        cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 ${
+                          darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
+                        }`;
                       }
                       if (day.isSprintStart) {
                         cellStyle += ' border-l-2 border-l-orange-500';
@@ -994,16 +1112,44 @@ export default function SprintDetail() {
                           darkMode ? 'border-slate-800' : 'border-slate-200'
                         }`}>
                           {/* TASK sticky column divider */}
-                          <td className={`py-3 px-4 sticky left-0 z-20 font-black border-r text-left ${secBgClass} ${
-                            darkMode ? 'border-slate-800' : 'border-slate-200'
-                          }`}>
+                          <td
+                            className={`py-3 px-4 sticky left-0 z-20 font-black border-r text-left ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
+                          >
                             {config.label}
                           </td>
-                          <td className={`py-3 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                          <td className={`py-3 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                          <td className={`py-3 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                          <td className={`py-3 px-3 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
-                          <td className={`py-3 px-4 border-r ${darkMode ? 'border-slate-800' : 'border-slate-200'}`} />
+                          <td
+                            className={`py-3 px-4 sticky left-[220px] z-20 border-r ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
+                          />
+                          <td
+                            className={`py-3 px-3 sticky left-[370px] z-20 border-r ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                          />
+                          <td
+                            className={`py-3 px-3 sticky left-[430px] z-20 border-r ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                          />
+                          <td
+                            className={`py-3 px-3 sticky left-[520px] z-20 border-r ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                          />
+                          <td
+                            className={`py-3 px-4 sticky left-[610px] z-20 border-r ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                          />
 
                           {/* Date grid cells */}
                           {timelineDaysList.map((day, idx) => {
@@ -1026,13 +1172,31 @@ export default function SprintDetail() {
                         {/* Task rows */}
                         {catTasks.map((task) => {
                           const isRowHovered = hoveredRowId === task.id;
+                          const isActiveRow = activeDatePickerId && activeDatePickerId.startsWith(`${task.id}-`);
+                          const rowZIndexClass = isActiveRow ? 'z-35' : 'z-20';
+                          
+                          const stickyBgClass = isRowHovered
+                            ? darkMode
+                              ? 'bg-slate-800 text-white border-slate-700 font-bold'
+                              : 'bg-slate-50 text-slate-900 border-slate-200 font-bold'
+                            : darkMode
+                            ? 'bg-slate-900 text-slate-100 border-slate-800 font-bold'
+                            : 'bg-white text-slate-900 border-slate-200 font-bold';
+
+                          const stickyNormalBgClass = isRowHovered
+                            ? darkMode
+                              ? 'bg-slate-800 text-white border-slate-700'
+                              : 'bg-slate-50 text-slate-900 border-slate-200'
+                            : darkMode
+                            ? 'bg-slate-900 text-slate-100 border-slate-800'
+                            : 'bg-white text-slate-900 border-slate-200';
 
                           return (
                             <tr
                               key={task.id}
                               onMouseEnter={() => setHoveredRowId(task.id)}
                               onMouseLeave={() => setHoveredRowId(null)}
-                              className={`transition-colors duration-100 ${
+                              className={`transition-colors duration-100 ${isActiveRow ? 'relative z-30' : ''} ${
                                 isRowHovered
                                   ? darkMode
                                     ? 'bg-slate-800/40 text-white font-bold'
@@ -1043,25 +1207,25 @@ export default function SprintDetail() {
                               }`}
                             >
                               {/* TASK Name cell (sticky, matches row background) */}
-                              <td className={`py-4 px-4 sticky left-0 z-20 border-r align-middle text-left ${
-                                isRowHovered
-                                  ? darkMode ? 'bg-slate-800 text-white border-slate-700 font-bold' : 'bg-slate-50 text-slate-900 border-slate-200 font-bold'
-                                  : darkMode ? 'bg-slate-900 text-slate-100 border-slate-800 font-bold' : 'bg-white text-slate-900 border-slate-200 font-bold'
-                              }`}>
-                                <div className="truncate max-w-xs">
+                              <td
+                                className={`py-4 px-4 sticky left-0 ${rowZIndexClass} border-r align-middle text-left ${stickyBgClass}`}
+                                style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
+                              >
+                                <div className="truncate max-w-[210px]" title={task.title}>
                                   {task.title}
                                 </div>
                               </td>
 
                               {/* ASSIGNED TO */}
-                              <td className={`py-4 px-4 border-r align-middle text-left ${
-                                darkMode ? 'border-slate-800' : 'border-slate-200'
-                              }`}>
+                              <td
+                                className={`py-4 px-4 sticky left-[220px] ${rowZIndexClass} border-r align-middle text-left focus-within:z-50 ${stickyNormalBgClass}`}
+                                style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
+                              >
                                 {isEditing ? (
                                   <select
                                     value={task.assigned_employee?.id || ""}
                                     onChange={(e) => handleAssigneeChange(task.id, e.target.value)}
-                                    className={`p-1.5 rounded-lg text-xs border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                                    className={`p-1 rounded text-[10px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${
                                       darkMode
                                         ? 'bg-slate-900 border-slate-750 text-white'
                                         : 'bg-white border-slate-250 text-slate-800'
@@ -1075,23 +1239,27 @@ export default function SprintDetail() {
                                     ))}
                                   </select>
                                 ) : (
-                                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                                  <span className={`truncate block max-w-[140px] ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                     {task.assigned_employee?.user?.full_name || 'Unassigned'}
                                   </span>
                                 )}
                               </td>
 
                               {/* PROGRESS */}
-                              <td className={`py-4 px-3 text-center border-r align-middle font-extrabold text-[10px] ${
-                                darkMode ? 'border-slate-800 text-slate-350' : 'border-slate-200 text-slate-800'
-                              }`}>
+                              <td
+                                className={`py-4 px-1 sticky left-[370px] ${rowZIndexClass} text-center border-r align-middle font-extrabold text-[10px] ${stickyNormalBgClass}`}
+                                style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                              >
                                 {getProgressPercentage(task.status)}
                               </td>
 
                               {/* START */}
-                              <td className={`py-4 px-3 border-r align-middle text-[10px] ${
-                                darkMode ? 'border-slate-800' : 'border-slate-200'
-                              }`}>
+                              <td
+                                className={`py-4 px-1 sticky left-[430px] border-r align-middle text-[10px] ${
+                                  activeDatePickerId === `${task.id}-start` ? 'z-50' : rowZIndexClass
+                                } ${stickyNormalBgClass}`}
+                                style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                              >
                                 {isEditing ? (
                                   <CustomDatePicker
                                     value={task.planned_start_date}
@@ -1099,18 +1267,23 @@ export default function SprintDetail() {
                                     maxDate={task.planned_end_date || sprint?.end_date}
                                     onChange={(newDate) => handleStartDateChange(task.id, newDate)}
                                     darkMode={darkMode}
+                                    onOpen={() => setActiveDatePickerId(`${task.id}-start`)}
+                                    onClose={() => setActiveDatePickerId(null)}
                                   />
                                 ) : (
-                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-555'}>
                                     {task.planned_start_date || <span className="opacity-30">-</span>}
                                   </span>
                                 )}
                               </td>
 
                               {/* END */}
-                              <td className={`py-4 px-3 border-r align-middle text-[10px] ${
-                                darkMode ? 'border-slate-800' : 'border-slate-200'
-                              }`}>
+                              <td
+                                className={`py-4 px-1 sticky left-[520px] border-r align-middle text-[10px] ${
+                                  activeDatePickerId === `${task.id}-end` ? 'z-50' : rowZIndexClass
+                                } ${stickyNormalBgClass}`}
+                                style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                              >
                                 {isEditing ? (
                                   <CustomDatePicker
                                     value={task.planned_end_date}
@@ -1118,19 +1291,31 @@ export default function SprintDetail() {
                                     maxDate={sprint?.end_date}
                                     onChange={(newDate) => handleEndDateChange(task.id, newDate)}
                                     darkMode={darkMode}
+                                    onOpen={() => setActiveDatePickerId(`${task.id}-end`)}
+                                    onClose={() => setActiveDatePickerId(null)}
                                   />
                                 ) : (
-                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-550'}>
+                                  <span className={darkMode ? 'text-slate-400' : 'text-slate-555'}>
                                     {task.planned_end_date || <span className="opacity-30">-</span>}
                                   </span>
                                 )}
                               </td>
 
                               {/* REMARKS */}
-                              <td className={`py-4 px-4 border-r align-middle text-[10px] text-left italic ${
-                                darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-550'
-                              }`}>
-                                {task.recommendation_reason || task.jira_id || <span className="opacity-30">-</span>}
+                              <td
+                                className={`py-4 px-2 sticky left-[610px] ${rowZIndexClass} border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
+                                style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                              >
+                                <div className="relative">
+                                  <div className="truncate max-w-[200px]">
+                                    {task.recommendation_reason || task.jira_id || <span className="opacity-30">-</span>}
+                                  </div>
+                                  {(task.recommendation_reason || task.jira_id) && (
+                                    <div className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 absolute top-1/2 -translate-y-1/2 left-0 z-50 p-3 rounded-lg shadow-2xl border text-xs font-normal not-italic whitespace-normal break-words w-[400px] bg-slate-900 border-slate-750 text-white dark:bg-slate-850 dark:border-slate-700">
+                                      {task.recommendation_reason || task.jira_id}
+                                    </div>
+                                  )}
+                                </div>
                               </td>
 
                               {/* Timeline cells */}
