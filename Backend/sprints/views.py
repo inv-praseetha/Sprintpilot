@@ -185,12 +185,48 @@ class SprintDownloadScheduleView(APIView):
                     ws.cell(row=current_row, column=6, value=t_end)
                     
                     # Column G: Remarks
-                    remarks = f"Priority: {task.priority}"
+                    rec = task.recommendations.filter(accepted=True).first()
+                    if not rec and task.assigned_employee:
+                        rec = task.recommendations.filter(recommended_employee=task.assigned_employee).first()
+                    
+                    remarks_parts = []
+                    if rec and rec.reason:
+                        remarks_parts.append(rec.reason)
+                    else:
+                        remarks_parts.append(f"Priority: {task.priority}")
                     if task.jira_id:
-                        remarks += f" ({task.jira_id})"
+                        remarks_parts.append(f"({task.jira_id})")
+                    
+                    remarks = " ".join(remarks_parts)
                     ws.cell(row=current_row, column=7, value=remarks)
                     
                     current_row += 1
+
+            # Remove the old conditional formatting rule for the Gantt chart area
+            keys_to_remove = []
+            for key in list(ws.conditional_formatting._cf_rules.keys()):
+                if "H7" in key.sqref or "BK51" in key.sqref:
+                    keys_to_remove.append(key)
+            for key in keys_to_remove:
+                del ws.conditional_formatting._cf_rules[key]
+
+            # Re-apply the weekend rule and the Gantt highlight rules to the active task rows (H10:BK{current_row - 1})
+            if current_row - 1 >= 10:
+                cf_range = f"H10:BK{current_row - 1}"
+                
+                from openpyxl.formatting.rule import FormulaRule
+                from openpyxl.styles import PatternFill
+                
+                weekend_fill = PatternFill(start_color="A5A5A5", end_color="A5A5A5", fill_type="solid")
+                gantt_fill = PatternFill(start_color="B4A7D6", end_color="B4A7D6", fill_type="solid")
+                
+                weekend_rule = FormulaRule(formula=['OR(TEXT(H$4,"ddd")="Sat", TEXT(H$4,"ddd")="Sun", COUNTIF($B$680:$B$696,H$4)>0)'], fill=weekend_fill)
+                gantt_rule_cd = FormulaRule(formula=['AND(H$4>=$C10,H$4<=$D10)'], fill=gantt_fill)
+                gantt_rule_ef = FormulaRule(formula=['AND(H$4>=$E10,H$4<=$F10)'], fill=gantt_fill)
+                
+                ws.conditional_formatting.add(cf_range, weekend_rule)
+                ws.conditional_formatting.add(cf_range, gantt_rule_cd)
+                ws.conditional_formatting.add(cf_range, gantt_rule_ef)
             
             import io
             buffer = io.BytesIO()

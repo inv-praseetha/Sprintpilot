@@ -12,6 +12,7 @@ class SprintTaskSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    recommendation_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = SprintTask
@@ -32,9 +33,20 @@ class SprintTaskSerializer(serializers.ModelSerializer):
             'planned_end_date',
             'backlog_task_id',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'recommendation_reason'
         ]
         read_only_fields = ['id', 'sprint', 'created_at', 'updated_at']
+
+    def get_recommendation_reason(self, obj):
+        rec = obj.recommendations.filter(accepted=True).first()
+        if rec:
+            return rec.reason
+        if obj.assigned_employee:
+            rec = obj.recommendations.filter(recommended_employee=obj.assigned_employee).first()
+            if rec:
+                return rec.reason
+        return None
 
 class SprintSerializer(serializers.ModelSerializer):
     tasks = SprintTaskSerializer(many=True, read_only=True)
