@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from project.models import Project
+from accounts.models import EmployeeProfile
 from sprints.models import Sprint, SprintTask
 from sprints.serializers import SprintSerializer, SprintTaskSerializer
 
