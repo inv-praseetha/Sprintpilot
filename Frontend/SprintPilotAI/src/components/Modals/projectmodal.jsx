@@ -13,14 +13,14 @@ export default function ProjectModal({ show, onClose, darkMode, children }) {
         }`}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-100 bg-slate-50/50 dark:bg-slate-100/50">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-100 bg-slate-50/50 dark:bg-slate-100/50 rounded-t-3xl">
           <div className="text-left">
             <h3 className="font-extrabold text-2xl">Create New Project</h3>
             <p className="text-xs text-slate-400 mt-1">Configure project metadata, assign leadership and allocate resources.</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-100 text-slate-455 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
