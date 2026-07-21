@@ -30,46 +30,6 @@ import {
   ExternalLink
 } from 'lucide-react';
 
-const mockSprintsData = {
-  'Cloud Sync Platform': {
-    'Sprint 5 (Current)': [
-      { title: 'Implement File Chunking API', desc: 'Develop backend handler to slice large binary assets into 4MB secure blobs.', category: 'BACKEND', startDate: '2026-06-26', endDate: '2026-07-02', status: 'Completed' },
-      { title: 'Design Decentralized Encryption Protocol', desc: 'Draft architecture review for key derivation functions using AES-GCM.', category: 'INFRA', startDate: '2026-06-28', endDate: '2026-07-05', status: 'Completed' },
-      { title: 'Build Web Upload Interface', desc: 'Create React dropzone dashboard with real-time multi-threaded upload progress bars.', category: 'UI', startDate: '2026-07-01', endDate: '2026-07-08', status: 'In Progress' },
-      { title: 'Perform Chunk Load Testing', desc: 'Author Apache JMeter scripts simulating 500 concurrent file chunk uploads.', category: 'QA', startDate: '2026-07-04', endDate: '2026-07-09', status: 'In Progress' }
-    ]
-  },
-  'AI Analytics Hub': {
-    'Sprint 6 (Current)': [
-      { title: 'Neural Model Fine-tuning', desc: 'Train LLM transformer blocks on refined developer timesheet corpus.', category: 'BACKEND', startDate: '2026-06-24', endDate: '2026-06-30', status: 'Completed' },
-      { title: 'Interactive Loss Curves Chart', desc: 'Plot training/validation telemetry curves with SVG tooltips in real-time.', category: 'UI', startDate: '2026-06-27', endDate: '2026-07-03', status: 'Completed' },
-      { title: 'API Telemetry Endpoints', desc: 'Create fast API handlers logging GPU temp and validation loss.', category: 'BACKEND', startDate: '2026-07-01', endDate: '2026-07-07', status: 'In Progress' },
-      { title: 'Integrate Docker GPU Runner', desc: 'Configure NVIDIA container toolkit runtime across local cluster instances.', category: 'INFRA', startDate: '2026-07-02', endDate: '2026-07-07', status: 'In Progress' }
-    ]
-  },
-  'Developer Portal': {
-    'Sprint 3 (Current)': [
-      { title: 'SDK Sandbox Playground', desc: 'Embed interactive typescript client preview console in browser layout.', category: 'UI', startDate: '2026-06-29', endDate: '2026-07-05', status: 'Completed' },
-      { title: 'OAuth2 Client Registration API', desc: 'Design backend handlers issuing client credentials, secrets, and auth scopes.', category: 'BACKEND', startDate: '2026-07-01', endDate: '2026-07-08', status: 'In Progress' },
-      { title: 'Swagger Spec OpenAPI Linting', desc: 'Implement automated YAML specs parsing and validation hooks on file upload.', category: 'QA', startDate: '2026-07-03', endDate: '2026-07-10', status: 'In Progress' }
-    ]
-  },
-  'Security Gateway': {
-    'Sprint 5 (Current)': [
-      { title: 'Redis Cache Rate Limiter', desc: 'Deploy sliding window algorithm tracking client token buckets in memory.', category: 'BACKEND', startDate: '2026-07-10', endDate: '2026-07-15', status: 'Completed' },
-      { title: 'Verify SSL Handshake Offloading', desc: 'Setup Nginx TLS terminate configurations on proxy nodes.', category: 'INFRA', startDate: '2026-07-12', endDate: '2026-07-18', status: 'In Progress' },
-      { title: 'Penetration Scripting Framework', desc: 'Write automated vulnerability scanners mapping auth token headers.', category: 'QA', startDate: '2026-07-14', endDate: '2026-07-21', status: 'In Progress' }
-    ]
-  }
-};
-
-const categoryConfig = {
-  UI: { color: '#ea580c', bg: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
-  BACKEND: { color: '#3b82f6', bg: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-  INFRA: { color: '#8b5cf6', bg: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
-  QA: { color: '#10b981', bg: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' }
-};
-
 export default function ProjectDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -219,12 +179,13 @@ export default function ProjectDetail() {
         startDate,
         endDate,
         workspaceUrl: sprint.workspace_url,
-        rawStartDate: sprint.start_date
+        rawStartDate: sprint.start_date,
+        createdAt: sprint.created_at
       };
     }).sort((a, b) => {
-      if (!a.rawStartDate) return 1;
-      if (!b.rawStartDate) return -1;
-      return new Date(a.rawStartDate) - new Date(b.rawStartDate);
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
     });
   }, [sprints]);
 

@@ -280,7 +280,7 @@ class SprintAPITests(APITestCase):
         url = reverse('sprint_task_update', kwargs={'pk': self.task.id})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(SprintTask.objects.filter(id=self.task.id).exists())
+        self.assertTrue(SprintTask.objects.get(id=self.task.id).is_deleted)
 
     def test_task_delete_completed_project_blocked(self):
         self.active_project.status = "COMPLETED"
@@ -306,7 +306,7 @@ class SprintAPITests(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("Successfully deleted 2 tasks", response.data['detail'])
-        self.assertFalse(SprintTask.objects.filter(id__in=[self.task.id, another_task.id]).exists())
+        self.assertTrue(all(t.is_deleted for t in SprintTask.objects.filter(id__in=[self.task.id, another_task.id])))
 
     def test_task_bulk_delete_completed_project_blocked(self):
         self.active_project.status = "COMPLETED"
