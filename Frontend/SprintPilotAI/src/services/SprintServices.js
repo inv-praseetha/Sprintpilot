@@ -26,15 +26,22 @@ export const SprintServices = {
     return response.data;
   },
 
-  getAISuggestedSchedule: async (sprintId) => {
-    const response = await apiClient.post(`sprints/${sprintId}/ai-schedule/`);
+  getAISuggestedSchedule: async (sprintId, taskIds = []) => {
+    const payload = taskIds && taskIds.length > 0 ? { task_ids: taskIds } : {};
+    const response = await apiClient.post(`sprints/${sprintId}/ai-schedule/`, payload);
     return response.data;
   },
 
   importSchedule: async (sprintId, tasksData) => {
     const response = await apiClient.post(`sprints/${sprintId}/import-schedule/`, tasksData);
     return response.data;
+  },
+
+  createSprintTask: async (sprintId, taskData) => {
+    const response = await apiClient.post(`sprints/${sprintId}/tasks/`, taskData);
+    return response.data;
   }
 };
 
 export default SprintServices;
+

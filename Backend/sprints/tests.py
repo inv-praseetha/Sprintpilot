@@ -331,6 +331,50 @@ class SprintAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Cannot import schedule for a completed project.", response.data['detail'])
 
+    # 9. Single Task Creation Tests
+    def test_create_sprint_task_success(self):
+        url = reverse('sprint_task_create', kwargs={'sprint_id': self.sprint.id})
+        data = {
+            "title": "New Single Task",
+            "category": "Backend",
+            "priority": "Critical",
+            "status": "OPEN"
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['title'], "New Single Task")
+        self.assertEqual(response.data['category'], "Backend")
+        self.assertEqual(response.data['priority'], "Critical")
+        
+        # Verify it was saved in DB
+        self.assertTrue(SprintTask.objects.filter(title="New Single Task", sprint=self.sprint).exists())
+
+    def test_create_sprint_task_story_points_calculation(self):
+        url = reverse('sprint_task_create', kwargs={'sprint_id': self.sprint.id})
+        data = {
+            "title": "Scheduled Single Task",
+            "planned_start_date": "2026-07-20",  # Monday
+            "planned_end_date": "2026-07-24"     # Friday (5 working days)
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        task = SprintTask.objects.get(title="Scheduled Single Task", sprint=self.sprint)
+        self.assertEqual(task.story_points, 10.0) # 5 days * 2
+        self.assertEqual(task.estimated_hours, 40.0) # 5 days * 8
+
+    def test_create_sprint_task_completed_project_blocked(self):
+        self.active_project.status = "COMPLETED"
+        self.active_project.save()
+
+        url = reverse('sprint_task_create', kwargs={'sprint_id': self.sprint.id})
+        data = {
+            "title": "Blocked Task"
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot add tasks to a completed project.", response.data['detail'])
+
+
 
 class SprintServiceTests(APITestCase):
     def setUp(self):

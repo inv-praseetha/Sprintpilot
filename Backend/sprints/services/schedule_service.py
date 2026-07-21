@@ -22,7 +22,7 @@ def generate_and_persist_recommendations(sprint, tasks, api_key):
     output_suggestions = []
     
     with transaction.atomic():
-        TaskRecommendation.objects.filter(task__sprint=sprint).delete()
+        TaskRecommendation.objects.filter(task__in=tasks).delete()
         
         for sug in suggestions:
             t_id = sug.get("task_id")

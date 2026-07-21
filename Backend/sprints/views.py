@@ -469,7 +469,12 @@ class SprintAISuggestScheduleView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        tasks = sprint.tasks.all()
+        task_ids = request.data.get('task_ids', [])
+        if task_ids:
+            tasks = sprint.tasks.filter(id__in=task_ids)
+        else:
+            tasks = sprint.tasks.all()
+
         if not tasks.exists():
             return Response(
                 {"detail": "No tasks found in this sprint to schedule."},
@@ -514,3 +519,45 @@ class SprintImportScheduleView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SprintTaskCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if sprint.project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot add tasks to a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = SprintTaskSerializer(data=request.data)
+        if serializer.is_valid():
+            task = serializer.save(sprint=sprint)
+            
+            # Recalculate story points and hours if planned start and end date are provided
+            start_date = serializer.validated_data.get('planned_start_date')
+            end_date = serializer.validated_data.get('planned_end_date')
+            if start_date and end_date:
+                from sprints.services.schedule_service import calculate_working_days
+                start_str = start_date.strftime("%Y-%m-%d")
+                end_str = end_date.strftime("%Y-%m-%d")
+                wd = calculate_working_days(start_str, end_str)
+                task.story_points = wd * 2
+                task.estimated_hours = wd * 8
+                task.save()
+            
+            # Update TaskRecommendation states if this task matches the assigned employee
+            if task.assigned_employee:
+                from sprints.models import TaskRecommendation
+                TaskRecommendation.objects.filter(task=task, recommended_employee=task.assigned_employee).update(accepted=True)
+                TaskRecommendation.objects.filter(task=task).exclude(recommended_employee=task.assigned_employee).update(accepted=False)
+                
+            return Response(SprintTaskSerializer(task).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

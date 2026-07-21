@@ -4,6 +4,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
+import AddTaskModal from '../../components/Modals/AddTaskModal';
+import CustomDatePicker from '../../components/Common/CustomDatePicker';
+
 import {
   ArrowLeft,
   Calendar,
@@ -17,8 +20,10 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Download
+  Download,
+  Plus
 } from 'lucide-react';
+
 
 const categoryConfig = {
   UI: {
@@ -116,260 +121,7 @@ const generateTimelineDays = (startStr, endStr) => {
   return daysList;
 };
 
-// CustomDatePicker component
-function CustomDatePicker({ value, onChange, minDate, maxDate, darkMode, onOpen, onClose }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
-  const containerRef = useRef(null);
-  const popoverRef = useRef(null);
-  const buttonRef = useRef(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      if (onOpen) onOpen();
-    } else {
-      if (onClose) onClose();
-    }
-  }, [isOpen, onOpen, onClose]);
-
-  // Click outside to close handler
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const clickedContainer = containerRef.current && containerRef.current.contains(event.target);
-      const clickedPopover = popoverRef.current && popoverRef.current.contains(event.target);
-      if (!clickedContainer && !clickedPopover) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Close calendar on scroll
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleScroll = () => {
-      setIsOpen(false);
-    };
-    window.addEventListener('scroll', handleScroll, true);
-    return () => window.removeEventListener('scroll', handleScroll, true);
-  }, [isOpen]);
-
-  const toggleOpen = () => {
-    if (!isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setCoords({
-        top: rect.bottom + window.scrollY + 6,
-        left: rect.left + window.scrollX
-      });
-    }
-    setIsOpen(!isOpen);
-  };
-
-  // Initialize view date based on current value, minDate or today
-  const [viewDate, setViewDate] = useState(() => {
-    const initial = value || minDate || new Date().toISOString().split('T')[0];
-    const [y, m, d] = initial.split('-').map(Number);
-    return new Date(y, m - 1, 1);
-  });
-
-  // Keep viewDate updated if value changes and calendar is reopened
-  useEffect(() => {
-    if (isOpen) {
-      const initial = value || minDate || new Date().toISOString().split('T')[0];
-      const [y, m, d] = initial.split('-').map(Number);
-      setViewDate(new Date(y, m - 1, 1));
-      
-      // Refresh coordinates in case of layout changes
-      if (buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
-        setCoords({
-          top: rect.bottom + window.scrollY + 6,
-          left: rect.left + window.scrollX
-        });
-      }
-    }
-  }, [isOpen, value]);
-
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-
-  const handlePrevMonth = (e) => {
-    e.stopPropagation();
-    setViewDate(new Date(year, month - 1, 1));
-  };
-
-  const handleNextMonth = (e) => {
-    e.stopPropagation();
-    setViewDate(new Date(year, month + 1, 1));
-  };
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayIndex = new Date(year, month, 1).getDay();
-
-  const days = [];
-  for (let i = 0; i < firstDayIndex; i++) {
-    days.push(null);
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    days.push(d);
-  }
-
-  const getFormattedDateStr = (day) => {
-    if (!day) return '';
-    const mStr = String(month + 1).padStart(2, '0');
-    const dStr = String(day).padStart(2, '0');
-    return `${year}-${mStr}-${dStr}`;
-  };
-
-  const handleDayClick = (day, e) => {
-    e.stopPropagation();
-    if (!day) return;
-    const dateStr = getFormattedDateStr(day);
-    
-    // Check if weekend
-    const dObj = new Date(year, month, day);
-    const dayOfWeek = dObj.getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-    // Check bounds
-    const isOutOfRange = (minDate && dateStr < minDate) || (maxDate && dateStr > maxDate);
-
-    if (isWeekend || isOutOfRange) return;
-
-    onChange(dateStr);
-    setIsOpen(false);
-  };
-
-  const monthsList = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-
-  const formatDateDisplay = (dateStr) => {
-    if (!dateStr) return "Select date";
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
-    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  return (
-    <div className="relative w-full" ref={containerRef}>
-      {/* Trigger Button */}
-      <button
-        type="button"
-        ref={buttonRef}
-        onClick={toggleOpen}
-        className={`px-3 py-1.5 rounded-xl text-left text-[11px] border w-full font-extrabold flex items-center justify-between transition-colors focus:outline-none ${
-          darkMode
-            ? 'bg-slate-900 border-slate-750 text-white hover:bg-slate-800'
-            : 'bg-white border-slate-250 text-slate-800 hover:bg-slate-50'
-        }`}
-      >
-        <span>{formatDateDisplay(value)}</span>
-        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-      </button>
-
-      {/* Calendar Popover (Rendered at Body Level) */}
-      {isOpen && createPortal(
-        <div
-          ref={popoverRef}
-          style={{
-            position: 'absolute',
-            top: `${coords.top}px`,
-            left: `${coords.left}px`,
-            zIndex: 999999
-          }}
-          className={`p-3 w-60 rounded-2xl border shadow-xl animate-fadeIn ${
-            darkMode
-              ? 'bg-slate-950 border-slate-850 text-white'
-              : 'bg-white border-slate-205 text-slate-800'
-          }`}
-        >
-          {/* Header */}
-          <div className="flex justify-between items-center mb-2.5">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className={`p-1 rounded-lg transition-colors ${
-                darkMode ? 'hover:bg-slate-900 text-slate-400' : 'hover:bg-slate-100 text-slate-650'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-[11px] font-black tracking-wide uppercase">
-              {monthsList[month]} {year}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className={`p-1 rounded-lg transition-colors ${
-                darkMode ? 'hover:bg-slate-900 text-slate-400' : 'hover:bg-slate-100 text-slate-650'
-              }`}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-0.5 text-center font-black text-[9px] uppercase tracking-wider text-slate-450 mb-1.5">
-            <span>S</span>
-            <span>M</span>
-            <span>T</span>
-            <span>W</span>
-            <span>T</span>
-            <span>F</span>
-            <span>S</span>
-          </div>
-
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-0.5">
-            {days.map((day, idx) => {
-              if (day === null) {
-                return <div key={`empty-${idx}`} />;
-              }
-
-              const dateStr = getFormattedDateStr(day);
-              
-              // Validate constraints
-              const dObj = new Date(year, month, day);
-              const dayOfWeek = dObj.getDay();
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-              const isOutOfRange = (minDate && dateStr < minDate) || (maxDate && dateStr > maxDate);
-              const isDisabled = isWeekend || isOutOfRange;
-
-              const isSelected = value === dateStr;
-
-              let cellClass = `h-7 w-7 text-[10px] font-black rounded-lg flex items-center justify-center transition-all `;
-              if (isSelected) {
-                cellClass += " bg-orange-500 text-white font-bold shadow-md shadow-orange-500/20";
-              } else if (isDisabled) {
-                cellClass += darkMode
-                  ? " text-slate-800 opacity-20 cursor-not-allowed"
-                  : " text-slate-300 opacity-20 cursor-not-allowed";
-              } else {
-                cellClass += darkMode
-                  ? " text-slate-350 hover:bg-slate-900 cursor-pointer"
-                  : " text-slate-750 hover:bg-slate-100 cursor-pointer";
-              }
-
-              return (
-                <div
-                  key={`day-${day}`}
-                  onClick={(e) => !isDisabled && handleDayClick(day, e)}
-                  className={cellClass}
-                >
-                  {day}
-                </div>
-              );
-            })}
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
 
 export default function SprintDetail() {
   const { projectId, sprintId } = useParams();
@@ -394,6 +146,28 @@ export default function SprintDetail() {
   
   // Tracking changed items
   const [modifiedTaskIds, setModifiedTaskIds] = useState(new Set());
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+
+  const refreshSprint = async () => {
+    try {
+      const sprintData = await SprintServices.getSprintDetails(sprintId);
+      setSprint(sprintData);
+      
+      const rawTasks = sprintData.tasks || [];
+      const dbTasks = rawTasks.map(t => ({
+        ...t,
+        planned_start_date: (t.planned_start_date === 'None' || t.planned_start_date === 'null' || !t.planned_start_date) ? null : t.planned_start_date,
+        planned_end_date: (t.planned_end_date === 'None' || t.planned_end_date === 'null' || !t.planned_end_date) ? null : t.planned_end_date
+      }));
+
+      setTasks(dbTasks);
+      setOriginalTasks(JSON.parse(JSON.stringify(dbTasks)));
+    } catch (err) {
+      console.error('[SprintDetail] Error refreshing sprint details:', err);
+    }
+  };
+
 
   // Fetch Sprint & Employee Data on mount
   useEffect(() => {
@@ -404,6 +178,7 @@ export default function SprintDetail() {
         setIsGenerating(false);
         setIsEditing(false);
         setModifiedTaskIds(new Set());
+        setSelectedTaskIds(new Set());
 
         // 1. Fetch Sprint Details (with nested tasks)
         const sprintData = await SprintServices.getSprintDetails(sprintId);
@@ -455,7 +230,8 @@ export default function SprintDetail() {
     }, 800);
 
     try {
-      const suggestions = await SprintServices.getAISuggestedSchedule(sprintId);
+      const activeTaskIds = selectedTaskIds.size > 0 ? Array.from(selectedTaskIds) : [];
+      const suggestions = await SprintServices.getAISuggestedSchedule(sprintId, activeTaskIds);
       
       clearInterval(interval);
       
@@ -478,10 +254,15 @@ export default function SprintDetail() {
       });
 
       const updatedIds = suggestions.map(s => s.task_id);
-      setModifiedTaskIds(new Set(updatedIds));
+      setModifiedTaskIds(prev => {
+        const next = new Set(prev);
+        updatedIds.forEach(id => next.add(id));
+        return next;
+      });
 
       setIsGenerating(false);
       setIsEditing(true);
+      setSelectedTaskIds(new Set());
     } catch (err) {
       clearInterval(interval);
       setIsGenerating(false);
@@ -551,8 +332,73 @@ export default function SprintDetail() {
     setIsSyncing(true);
     setTimeout(() => {
       setIsSyncing(false);
-      alert('Sprint backlog successfully synced with Jira board!');
+      if (selectedTaskIds.size > 0) {
+        alert(`Successfully synced ${selectedTaskIds.size} selected tasks with Jira board!`);
+        setSelectedTaskIds(new Set());
+      } else {
+        alert('Sprint backlog successfully synced with Jira board!');
+      }
     }, 1000);
+  };
+
+  const toggleSelectTask = (taskId) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTaskIds.size === tasks.length) {
+      setSelectedTaskIds(new Set());
+    } else {
+      setSelectedTaskIds(new Set(tasks.map(t => t.id)));
+    }
+  };
+
+  const handleSingleTaskSync = async (taskId) => {
+    setIsGenerating(true);
+    setLoadingText('Syncing task with AI...');
+    try {
+      const suggestions = await SprintServices.getAISuggestedSchedule(sprintId, [taskId]);
+      
+      setTasks(prev => {
+        return prev.map(t => {
+          const sug = suggestions.find(s => s.task_id === t.id);
+          if (sug) {
+            const empId = sug.assigned_employee?.id || sug.assigned_employee_id;
+            const emp = employees.find(e => e.id === empId) || sug.assigned_employee || null;
+            return {
+              ...t,
+              planned_start_date: sug.planned_start_date,
+              planned_end_date: sug.planned_end_date,
+              assigned_employee: emp,
+              recommendation_reason: sug.reason
+            };
+          }
+          return t;
+        });
+      });
+
+      const updatedIds = suggestions.map(s => s.task_id);
+      setModifiedTaskIds(prev => {
+        const next = new Set(prev);
+        updatedIds.forEach(id => next.add(id));
+        return next;
+      });
+
+      setIsGenerating(false);
+      setIsEditing(true);
+    } catch (err) {
+      setIsGenerating(false);
+      console.error('[SprintDetail] Single task sync failed:', err);
+      alert(`Sync Failed: ${err.response?.data?.detail || err.message}`);
+    }
   };
 
   const handleDownloadSchedule = async () => {
@@ -817,7 +663,41 @@ export default function SprintDetail() {
 
               {/* Action Buttons: Update / Save & Sync */}
               <div className="flex items-center gap-2">
-                {isEditing ? (
+                {selectedTaskIds.size > 0 ? (
+                  <>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
+                      darkMode ? 'bg-orange-950/40 text-orange-400' : 'bg-orange-50 text-orange-655'
+                    }`}>
+                      {selectedTaskIds.size} Selected
+                    </span>
+                    <button
+                      onClick={handleSyncClick}
+                      disabled={isSyncing || sprint?.project_status === 'COMPLETED'}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        darkMode 
+                          ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-655'
+                      }`}
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      Sync
+                    </button>
+                    <button
+                      onClick={() => setSelectedTaskIds(new Set())}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        darkMode 
+                          ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-655'
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : isEditing ? (
                   <>
                     <button
                       onClick={handleCancelEdit}
@@ -873,6 +753,18 @@ export default function SprintDetail() {
                       Sync
                     </button>
                     <button
+                      onClick={() => setIsAddTaskModalOpen(true)}
+                      disabled={sprint?.project_status === 'COMPLETED'}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        darkMode 
+                          ? 'border-slate-800 hover:bg-slate-800 text-slate-300' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5 text-slate-400" />
+                      Add Task
+                    </button>
+                    <button
                       onClick={handleStartUpdateMode}
                       disabled={sprint?.project_status === 'COMPLETED'}
                       className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -911,8 +803,14 @@ export default function SprintDetail() {
                   {/* Row 1: Week headers */}
                   <tr className={`border-b text-[10px] font-black tracking-widest uppercase text-slate-450`}>
                     <th
-                      colSpan={5}
                       className={`py-2.5 px-4 border-r sticky left-0 top-0 z-40 ${
+                        darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}
+                      style={{ minWidth: '40px', maxWidth: '40px', width: '40px' }}
+                    />
+                    <th
+                      colSpan={5}
+                      className={`py-2.5 px-4 border-r sticky left-[40px] top-0 z-40 ${
                         darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
                       }`}
                       style={{ minWidth: '610px', maxWidth: '610px', width: '610px' }}
@@ -920,7 +818,7 @@ export default function SprintDetail() {
                       Task Specifications
                     </th>
                     <th
-                      className={`py-2.5 px-4 border-r sticky left-[610px] top-0 z-40 ${
+                      className={`py-2.5 px-4 border-r sticky left-[650px] top-0 z-40 ${
                         darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
                       }`}
                       style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
@@ -968,7 +866,20 @@ export default function SprintDetail() {
                   {/* Row 2: Columns mapping */}
                   <tr className={`border-b text-[10px] font-black`}>
                     <th
-                      className={`py-2 px-4 sticky left-0 top-[36px] z-40 border-r w-56 ${
+                      className={`py-2 px-2 sticky left-0 top-[36px] z-40 border-r w-10 flex items-center justify-center h-full ${
+                        darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '40px', maxWidth: '40px', width: '40px' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={tasks.length > 0 && selectedTaskIds.size === tasks.length}
+                        onChange={toggleSelectAll}
+                        className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer w-3.5 h-3.5"
+                      />
+                    </th>
+                    <th
+                      className={`py-2 px-4 sticky left-[40px] top-[36px] z-40 border-r w-56 ${
                         darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                       }`}
                       style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
@@ -976,7 +887,7 @@ export default function SprintDetail() {
                       TASK
                     </th>
                     <th
-                      className={`py-2 px-4 sticky left-[220px] top-[36px] z-40 border-r w-36 ${
+                      className={`py-2 px-4 sticky left-[260px] top-[36px] z-40 border-r w-36 ${
                         darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                       }`}
                       style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
@@ -984,7 +895,7 @@ export default function SprintDetail() {
                       ASSIGNED TO
                     </th>
                     <th
-                      className={`py-2 px-3 sticky left-[370px] top-[36px] z-40 w-14 text-center border-r ${
+                      className={`py-2 px-3 sticky left-[410px] top-[36px] z-40 w-14 text-center border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                       }`}
                       style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
@@ -992,7 +903,7 @@ export default function SprintDetail() {
                       PROGRESS
                     </th>
                     <th
-                      className={`py-2 px-3 sticky left-[430px] top-[36px] z-40 w-24 border-r ${
+                      className={`py-2 px-3 sticky left-[470px] top-[36px] z-40 w-24 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                       }`}
                       style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
@@ -1000,7 +911,7 @@ export default function SprintDetail() {
                       START
                     </th>
                     <th
-                      className={`py-2 px-3 sticky left-[520px] top-[36px] z-40 w-24 border-r ${
+                      className={`py-2 px-3 sticky left-[560px] top-[36px] z-40 w-24 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                       }`}
                       style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
@@ -1008,7 +919,7 @@ export default function SprintDetail() {
                       END
                     </th>
                     <th
-                      className={`py-2 px-4 sticky left-[610px] top-[36px] z-40 border-r w-52 ${
+                      className={`py-2 px-4 sticky left-[650px] top-[36px] z-40 border-r w-52 ${
                         darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                       }`}
                       style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
@@ -1043,37 +954,43 @@ export default function SprintDetail() {
                   {/* Row 3: Day Names */}
                   <tr className={`border-b text-[9px] font-black uppercase`}>
                     <th
-                      className={`py-1 px-4 sticky left-0 top-[68px] z-40 border-r ${
+                      className={`py-1 px-2 sticky left-0 top-[68px] z-40 border-r ${
+                        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}
+                      style={{ minWidth: '40px', maxWidth: '40px', width: '40px' }}
+                    />
+                    <th
+                      className={`py-1 px-4 sticky left-[40px] top-[68px] z-40 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                       style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
                     />
                     <th
-                      className={`py-1 px-4 sticky left-[220px] top-[68px] z-40 border-r ${
+                      className={`py-1 px-4 sticky left-[260px] top-[68px] z-40 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                       style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
                     />
                     <th
-                      className={`py-1 px-3 sticky left-[370px] top-[68px] z-40 border-r ${
+                      className={`py-1 px-3 sticky left-[410px] top-[68px] z-40 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                       style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                     />
                     <th
-                      className={`py-1 px-3 sticky left-[430px] top-[68px] z-40 border-r ${
+                      className={`py-1 px-3 sticky left-[470px] top-[68px] z-40 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                       style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                     />
                     <th
-                      className={`py-1 px-3 sticky left-[520px] top-[68px] z-40 border-r ${
+                      className={`py-1 px-3 sticky left-[560px] top-[68px] z-40 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                       style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                     />
                     <th
-                      className={`py-1 px-4 sticky left-[610px] top-[68px] z-40 border-r ${
+                      className={`py-1 px-4 sticky left-[650px] top-[68px] z-40 border-r ${
                         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                       }`}
                       style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
@@ -1121,9 +1038,15 @@ export default function SprintDetail() {
                         <tr className={`${secBgClass} font-black text-xs border-t border-b ${
                           darkMode ? 'border-slate-800' : 'border-slate-200'
                         }`}>
+                          <td
+                            className={`py-3 px-2 sticky left-0 z-20 border-r ${secBgClass} ${
+                              darkMode ? 'border-slate-800' : 'border-slate-200'
+                            }`}
+                            style={{ minWidth: '40px', maxWidth: '40px', width: '40px' }}
+                          />
                           {/* TASK sticky column divider */}
                           <td
-                            className={`py-3 px-4 sticky left-0 z-20 font-black border-r text-left ${secBgClass} ${
+                            className={`py-3 px-4 sticky left-[40px] z-20 font-black border-r text-left ${secBgClass} ${
                               darkMode ? 'border-slate-800' : 'border-slate-200'
                             }`}
                             style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
@@ -1131,31 +1054,31 @@ export default function SprintDetail() {
                             {config.label}
                           </td>
                           <td
-                            className={`py-3 px-4 sticky left-[220px] z-20 border-r ${secBgClass} ${
+                            className={`py-3 px-4 sticky left-[260px] z-20 border-r ${secBgClass} ${
                               darkMode ? 'border-slate-800' : 'border-slate-200'
                             }`}
                             style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
                           />
                           <td
-                            className={`py-3 px-3 sticky left-[370px] z-20 border-r ${secBgClass} ${
+                            className={`py-3 px-3 sticky left-[410px] z-20 border-r ${secBgClass} ${
                               darkMode ? 'border-slate-800' : 'border-slate-200'
                             }`}
                             style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                           />
                           <td
-                            className={`py-3 px-3 sticky left-[430px] z-20 border-r ${secBgClass} ${
+                            className={`py-3 px-3 sticky left-[470px] z-20 border-r ${secBgClass} ${
                               darkMode ? 'border-slate-800' : 'border-slate-200'
                             }`}
                             style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                           />
                           <td
-                            className={`py-3 px-3 sticky left-[520px] z-20 border-r ${secBgClass} ${
+                            className={`py-3 px-3 sticky left-[560px] z-20 border-r ${secBgClass} ${
                               darkMode ? 'border-slate-800' : 'border-slate-200'
                             }`}
                             style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                           />
                           <td
-                            className={`py-3 px-4 sticky left-[610px] z-20 border-r ${secBgClass} ${
+                            className={`py-3 px-4 sticky left-[650px] z-20 border-r ${secBgClass} ${
                               darkMode ? 'border-slate-800' : 'border-slate-200'
                             }`}
                             style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
@@ -1216,19 +1139,32 @@ export default function SprintDetail() {
                                   : 'bg-white'
                               }`}
                             >
+                              {/* Checkbox column */}
+                              <td
+                                className={`py-4 px-2 sticky left-0 ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
+                                style={{ minWidth: '40px', maxWidth: '40px', width: '40px' }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTaskIds.has(task.id)}
+                                  onChange={() => toggleSelectTask(task.id)}
+                                  className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer w-3.5 h-3.5"
+                                />
+                              </td>
+
                               {/* TASK Name cell (sticky, matches row background) */}
                               <td
-                                className={`py-4 px-4 sticky left-0 ${rowZIndexClass} border-r align-middle text-left ${stickyBgClass}`}
+                                className={`py-4 px-4 sticky left-[40px] ${rowZIndexClass} border-r align-middle text-left ${stickyBgClass}`}
                                 style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
                               >
-                                <div className="truncate max-w-[210px]" title={task.title}>
+                                <div className="truncate w-full" title={task.title}>
                                   {task.title}
                                 </div>
                               </td>
 
                               {/* ASSIGNED TO */}
                               <td
-                                className={`py-4 px-4 sticky left-[220px] ${rowZIndexClass} border-r align-middle text-left focus-within:z-50 ${stickyNormalBgClass}`}
+                                className={`py-4 px-4 sticky left-[260px] ${rowZIndexClass} border-r align-middle text-left focus-within:z-50 ${stickyNormalBgClass}`}
                                 style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
                               >
                                 {isEditing ? (
@@ -1257,7 +1193,7 @@ export default function SprintDetail() {
 
                               {/* PROGRESS */}
                               <td
-                                className={`py-4 px-1 sticky left-[370px] ${rowZIndexClass} text-center border-r align-middle font-extrabold text-[10px] ${stickyNormalBgClass}`}
+                                className={`py-4 px-1 sticky left-[410px] ${rowZIndexClass} text-center border-r align-middle font-extrabold text-[10px] ${stickyNormalBgClass}`}
                                 style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                               >
                                 {getProgressPercentage(task.status)}
@@ -1265,7 +1201,7 @@ export default function SprintDetail() {
 
                               {/* START */}
                               <td
-                                className={`py-4 px-1 sticky left-[430px] border-r align-middle text-[10px] ${
+                                className={`py-4 px-1 sticky left-[470px] border-r align-middle text-[10px] ${
                                   activeDatePickerId === `${task.id}-start` ? 'z-50' : rowZIndexClass
                                 } ${stickyNormalBgClass}`}
                                 style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
@@ -1289,7 +1225,7 @@ export default function SprintDetail() {
 
                               {/* END */}
                               <td
-                                className={`py-4 px-1 sticky left-[520px] border-r align-middle text-[10px] ${
+                                className={`py-4 px-1 sticky left-[560px] border-r align-middle text-[10px] ${
                                   activeDatePickerId === `${task.id}-end` ? 'z-50' : rowZIndexClass
                                 } ${stickyNormalBgClass}`}
                                 style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
@@ -1313,7 +1249,7 @@ export default function SprintDetail() {
 
                               {/* REMARKS */}
                               <td
-                                className={`py-4 px-2 sticky left-[610px] ${rowZIndexClass} border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
+                                className={`py-4 px-2 sticky left-[650px] ${rowZIndexClass} border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
                                 style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                               >
                                 <div className="relative">
@@ -1386,7 +1322,19 @@ export default function SprintDetail() {
           </div>
         </>
       )}
+      
+      <AddTaskModal
+        show={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        sprintId={sprintId}
+        sprintStartDate={sprint?.start_date}
+        sprintEndDate={sprint?.end_date}
+        employees={employees}
+        darkMode={darkMode}
+        onTaskCreated={refreshSprint}
+      />
     </div>
   </div>
     );
   }
+
