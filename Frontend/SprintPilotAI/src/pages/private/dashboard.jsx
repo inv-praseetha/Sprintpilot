@@ -337,7 +337,10 @@ const Dashboard = () => {
     const height = 30;
     const padding = 4;
     const points = sprintsHistory.map((s, idx) => {
-      const x = padding + (idx / (sprintsHistory.length - 1)) * (width - 2 * padding);
+      const divisor = sprintsHistory.length > 1 ? sprintsHistory.length - 1 : 1;
+      const x = sprintsHistory.length > 1
+        ? padding + (idx / divisor) * (width - 2 * padding)
+        : width / 2;
       const y = height - padding - (s.completedTasks / maxVal) * (height - 2 * padding);
       return `${x},${y}`;
     });
@@ -350,12 +353,15 @@ const Dashboard = () => {
     const height = 30;
     const padding = 4;
     const points = sprintsHistory.map((s, idx) => {
-      const x = padding + (idx / (sprintsHistory.length - 1)) * (width - 2 * padding);
+      const divisor = sprintsHistory.length > 1 ? sprintsHistory.length - 1 : 1;
+      const x = sprintsHistory.length > 1
+        ? padding + (idx / divisor) * (width - 2 * padding)
+        : width / 2;
       const y = height - padding - (s.completedTasks / maxVal) * (height - 2 * padding);
       return `${x},${y}`;
     });
-    const firstX = padding;
-    const lastX = width - padding;
+    const firstX = sprintsHistory.length > 1 ? padding : width / 2;
+    const lastX = sprintsHistory.length > 1 ? width - padding : width / 2;
     return `M ${firstX},${height} L ${points.join(' L ')} L ${lastX},${height} Z`;
   };
 

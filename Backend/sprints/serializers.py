@@ -66,13 +66,15 @@ class SprintTaskSerializer(serializers.ModelSerializer):
         return None
 
     def get_recommendation_reason(self, obj):
-        rec = obj.recommendations.filter(accepted=True).first()
-        if rec:
-            return rec.reason
+        # Avoid N+1 database queries by checking prefetched recommendations in memory
+        recs = list(obj.recommendations.all())
+        accepted_rec = next((r for r in recs if r.accepted), None)
+        if accepted_rec:
+            return accepted_rec.reason
         if obj.assigned_employee:
-            rec = obj.recommendations.filter(recommended_employee=obj.assigned_employee).first()
-            if rec:
-                return rec.reason
+            matching_rec = next((r for r in recs if r.recommended_employee_id == obj.assigned_employee_id), None)
+            if matching_rec:
+                return matching_rec.reason
         return None
 
 class SprintSerializer(serializers.ModelSerializer):

@@ -330,8 +330,10 @@ class SprintListCreateView(APIView):
         except Project.DoesNotExist:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        sprints = Sprint.objects.filter(project=project).prefetch_related(
-            'tasks__assigned_employee__user'
+        sprints = Sprint.objects.filter(project=project).select_related('project').prefetch_related(
+            'tasks__assigned_employee__user',
+            'tasks__assigned_employee__employee_skill_relations__skill',
+            'tasks__recommendations'
         )
         serializer = SprintSerializer(sprints, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -437,7 +439,11 @@ class SprintDetailView(APIView):
 
     def get(self, request, pk, *args, **kwargs):
         try:
-            sprint = Sprint.objects.prefetch_related('tasks__assigned_employee__user').get(id=pk)
+            sprint = Sprint.objects.select_related('project').prefetch_related(
+                'tasks__assigned_employee__user',
+                'tasks__assigned_employee__employee_skill_relations__skill',
+                'tasks__recommendations'
+            ).get(id=pk)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
 
