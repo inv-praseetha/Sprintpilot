@@ -72,7 +72,7 @@ class SprintDownloadScheduleView(APIView):
             ws["E3"] = 1 # Display Week is normally 1
             
             # 2. Gather tasks and group by category
-            tasks = sprint.tasks.all().order_by('created_at')
+            tasks = sprint.tasks.filter(is_deleted=False).order_by('created_at')
             
             # Categories in required order
             category_mapping = [
@@ -330,7 +330,11 @@ class SprintListCreateView(APIView):
         except Project.DoesNotExist:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        from django.db.models import Prefetch
+        from sprints.models import SprintTask
+
         sprints = Sprint.objects.filter(project=project).select_related('project').prefetch_related(
+            Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
             'tasks__assigned_employee__user',
             'tasks__assigned_employee__employee_skill_relations__skill',
             'tasks__recommendations'
@@ -439,7 +443,11 @@ class SprintDetailView(APIView):
 
     def get(self, request, pk, *args, **kwargs):
         try:
+            from django.db.models import Prefetch
+            from sprints.models import SprintTask
+            
             sprint = Sprint.objects.select_related('project').prefetch_related(
+                Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
                 'tasks__assigned_employee__user',
                 'tasks__assigned_employee__employee_skill_relations__skill',
                 'tasks__recommendations'
@@ -561,7 +569,18 @@ class SprintTaskUpdateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        task.delete()
+        if task.backlog_task_id:
+            from backlog.services.backlog_client import BacklogService
+            try:
+                BacklogService().delete_issue(task.backlog_task_id)
+            except Exception as e:
+                return Response(
+                    {"detail": f"Failed to delete task from Backlog: {str(e)}"},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
+
+        task.is_deleted = True
+        task.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -584,7 +603,7 @@ class SprintTaskBulkDeleteView(APIView):
             )
 
         count = tasks.count()
-        tasks.delete()
+        tasks.update(is_deleted=True)
         return Response({"detail": f"Successfully deleted {count} tasks."}, status=status.HTTP_200_OK)
 
 # View endpoints delegated to services
@@ -613,9 +632,9 @@ class SprintAISuggestScheduleView(APIView):
 
         task_ids = request.data.get('task_ids', [])
         if task_ids:
-            tasks = sprint.tasks.filter(id__in=task_ids)
+            tasks = sprint.tasks.filter(id__in=task_ids, is_deleted=False)
         else:
-            tasks = sprint.tasks.all()
+            tasks = sprint.tasks.filter(is_deleted=False)
 
         if not tasks.exists():
             return Response(

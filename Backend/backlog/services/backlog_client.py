@@ -292,3 +292,28 @@ class BacklogService:
             logger.error(f"Failed to update task in Backlog: {e}")
             raise Exception(f"Failed to update task in Backlog: {e}")
 
+    def delete_issue(self, backlog_task_id):
+        if not self.workspace_url or not self.api_key:
+            raise ValueError("Backlog configuration missing.")
+
+        if not backlog_task_id:
+            raise ValueError("No Backlog Issue ID provided to delete.")
+
+        url = f"{self.workspace_url}/api/v2/issues/{backlog_task_id}"
+        params = {"apiKey": self.api_key}
+
+        try:
+            response = requests.delete(url, params=params)
+            response.raise_for_status()
+            return True
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                err_text = e.response.text
+                logger.error(f"Backlog response on delete: {err_text}")
+                # If it's already deleted or not found, we could ignore it or raise
+                if e.response.status_code == 404:
+                    logger.warning(f"Backlog task {backlog_task_id} not found on delete. Assuming already deleted.")
+                    return True
+            logger.error(f"Failed to delete task {backlog_task_id} in Backlog: {e}")
+            raise Exception(f"Failed to delete task in Backlog: {e}")
+
