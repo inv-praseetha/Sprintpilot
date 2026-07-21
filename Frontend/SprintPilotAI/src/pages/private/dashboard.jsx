@@ -131,7 +131,7 @@ const Dashboard = () => {
                     mappedStatus = 'Completed';
                   } else if (s.status === 'ACTIVE') {
                     const end = new Date(s.end_date);
-                    if (end < today) {
+                    if (end < today || overdueTasks > 0) {
                       mappedStatus = 'Delayed';
                     } else {
                       mappedStatus = 'In Progress';
