@@ -13,8 +13,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
     status: 'OPEN',
     assigned_employee_id: '',
     planned_start_date: '',
-    planned_end_date: '',
-    backlog_task_id: ''
+    planned_end_date: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -44,6 +43,30 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
       setError('Task Title is required.');
       return;
     }
+    if (!formData.category) {
+      setError('Category is required.');
+      return;
+    }
+    if (!formData.status) {
+      setError('Status is required.');
+      return;
+    }
+    if (!formData.assigned_employee_id) {
+      setError('Assignee is required.');
+      return;
+    }
+    if (!formData.planned_start_date) {
+      setError('Planned Start Date is required.');
+      return;
+    }
+    if (!formData.planned_end_date) {
+      setError('Planned End Date is required.');
+      return;
+    }
+    if (!formData.description.trim()) {
+      setError('Description is required.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -59,8 +82,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
         status: formData.status,
         assigned_employee_id: formData.assigned_employee_id || null,
         planned_start_date: formData.planned_start_date || null,
-        planned_end_date: formData.planned_end_date || null,
-        backlog_task_id: formData.backlog_task_id.trim() || null
+        planned_end_date: formData.planned_end_date || null
       };
 
       const newTask = await SprintServices.createSprintTask(sprintId, payload);
@@ -153,7 +175,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
             </div>
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Category
+                Category <span className="text-red-500">*</span>
               </label>
               <select
                 name="category"
@@ -164,6 +186,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
                 }`}
+                required
               >
                 <option value="UI">UI Development</option>
                 <option value="Backend">Backend Development</option>
@@ -197,7 +220,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Status
+                Status <span className="text-red-500">*</span>
               </label>
               <select
                 name="status"
@@ -208,6 +231,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
                 }`}
+                required
               >
                 <option value="OPEN">TODO / Open</option>
                 <option value="IN_PROGRESS">In Progress</option>
@@ -217,7 +241,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
             </div>
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Assignee
+                Assignee <span className="text-red-500">*</span>
               </label>
               <select
                 name="assigned_employee_id"
@@ -228,8 +252,9 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
                 }`}
+                required
               >
-                <option value="">Unassigned</option>
+                <option value="">Choose an assignee...</option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.user.full_name} ({emp.role})
@@ -243,7 +268,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Planned Start Date
+                Planned Start Date <span className="text-red-500">*</span>
               </label>
               <CustomDatePicker
                 value={formData.planned_start_date}
@@ -257,7 +282,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
             </div>
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Planned End Date
+                Planned End Date <span className="text-red-500">*</span>
               </label>
               <CustomDatePicker
                 value={formData.planned_end_date}
@@ -273,42 +298,24 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
 
 
 
-          {/* Row 6: Description & Backlog Task ID */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                placeholder="Enter task detailed description..."
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors resize-none ${
-                  darkMode
-                    ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
-                    : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-                }`}
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Backlog Task ID
-              </label>
-              <input
-                type="text"
-                name="backlog_task_id"
-                value={formData.backlog_task_id}
-                onChange={handleChange}
-                placeholder="e.g. BK-99"
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                  darkMode
-                    ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
-                    : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-                }`}
-              />
-            </div>
+          {/* Row 6: Description */}
+          <div>
+            <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+              Description <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={3}
+              placeholder="Enter task detailed description..."
+              className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors resize-none ${
+                darkMode
+                  ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
+                  : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
+              }`}
+              required
+            />
           </div>
 
           {/* Form Actions */}

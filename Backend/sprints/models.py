@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.utils import timezone
 from project.models import Project
 from accounts.models import EmployeeProfile
 
@@ -18,6 +19,9 @@ class Sprint(models.Model):
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PLANNED)
     backlog_version_id = models.CharField(max_length=50, null=True, blank=True)
     backlog_project_id = models.CharField(max_length=50, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    synced_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'sprints'
@@ -29,6 +33,10 @@ class Sprint(models.Model):
             raise ValidationError("end_date must be greater than or equal to start_date")
 
     def save(self, *args, **kwargs):
+        if self.status == self.Status.COMPLETED and not self.completed_at:
+            self.completed_at = timezone.now()
+        elif self.status != self.Status.COMPLETED:
+            self.completed_at = None
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -80,6 +88,68 @@ class SprintTask(models.Model):
     class Meta:
         db_table = 'sprint_tasks'
         ordering = ['created_at']
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from datetime import datetime, date
+
+        def to_date(d):
+            if isinstance(d, str):
+                try:
+                    return datetime.strptime(d, "%Y-%m-%d").date()
+                except ValueError:
+                    return None
+            return d
+
+        start = to_date(self.planned_start_date)
+        end = to_date(self.planned_end_date)
+
+        # 1. Validate dates relative to each other
+        if start and end:
+            if end < start:
+                raise ValidationError({"planned_end_date": "Task planned end date cannot be before planned start date."})
+
+        # 2. Validate dates are within sprint bounds
+        if self.sprint:
+            sprint_start = to_date(self.sprint.start_date)
+            sprint_end = to_date(self.sprint.end_date)
+            if start:
+                if start < sprint_start or start > sprint_end:
+                    raise ValidationError({"planned_start_date": f"Task planned start date ({start}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
+            if end:
+                if end < sprint_start or end > sprint_end:
+                    raise ValidationError({"planned_end_date": f"Task planned end date ({end}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
+
+        # 3. Validate assigned employee is a project member
+        if self.assigned_employee and self.sprint and self.sprint.project:
+            from project.models import ProjectMember
+            is_member = ProjectMember.objects.filter(
+                project=self.sprint.project,
+                employee_profile=self.assigned_employee
+            ).exists()
+            if not is_member:
+                raise ValidationError({"assigned_employee": f"Employee {self.assigned_employee.user.full_name} is not a member of project {self.sprint.project.name}."})
+
+        # 4. Mandatory fields checks
+        # Allow blank dates/assignees only if the task has no planned_start_date AND no planned_end_date AND no assigned_employee
+        is_unscheduled = (not self.planned_start_date) and (not self.planned_end_date) and (not self.assigned_employee)
+        if not is_unscheduled:
+            if not self.category:
+                raise ValidationError({"category": "Category is required."})
+            if not self.status:
+                raise ValidationError({"status": "Status is required."})
+            if not self.assigned_employee:
+                raise ValidationError({"assigned_employee": "Assignee is required."})
+            if not self.planned_start_date:
+                raise ValidationError({"planned_start_date": "Planned start date is required."})
+            if not self.planned_end_date:
+                raise ValidationError({"planned_end_date": "Planned end date is required."})
+            if not self.description or not self.description.strip():
+                raise ValidationError({"description": "Description is required."})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

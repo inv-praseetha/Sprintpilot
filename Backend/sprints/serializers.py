@@ -16,6 +16,22 @@ class SprintTaskSerializer(serializers.ModelSerializer):
 
     backlog_task_url = serializers.SerializerMethodField()
 
+    def validate(self, attrs):
+        if not attrs.get('category'):
+            raise serializers.ValidationError({"category": "Category is required."})
+        if not attrs.get('status'):
+            raise serializers.ValidationError({"status": "Status is required."})
+        if not attrs.get('assigned_employee'):
+            raise serializers.ValidationError({"assigned_employee_id": "Assignee is required."})
+        if not attrs.get('planned_start_date'):
+            raise serializers.ValidationError({"planned_start_date": "Planned start date is required."})
+        if not attrs.get('planned_end_date'):
+            raise serializers.ValidationError({"planned_end_date": "Planned end date is required."})
+        description = attrs.get('description')
+        if not description or not description.strip():
+            raise serializers.ValidationError({"description": "Description is required."})
+        return attrs
+
     class Meta:
         model = SprintTask
         fields = [
@@ -63,6 +79,7 @@ class SprintSerializer(serializers.ModelSerializer):
     tasks = SprintTaskSerializer(many=True, read_only=True)
     project_status = serializers.CharField(source='project.status', read_only=True)
     project_custom_id = serializers.CharField(source='project.project_id', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True)
     workspace_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -71,6 +88,7 @@ class SprintSerializer(serializers.ModelSerializer):
             'id',
             'project',
             'project_status',
+            'project_name',
             'milestone',
             'start_date',
             'end_date',
