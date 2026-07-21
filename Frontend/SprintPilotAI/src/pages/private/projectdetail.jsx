@@ -26,7 +26,8 @@ import {
   Loader2,
   AlertCircle,
   FileSpreadsheet,
-  Pencil
+  Pencil,
+  ExternalLink
 } from 'lucide-react';
 
 const mockSprintsData = {
@@ -215,7 +216,8 @@ export default function ProjectDetail() {
         name: sprint.milestone || sprint.name,
         totalTasks,
         startDate,
-        endDate
+        endDate,
+        workspaceUrl: sprint.workspace_url
       };
     });
   }, [sprints]);
@@ -982,7 +984,21 @@ export default function ProjectDetail() {
                       <td className={`py-4 px-5 font-extrabold text-sm ${
                         darkMode ? 'text-white' : 'text-slate-800'
                       }`}>
-                        {sprint.milestone || sprint.name}
+                        <div className="flex items-center gap-2">
+                          <span>{sprint.milestone || sprint.name}</span>
+                          {sprint.workspaceUrl && (
+                            <a 
+                              href={sprint.workspaceUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-blue-400' : 'bg-slate-100 hover:bg-slate-200 text-blue-600'}`}
+                              title="View Milestone Issues in Backlog"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </td>
 
                       {/* Total Tasks */}

@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Plus
+  Plus,
+  ExternalLink
 } from 'lucide-react';
 
 
@@ -143,6 +144,7 @@ export default function SprintDetail() {
   const [loadingText, setLoadingText] = useState('');
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [activeDatePickerId, setActiveDatePickerId] = useState(null);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
   
   // Tracking changed items
   const [modifiedTaskIds, setModifiedTaskIds] = useState(new Set());
@@ -327,18 +329,29 @@ export default function SprintDetail() {
     }
   };
 
-  // Sync button dummy action (does nothing backend-wise)
+  // Sync button action to push tasks to Backlog
   const handleSyncClick = () => {
+    setShowSyncConfirm(true);
+  };
+
+  const performSync = async () => {
+    setShowSyncConfirm(false);
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      const response = await apiClient.post(`sprints/${sprintId}/sync-backlog/`);
+      alert(`Success: ${response.data.detail}`);
+    } catch (err) {
+      console.error('[SprintDetail] Error syncing to Backlog:', err);
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to sync tasks to Backlog.';
+      alert(`Sync Failed: ${errMsg}`);
+    } finally {
       setIsSyncing(false);
       if (selectedTaskIds.size > 0) {
         alert(`Successfully synced ${selectedTaskIds.size} selected tasks with Jira board!`);
         setSelectedTaskIds(new Set());
       } else {
-        alert('Sprint backlog successfully synced with Jira board!');
-      }
-    }, 1000);
+        }
+    }
   };
 
   const toggleSelectTask = (taskId) => {
@@ -1157,8 +1170,21 @@ export default function SprintDetail() {
                                 className={`py-4 px-4 sticky left-[40px] ${rowZIndexClass} border-r align-middle text-left ${stickyBgClass}`}
                                 style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
                               >
-                                <div className="truncate w-full" title={task.title}>
-                                  {task.title}
+                                <div className="flex items-center gap-2">
+                                  <div className="truncate flex-1" title={task.title}>
+                                    {task.title}
+                                  </div>
+                                  {task.backlog_task_url && (
+                                    <a
+                                      href={task.backlog_task_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`p-1 rounded-md transition-colors ${darkMode ? 'hover:bg-slate-800 text-blue-400' : 'hover:bg-slate-200 text-blue-600'}`}
+                                      title="Open in Backlog"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </a>
+                                  )}
                                 </div>
                               </td>
 
@@ -1322,7 +1348,7 @@ export default function SprintDetail() {
           </div>
         </>
       )}
-      
+        
       <AddTaskModal
         show={isAddTaskModalOpen}
         onClose={() => setIsAddTaskModalOpen(false)}
@@ -1334,7 +1360,52 @@ export default function SprintDetail() {
         onTaskCreated={refreshSprint}
       />
     </div>
-  </div>
-    );
-  }
+
+      {/* Sync Confirmation Modal */}
+      {showSyncConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
+              <div className="text-left">
+                <h3 className="font-extrabold text-base tracking-tight">Confirm Sync to Backlog</h3>
+              </div>
+              <button
+                onClick={() => setShowSyncConfirm(false)}
+                className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-medium">
+                Are you sure you want to sync the tasks for milestone <span className="font-bold text-orange-500">{sprint?.milestone || sprint?.name}</span> (Project ID: <span className="font-mono text-xs opacity-75">{sprint?.project_custom_id || sprint?.project}</span>)?
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Please confirm to proceed with syncing to Backlog.
+              </p>
+            </div>
+            <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
+              <button
+                onClick={() => setShowSyncConfirm(false)}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
+                  darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performSync}
+                className="px-5 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-orange-500/10"
+              >
+                Confirm Sync
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
