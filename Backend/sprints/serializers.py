@@ -87,5 +87,7 @@ class SprintSerializer(serializers.ModelSerializer):
         project_key = config('BACKLOG_PROJECT_KEY', default='')
         
         if workspace and project_key:
+            if obj.backlog_version_id and obj.backlog_project_id:
+                return f"{workspace}/find/{project_key}?allOver=false&fixedVersionId={obj.backlog_version_id}&limit=20&offset=0&order=false&projectId={obj.backlog_project_id}&simpleSearch=true&sort=UPDATED&statusId=1&statusId=2&statusId=3"
             return f"{workspace}/projects/{project_key}"
         return workspace if workspace else None

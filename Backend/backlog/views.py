@@ -29,6 +29,16 @@ class SprintSyncBacklogView(APIView):
         except Exception as e:
             return Response({"detail": f"Configuration error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
+        try:
+            project_id, _ = backlog_service._resolve_project_and_issue_type()
+            if project_id:
+                version_id = backlog_service._get_or_create_version(project_id, sprint.milestone)
+                sprint.backlog_project_id = project_id
+                sprint.backlog_version_id = version_id
+                sprint.save(update_fields=['backlog_project_id', 'backlog_version_id'])
+        except Exception as e:
+            pass # Non-critical if we fail to fetch version info
+
         synced_count = 0
         tasks = sprint.tasks.all()
         errors = []

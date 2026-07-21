@@ -86,11 +86,24 @@ class BacklogService:
             raise ValueError("Could not resolve Numeric Project ID or Issue Type ID from Backlog API.")
 
         # Prepare description with assignee details
-        assignee_text = ""
+        extra_info = []
         if task.assigned_employee:
-            assignee_text = f"\n\n---\n*Assigned in Sprintpilot to: {task.assigned_employee.user.full_name} ({task.assigned_employee.user.email})*"
+            extra_info.append(f"*Assigned in Sprintpilot to: {task.assigned_employee.user.full_name} ({task.assigned_employee.user.email})*")
+        
+        if task.category:
+            extra_info.append(f"*Category: {task.category}*")
+            
+        if task.planned_start_date:
+            extra_info.append(f"*Start Date: {task.planned_start_date.isoformat()}*")
+            
+        if task.planned_end_date:
+            extra_info.append(f"*End Date: {task.planned_end_date.isoformat()}*")
+            
+        if task.jira_id:
+            extra_info.append(f"*Jira ID: {task.jira_id}*")
 
-        description = f"{task.description or ''}{assignee_text}"
+        extra_text = "\n".join(extra_info)
+        description = f"{task.description or ''}\n\n---\n{extra_text}"
         
         # Map priority
         priority_map = {
