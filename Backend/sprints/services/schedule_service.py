@@ -22,7 +22,7 @@ def generate_and_persist_recommendations(sprint, tasks, api_key):
     output_suggestions = []
     
     with transaction.atomic():
-        TaskRecommendation.objects.filter(task__sprint=sprint).delete()
+        TaskRecommendation.objects.filter(task__in=tasks).delete()
         
         for sug in suggestions:
             t_id = sug.get("task_id")
@@ -110,12 +110,6 @@ def import_schedule(sprint, payload):
     with transaction.atomic():
         for item in payload:
             task_id = item.get('task_id') or item.get('id')
-            emp_id = item.get('assigned_employee_id') or item.get('assignedTo')
-            if emp_id and isinstance(emp_id, dict):
-                emp_id = emp_id.get('id')
-            start_date = item.get('planned_start_date') or item.get('startDate')
-            end_date = item.get('planned_end_date') or item.get('endDate')
-            
             if not task_id:
                 continue
                 
@@ -124,19 +118,39 @@ def import_schedule(sprint, payload):
             except SprintTask.DoesNotExist:
                 continue
                 
-            emp_profile = None
-            if emp_id and emp_id != 'unassigned' and emp_id != '':
-                try:
-                    emp_profile = EmployeeProfile.objects.get(id=emp_id)
-                except EmployeeProfile.DoesNotExist:
-                    pass
-                    
-            task.assigned_employee = emp_profile
-            task.planned_start_date = start_date or None
-            task.planned_end_date = end_date or None
+            has_assignee = 'assigned_employee_id' in item or 'assignedTo' in item
+            has_start = 'planned_start_date' in item or 'startDate' in item
+            has_end = 'planned_end_date' in item or 'endDate' in item
+
+            if has_assignee:
+                emp_id = item.get('assigned_employee_id') or item.get('assignedTo')
+                if emp_id and isinstance(emp_id, dict):
+                    emp_id = emp_id.get('id')
+                
+                emp_profile = None
+                if emp_id and emp_id != 'unassigned' and emp_id != '':
+                    try:
+                        emp_profile = EmployeeProfile.objects.get(id=emp_id)
+                    except EmployeeProfile.DoesNotExist:
+                        pass
+                
+                task.assigned_employee = emp_profile
+                
+                # Update recommendation accepted status
+                TaskRecommendation.objects.filter(task=task, recommended_employee=emp_profile).update(accepted=True)
+                TaskRecommendation.objects.filter(task=task).exclude(recommended_employee=emp_profile).update(accepted=False)
+
+            if has_start:
+                start_date = item.get('planned_start_date') or item.get('startDate')
+                task.planned_start_date = start_date or None
+
+            if has_end:
+                end_date = item.get('planned_end_date') or item.get('endDate')
+                task.planned_end_date = end_date or None
             
-            if start_date and end_date:
-                wd = calculate_working_days(start_date, end_date)
+            # Recalculate story points and hours based on final resolved dates
+            if task.planned_start_date and task.planned_end_date:
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
                 task.story_points = wd * 2
                 task.estimated_hours = wd * 8
             else:
@@ -144,6 +158,3 @@ def import_schedule(sprint, payload):
                 task.estimated_hours = None
                 
             task.save()
-            
-            TaskRecommendation.objects.filter(task=task, recommended_employee=emp_profile).update(accepted=True)
-            TaskRecommendation.objects.filter(task=task).exclude(recommended_employee=emp_profile).update(accepted=False)

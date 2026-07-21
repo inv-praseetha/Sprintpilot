@@ -374,6 +374,12 @@ export default function TaskUploadModal({
                         darkMode ? 'bg-slate-850 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
                       }`}
                     />
+                    <div className="mt-2 p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-start gap-2 text-left">
+                      <span className="text-[10px] text-orange-600 dark:text-orange-400 font-bold leading-normal">
+                        <span className="font-extrabold uppercase mr-1.5">Note:</span>
+                        The name defined here will serve as the official milestone name when syncing this sprint with Backlog.
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -100,8 +100,12 @@ class SprintAPITests(APITestCase):
             sprint=self.sprint,
             title="Task 1",
             status="OPEN",
-            category="UI"
+            category="UI",
+            description="Base task description"
         )
+
+        # Add profile as project member of active_project
+        ProjectMember.objects.create(project=self.active_project, employee_profile=self.profile)
 
         # Authenticate client requests
         self.client.force_authenticate(user=self.creator)
@@ -123,7 +127,8 @@ class SprintAPITests(APITestCase):
             category="Backend",
             assigned_employee=self.profile,
             planned_start_date=datetime.date.today(),
-            planned_end_date=datetime.date.today() + datetime.timedelta(days=2)
+            planned_end_date=datetime.date.today() + datetime.timedelta(days=2),
+            description="Test task 2 description"
         )
         url = reverse('sprint_download_schedule', kwargs={'sprint_id': self.sprint.id})
         response = self.client.get(url)
@@ -241,22 +246,22 @@ class SprintAPITests(APITestCase):
 
     def test_task_update_assignee_and_dates(self):
         url = reverse('sprint_task_update', kwargs={'pk': self.task.id})
+        start_date = self.sprint.start_date
+        end_date = self.sprint.start_date + datetime.timedelta(days=5)
         data = {
             "assigned_employee_id": str(self.profile.id),
-            "planned_start_date": "2026-07-20",
-            "planned_end_date": "2026-07-25"
+            "planned_start_date": str(start_date),
+            "planned_end_date": str(end_date)
         }
         response = self.client.put(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.task.refresh_from_db()
         self.assertEqual(self.task.assigned_employee, self.profile)
-        self.assertEqual(str(self.task.planned_start_date), "2026-07-20")
+        self.assertEqual(str(self.task.planned_start_date), str(start_date))
 
-        # Test unassigning
+        # Test unassigning is blocked (400) because assignee is mandatory for scheduled tasks
         response = self.client.put(url, {"assignedTo": ""}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.task.refresh_from_db()
-        self.assertIsNone(self.task.assigned_employee)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_task_update_completed_project_blocked(self):
         # Move project to COMPLETED
@@ -307,12 +312,16 @@ class SprintAPITests(APITestCase):
     # 8. Import Schedule Tests
     def test_import_schedule_success(self):
         url = reverse('sprint_import_schedule', kwargs={'sprint_id': self.sprint.id})
+        start_date = self.sprint.start_date
+        while start_date.weekday() != 0:  # Find next Monday
+            start_date += datetime.timedelta(days=1)
+        end_date = start_date + datetime.timedelta(days=4)  # Friday
         data = [
             {
                 "task_id": str(self.task.id),
                 "assigned_employee_id": str(self.profile.id),
-                "planned_start_date": "2026-07-20",
-                "planned_end_date": "2026-07-24"
+                "planned_start_date": str(start_date),
+                "planned_end_date": str(end_date)
             }
         ]
         response = self.client.post(url, data, format='json')
@@ -330,6 +339,61 @@ class SprintAPITests(APITestCase):
         response = self.client.post(url, [], format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Cannot import schedule for a completed project.", response.data['detail'])
+
+    def test_create_sprint_task_success(self):
+        url = reverse('sprint_task_create', kwargs={'sprint_id': self.sprint.id})
+        data = {
+            "title": "New Single Task",
+            "category": "Backend",
+            "priority": "Critical",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": str(self.sprint.start_date),
+            "planned_end_date": str(self.sprint.start_date + datetime.timedelta(days=1)),
+            "description": "This is a new backend task."
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['title'], "New Single Task")
+        self.assertEqual(response.data['category'], "Backend")
+        self.assertEqual(response.data['priority'], "Critical")
+        
+        # Verify it was saved in DB
+        self.assertTrue(SprintTask.objects.filter(title="New Single Task", sprint=self.sprint).exists())
+
+    def test_create_sprint_task_story_points_calculation(self):
+        url = reverse('sprint_task_create', kwargs={'sprint_id': self.sprint.id})
+        start_date = self.sprint.start_date
+        while start_date.weekday() != 0:  # Find next Monday
+            start_date += datetime.timedelta(days=1)
+        end_date = start_date + datetime.timedelta(days=4)  # Friday
+        data = {
+            "title": "Scheduled Single Task",
+            "category": "UI",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": str(start_date),
+            "planned_end_date": str(end_date),
+            "description": "Story points test description"
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        task = SprintTask.objects.get(title="Scheduled Single Task", sprint=self.sprint)
+        self.assertEqual(task.story_points, 10.0) # 5 days * 2
+        self.assertEqual(task.estimated_hours, 40.0) # 5 days * 8
+
+    def test_create_sprint_task_completed_project_blocked(self):
+        self.active_project.status = "COMPLETED"
+        self.active_project.save()
+
+        url = reverse('sprint_task_create', kwargs={'sprint_id': self.sprint.id})
+        data = {
+            "title": "Blocked Task"
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot add tasks to a completed project.", response.data['detail'])
+
 
 
 class SprintServiceTests(APITestCase):
@@ -362,8 +426,11 @@ class SprintServiceTests(APITestCase):
             sprint=self.sprint,
             title="Task 1",
             status="OPEN",
-            category="UI"
+            category="UI",
+            description="Base task description"
         )
+        # Add profile as member of self.project
+        ProjectMember.objects.create(project=self.project, employee_profile=self.profile)
 
     def test_calculate_working_days_edge_cases(self):
         # None cases
@@ -411,6 +478,8 @@ class SprintServiceTests(APITestCase):
         with self.assertRaises(ValueError):
             import_schedule(self.sprint, "not-a-list")
         
+        start_date = self.sprint.start_date
+        end_date = self.sprint.start_date + datetime.timedelta(days=2)
         # 2. Dict employee_id, missing fields, non-existent objects
         payload = [
             {
@@ -419,8 +488,8 @@ class SprintServiceTests(APITestCase):
             {
                 "task_id": str(self.task.id),
                 "assigned_employee_id": {"id": str(self.profile.id)},  # dict format
-                "planned_start_date": "2026-07-20",
-                "planned_end_date": "2026-07-22"
+                "planned_start_date": str(start_date),
+                "planned_end_date": str(end_date)
             },
             {
                 "id": "00000000-0000-0000-0000-000000000000",  # non-existent task
@@ -469,7 +538,8 @@ class SprintAISchedulerTests(APITestCase):
             sprint=self.sprint,
             title="Task 1",
             status="OPEN",
-            category="UI"
+            category="UI",
+            description="Base task description"
         )
         self.skill = Skill.objects.create(name="Python", category="BACKEND")
         
