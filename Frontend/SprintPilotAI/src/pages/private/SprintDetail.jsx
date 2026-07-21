@@ -407,7 +407,8 @@ export default function SprintDetail() {
     setShowSyncConfirm(false);
     setIsSyncing(true);
     try {
-      const response = await apiClient.post(`sprints/${sprintId}/sync-backlog/`);
+      const payload = selectedTaskIds.size > 0 ? { task_ids: Array.from(selectedTaskIds) } : {};
+      const response = await apiClient.post(`sprints/${sprintId}/sync-backlog/`, payload);
       alert(`Success: ${response.data.detail}`);
     } catch (err) {
       console.error('[SprintDetail] Error syncing to Backlog:', err);
@@ -416,7 +417,6 @@ export default function SprintDetail() {
     } finally {
       setIsSyncing(false);
       if (selectedTaskIds.size > 0) {
-        alert(`Successfully synced ${selectedTaskIds.size} selected tasks with Jira board!`);
         setSelectedTaskIds(new Set());
       } else {
       }

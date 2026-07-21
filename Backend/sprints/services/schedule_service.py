@@ -151,8 +151,21 @@ def import_schedule(sprint, payload):
             # Recalculate story points and hours based on final resolved dates
             if task.planned_start_date and task.planned_end_date:
                 wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
-                task.story_points = wd * 2
-                task.estimated_hours = wd * 8
+                
+                has_est = 'estimated_hours' in item or 'estimatedHours' in item
+                has_sp = 'story_points' in item or 'storyPoints' in item
+                
+                if has_est:
+                    val = item.get('estimated_hours') or item.get('estimatedHours')
+                    task.estimated_hours = val if val is not None else (wd * 8)
+                elif has_start or has_end or task.estimated_hours is None:
+                    task.estimated_hours = wd * 8
+                    
+                if has_sp:
+                    val = item.get('story_points') or item.get('storyPoints')
+                    task.story_points = val if val is not None else (wd * 2)
+                elif has_start or has_end or task.story_points is None:
+                    task.story_points = wd * 2
             else:
                 task.story_points = None
                 task.estimated_hours = None

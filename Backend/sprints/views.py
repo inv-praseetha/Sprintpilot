@@ -506,11 +506,41 @@ class SprintTaskUpdateView(APIView):
             else:
                 task.assigned_employee = None
 
-        if 'planned_start_date' in data or 'startDate' in data:
+        start_changed = 'planned_start_date' in data or 'startDate' in data
+        end_changed = 'planned_end_date' in data or 'endDate' in data
+        hours_changed = 'estimated_hours' in data or 'estimatedHours' in data
+        sp_changed = 'story_points' in data or 'storyPoints' in data
+        
+        if start_changed:
             task.planned_start_date = data.get('planned_start_date') or data.get('startDate')
 
-        if 'planned_end_date' in data or 'endDate' in data:
+        if end_changed:
             task.planned_end_date = data.get('planned_end_date') or data.get('endDate')
+
+        if hours_changed:
+            task.estimated_hours = data.get('estimated_hours') if 'estimated_hours' in data else data.get('estimatedHours')
+        elif start_changed or end_changed:
+            if task.planned_start_date and task.planned_end_date:
+                from sprints.services.schedule_service import calculate_working_days
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
+                task.estimated_hours = wd * 8
+            
+        if sp_changed:
+            task.story_points = data.get('story_points') if 'story_points' in data else data.get('storyPoints')
+        elif start_changed or end_changed:
+            if task.planned_start_date and task.planned_end_date:
+                from sprints.services.schedule_service import calculate_working_days
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
+                task.story_points = wd * 2
+            
+        if 'title' in data:
+            task.title = data.get('title')
+            
+        if 'description' in data:
+            task.description = data.get('description')
+            
+        if 'priority' in data:
+            task.priority = data.get('priority')
 
         try:
             task.save()
@@ -660,8 +690,10 @@ class SprintTaskCreateView(APIView):
                 start_str = start_date.strftime("%Y-%m-%d")
                 end_str = end_date.strftime("%Y-%m-%d")
                 wd = calculate_working_days(start_str, end_str)
-                task.story_points = wd * 2
-                task.estimated_hours = wd * 8
+                if task.story_points is None:
+                    task.story_points = wd * 2
+                if task.estimated_hours is None:
+                    task.estimated_hours = wd * 8
                 task.save()
             
             # Update TaskRecommendation states if this task matches the assigned employee
