@@ -4,9 +4,22 @@ import { useTheme } from './MainLayouut';
 import { useAuth } from '../../context/AuthContext';
 import { HelpCircle, Bell, Menu, LogOut } from 'lucide-react';
 
+const getInitials = (name) => {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + (parts[parts.length - 1][0] || '')).toUpperCase();
+};
+
+const formatRole = (role) => {
+  if (!role) return '';
+  return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
 export default function NavBar() {
   const { darkMode, setSidebarOpen } = useTheme();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -26,30 +39,21 @@ export default function NavBar() {
 
       {/* User profile and notification controls */}
       <div className="flex items-center gap-2 sm:gap-5">
-        <button className={`hidden sm:flex w-10 h-10 rounded-xl items-center justify-center border transition-colors cursor-pointer ${
-          darkMode ? 'border-slate-800 text-slate-300 bg-slate-900 hover:bg-slate-800' : 'border-slate-100 text-slate-500 bg-white hover:bg-slate-50'
-        }`}>
-          <HelpCircle className="w-5 h-5" />
-        </button>
-        <button className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors relative cursor-pointer ${
-          darkMode ? 'border-slate-800 text-slate-300 bg-slate-900 hover:bg-slate-800' : 'border-slate-100 text-slate-500 bg-white hover:bg-slate-50'
-        }`}>
-          <Bell className="w-5 h-5" />
-          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-500" />
-        </button>
-        
-        {/* Profile badge with dropdown */}
         <div className="relative">
-          <button 
+          <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800 cursor-pointer text-left focus:outline-none"
+            className="flex items-center gap-3 pl-2 border-slate-200 dark:border-slate-800 cursor-pointer text-left focus:outline-none"
           >
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold text-base ring-2 ring-orange-500/10 select-none">
-              AS
+              {getInitials(user?.full_name) || '??'}
             </div>
             <div className="hidden md:block">
-              <span className={`block font-semibold text-sm leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ashwin Sanalkumar</span>
-              <span className="block text-[11px] text-slate-400">Project Manager</span>
+              <span className={`block font-semibold text-sm leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {user?.full_name || 'Loading...'}
+              </span>
+              <span className="block text-[11px] text-slate-400">
+                {formatRole(user?.role) || 'Project Member'}
+              </span>
             </div>
           </button>
 
