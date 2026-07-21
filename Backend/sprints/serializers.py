@@ -95,9 +95,10 @@ class SprintSerializer(serializers.ModelSerializer):
             'status',
             'tasks',
             'project_custom_id',
-            'workspace_url'
+            'workspace_url',
+            'created_at'
         ]
-        read_only_fields = ['id', 'project']
+        read_only_fields = ['id', 'project', 'created_at']
 
     def get_workspace_url(self, obj):
         from decouple import config

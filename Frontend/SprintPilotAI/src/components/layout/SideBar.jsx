@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from './MainLayouut';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Bot,
@@ -57,6 +58,7 @@ function SidebarLink({ to, icon, label }) {
 
 export default function SideBar() {
   const { darkMode, setDarkMode, sidebarOpen, setSidebarOpen } = useTheme();
+  const { user } = useAuth();
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
@@ -87,13 +89,10 @@ export default function SideBar() {
               </div>
               <div>
                 <h2 className="font-bold text-lg leading-tight tracking-tight">Sprint Pilot AI</h2>
-                <span className="text-xs text-slate-400">hello@sprintpilotai.com</span>
+                <span className="text-xs text-slate-400">{user?.email || ''}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-                <ChevronDown className="w-4 h-4" />
-              </button>
               <button 
                 onClick={() => setSidebarOpen(false)}
                 className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer lg:hidden"
