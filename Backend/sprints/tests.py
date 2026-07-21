@@ -276,6 +276,57 @@ class SprintAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Cannot update tasks in a completed project.", response.data['detail'])
 
+    def test_task_delete_success(self):
+        url = reverse('sprint_task_update', kwargs={'pk': self.task.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(SprintTask.objects.filter(id=self.task.id).exists())
+
+    def test_task_delete_completed_project_blocked(self):
+        self.active_project.status = "COMPLETED"
+        self.active_project.save()
+        url = reverse('sprint_task_update', kwargs={'pk': self.task.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot delete tasks in a completed project.", response.data['detail'])
+
+    def test_task_bulk_delete_success(self):
+        # Create one more task to delete
+        another_task = SprintTask.objects.create(
+            title="Another Task",
+            category="UI",
+            priority="Normal",
+            description="Another description",
+            sprint=self.sprint
+        )
+        url = reverse('sprint_task_bulk_delete')
+        data = {
+            "task_ids": [str(self.task.id), str(another_task.id)]
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Successfully deleted 2 tasks", response.data['detail'])
+        self.assertFalse(SprintTask.objects.filter(id__in=[self.task.id, another_task.id]).exists())
+
+    def test_task_bulk_delete_completed_project_blocked(self):
+        self.active_project.status = "COMPLETED"
+        self.active_project.save()
+        url = reverse('sprint_task_bulk_delete')
+        data = {
+            "task_ids": [str(self.task.id)]
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot delete tasks in a completed project.", response.data['detail'])
+
+    def test_task_bulk_delete_no_ids(self):
+        url = reverse('sprint_task_bulk_delete')
+        data = {
+            "task_ids": []
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     # 7. AI Suggestion Tests
     @patch('decouple.config')
     def test_ai_schedule_no_api_key(self, mock_config):

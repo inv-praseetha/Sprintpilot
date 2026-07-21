@@ -106,11 +106,60 @@ class SprintDownloadScheduleView(APIView):
                         'number_format': cell.number_format
                     })
                     
-            # Also save standard task row style (using Row 11)
-            styles['task'] = []
+            # Save task styles per category
+            # UI task template: row 11
+            styles['task_UI'] = []
             for col in range(2, 8):
                 cell = ws.cell(row=11, column=col)
-                styles['task'].append({
+                styles['task_UI'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+
+            # Backend task template: row 21
+            styles['task_Backend'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=21, column=col)
+                styles['task_Backend'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+
+            # Infra task template: row 31
+            styles['task_INFRA'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=31, column=col)
+                styles['task_INFRA'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+
+            # QA task template: row 36
+            styles['task_QA'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=36, column=col)
+                styles['task_QA'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+                
+            # Save Releases row style (using Row 49)
+            styles['Releases'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=49, column=col)
+                styles['Releases'].append({
                     'fill': copy.copy(cell.fill) if cell.fill else None,
                     'font': copy.copy(cell.font) if cell.font else None,
                     'border': copy.copy(cell.border) if cell.border else None,
@@ -124,7 +173,7 @@ class SprintDownloadScheduleView(APIView):
                     cell = ws.cell(row=r, column=c)
                     cell.value = None
                     # Apply regular task style to clean up any old header formats in that row
-                    style_info = styles['task'][c - 2]
+                    style_info = styles['task_UI'][c - 2]
                     if style_info['fill']: cell.fill = style_info['fill']
                     if style_info['font']: cell.font = style_info['font']
                     if style_info['border']: cell.border = style_info['border']
@@ -152,6 +201,17 @@ class SprintDownloadScheduleView(APIView):
                 
                 # Write tasks under this phase
                 for task in cat_tasks:
+                    # Apply task style for this category
+                    style_list = styles[f'task_{cat_key}']
+                    for col_idx in range(2, 8):
+                        cell = ws.cell(row=current_row, column=col_idx)
+                        style_info = style_list[col_idx - 2]
+                        if style_info['fill']: cell.fill = style_info['fill']
+                        if style_info['font']: cell.font = style_info['font']
+                        if style_info['border']: cell.border = style_info['border']
+                        if style_info['alignment']: cell.alignment = style_info['alignment']
+                        cell.number_format = style_info['number_format']
+
                     # Write values
                     ws.cell(row=current_row, column=2, value=task.title) # Column B: Task Name
                     
@@ -186,22 +246,27 @@ class SprintDownloadScheduleView(APIView):
                     ws.cell(row=current_row, column=6, value=t_end)
                     
                     # Column G: Remarks
-                    rec = task.recommendations.filter(accepted=True).first()
-                    if not rec and task.assigned_employee:
-                        rec = task.recommendations.filter(recommended_employee=task.assigned_employee).first()
-                    
-                    remarks_parts = []
-                    if rec and rec.reason:
-                        remarks_parts.append(rec.reason)
-                    else:
-                        remarks_parts.append(f"Priority: {task.priority}")
-                    if task.jira_id:
-                        remarks_parts.append(f"({task.jira_id})")
-                    
-                    remarks = " ".join(remarks_parts)
-                    ws.cell(row=current_row, column=7, value=remarks)
+                    ws.cell(row=current_row, column=7, value=None)
                     
                     current_row += 1
+
+            # Write "Releases" header row (just color and name, no tasks, no remarks)
+            style_list = styles['Releases']
+            for col_idx in range(2, 8):
+                cell = ws.cell(row=current_row, column=col_idx)
+                style_info = style_list[col_idx - 2]
+                if style_info['fill']: cell.fill = style_info['fill']
+                if style_info['font']: cell.font = style_info['font']
+                if style_info['border']: cell.border = style_info['border']
+                if style_info['alignment']: cell.alignment = style_info['alignment']
+                cell.number_format = style_info['number_format']
+            
+            ws.cell(row=current_row, column=2, value='Releases') # Column B
+            # Ensure other columns in this row are empty (no remarks etc.)
+            for col_idx in range(3, 8):
+                ws.cell(row=current_row, column=col_idx, value=None)
+            
+            current_row += 1
 
             # Remove the old conditional formatting rule for the Gantt chart area
             keys_to_remove = []
@@ -229,6 +294,9 @@ class SprintDownloadScheduleView(APIView):
                 ws.conditional_formatting.add(cf_range, gantt_rule_cd)
                 ws.conditional_formatting.add(cf_range, gantt_rule_ef)
             
+            # Set Column E (Start Date) width to match Column F (End Date) width
+            ws.column_dimensions['E'].width = ws.column_dimensions['F'].width
+
             import io
             buffer = io.BytesIO()
             wb.save(buffer)
@@ -444,6 +512,44 @@ class SprintTaskUpdateView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk, *args, **kwargs):
+        try:
+            task = SprintTask.objects.get(id=pk)
+        except SprintTask.DoesNotExist:
+            return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if task.sprint.project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot delete tasks in a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SprintTaskBulkDeleteView(APIView):
+    """
+    API View to bulk delete sprint tasks.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        task_ids = request.data.get('task_ids', [])
+        if not task_ids:
+            return Response({"detail": "No task IDs provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        tasks = SprintTask.objects.filter(id__in=task_ids)
+        if tasks.filter(sprint__project__status='COMPLETED').exists():
+            return Response(
+                {"detail": "Cannot delete tasks in a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        count = tasks.count()
+        tasks.delete()
+        return Response({"detail": f"Successfully deleted {count} tasks."}, status=status.HTTP_200_OK)
 
 # View endpoints delegated to services
 class SprintAISuggestScheduleView(APIView):
