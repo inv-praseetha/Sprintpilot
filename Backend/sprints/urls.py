@@ -9,6 +9,7 @@ from sprints.views import (
     SprintImportScheduleView
 )
 
+
 urlpatterns = [
     path('sprints/download-template/', SprintDownloadTemplateView.as_view(), name='sprint_download_template'),
     path('sprints/<uuid:sprint_id>/download-schedule/', SprintDownloadScheduleView.as_view(), name='sprint_download_schedule'),

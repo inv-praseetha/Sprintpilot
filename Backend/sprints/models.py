@@ -16,7 +16,7 @@ class Sprint(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PLANNED)
-
+    
     class Meta:
         db_table = 'sprints'
         ordering = ['start_date']
