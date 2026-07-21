@@ -22,7 +22,8 @@ import {
   ChevronRight,
   Download,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 
 
@@ -168,6 +169,41 @@ export default function SprintDetail() {
       setOriginalTasks(JSON.parse(JSON.stringify(dbTasks)));
     } catch (err) {
       console.error('[SprintDetail] Error refreshing sprint details:', err);
+    }
+  };
+
+  const handleIndividualDelete = async (taskId) => {
+    if (!window.confirm("Are you sure you want to delete this task?")) return;
+    try {
+      setPageLoading(true);
+      await apiClient.delete(`sprints/tasks/${taskId}/`);
+      alert("Task deleted successfully.");
+      await refreshSprint();
+    } catch (err) {
+      console.error('[SprintDetail] Error deleting task:', err);
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to delete task.';
+      alert(`Delete failed: ${errMsg}`);
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete the ${selectedTaskIds.size} selected tasks?`)) return;
+    try {
+      setPageLoading(true);
+      const taskIds = Array.from(selectedTaskIds);
+      await apiClient.post(`sprints/tasks/bulk-delete/`, { task_ids: taskIds });
+      alert("Selected tasks deleted successfully.");
+      setSelectedTaskIds(new Set());
+      await refreshSprint();
+    } catch (err) {
+      console.error('[SprintDetail] Error bulk deleting tasks:', err);
+      const errMsg = err.response?.data?.detail || err.message || 'Failed to delete selected tasks.';
+      alert(`Delete failed: ${errMsg}`);
+    } finally {
+      setPageLoading(false);
     }
   };
 
@@ -729,6 +765,17 @@ export default function SprintDetail() {
                         Sync
                       </button>
                       <button
+                        onClick={handleBulkDelete}
+                        disabled={sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
+                            ? 'border-red-950/40 hover:bg-red-900/20 text-red-400'
+                            : 'border-red-200 hover:bg-red-50 text-red-600'
+                          }`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete Selected
+                      </button>
+                      <button
                         onClick={() => setSelectedTaskIds(new Set())}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
@@ -833,7 +880,7 @@ export default function SprintDetail() {
               <div className="overflow-auto max-h-[600px] relative custom-scrollbar">
                 <table
                   className="w-full text-left border-collapse"
-                  style={{ minWidth: `${820 + timelineDaysList.length * 32}px` }}
+                  style={{ minWidth: `${880 + timelineDaysList.length * 32}px` }}
                 >
                   <thead>
                     {/* Row 1: Week headers */}
@@ -844,10 +891,10 @@ export default function SprintDetail() {
                         style={{ minWidth: '40px', maxWidth: '40px', width: '40px' }}
                       />
                       <th
-                        colSpan={6}
+                        colSpan={7}
                         className={`py-2.5 px-4 border-r sticky left-[40px] top-0 z-40 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
                           }`}
-                        style={{ minWidth: '610px', maxWidth: '610px', width: '610px' }}
+                        style={{ minWidth: '670px', maxWidth: '670px', width: '670px' }}
                       >
                         Task Specifications
                       </th>
@@ -943,6 +990,13 @@ export default function SprintDetail() {
                       >
                         RECOMMENDATION REASON
                       </th>
+                      <th
+                        className={`py-2 px-3 sticky left-[860px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                          }`}
+                        style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                      >
+                        ACTIONS
+                      </th>
 
                       {/* Dates */}
                       {timelineDaysList.map((day, idx) => {
@@ -1002,6 +1056,11 @@ export default function SprintDetail() {
                         className={`py-1 px-4 sticky left-[650px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                      />
+                      <th
+                        className={`py-1 px-3 sticky left-[860px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                          }`}
+                        style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       />
 
                       {/* Day Names */}
@@ -1079,6 +1138,11 @@ export default function SprintDetail() {
                               className={`py-3 px-4 sticky left-[650px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
                               style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
+                            />
+                            <td
+                              className={`py-3 px-3 sticky left-[860px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                                }`}
+                              style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                             />
 
                             {/* Date grid cells */}
@@ -1267,6 +1331,25 @@ export default function SprintDetail() {
                                       </div>
                                     )}
                                   </div>
+                                </td>
+
+                                {/* ACTIONS */}
+                                <td
+                                  className={`py-4 px-2 sticky left-[860px] ${rowZIndexClass} text-center border-r align-middle ${stickyNormalBgClass}`}
+                                  style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                                >
+                                  <button
+                                    onClick={() => handleIndividualDelete(task.id)}
+                                    disabled={sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                                    className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                      darkMode 
+                                        ? 'hover:bg-slate-800 text-red-400 hover:text-red-300' 
+                                        : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                                    }`}
+                                    title="Delete task"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </td>
 
                                 {/* Timeline cells */}

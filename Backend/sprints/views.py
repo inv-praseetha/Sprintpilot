@@ -445,6 +445,44 @@ class SprintTaskUpdateView(APIView):
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request, pk, *args, **kwargs):
+        try:
+            task = SprintTask.objects.get(id=pk)
+        except SprintTask.DoesNotExist:
+            return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if task.sprint.project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot delete tasks in a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SprintTaskBulkDeleteView(APIView):
+    """
+    API View to bulk delete sprint tasks.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        task_ids = request.data.get('task_ids', [])
+        if not task_ids:
+            return Response({"detail": "No task IDs provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        tasks = SprintTask.objects.filter(id__in=task_ids)
+        if tasks.filter(sprint__project__status='COMPLETED').exists():
+            return Response(
+                {"detail": "Cannot delete tasks in a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        count = tasks.count()
+        tasks.delete()
+        return Response({"detail": f"Successfully deleted {count} tasks."}, status=status.HTTP_200_OK)
+
 # View endpoints delegated to services
 class SprintAISuggestScheduleView(APIView):
     permission_classes = [IsAuthenticated]
