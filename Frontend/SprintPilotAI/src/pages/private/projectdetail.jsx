@@ -87,6 +87,7 @@ export default function ProjectDetail() {
   // UI Toggle States
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [rosterExpanded, setRosterExpanded] = useState(true);
+  const [sprintsExpanded, setSprintsExpanded] = useState(true);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
   const [showEditLeadModal, setShowEditLeadModal] = useState(false);
@@ -217,8 +218,13 @@ export default function ProjectDetail() {
         totalTasks,
         startDate,
         endDate,
-        workspaceUrl: sprint.workspace_url
+        workspaceUrl: sprint.workspace_url,
+        rawStartDate: sprint.start_date
       };
+    }).sort((a, b) => {
+      if (!a.rawStartDate) return 1;
+      if (!b.rawStartDate) return -1;
+      return new Date(a.rawStartDate) - new Date(b.rawStartDate);
     });
   }, [sprints]);
 
@@ -717,7 +723,7 @@ export default function ProjectDetail() {
                       <th className="py-4 px-4 font-bold">Role</th>
                       <th className="py-4 px-4 font-bold">Status</th>
                       <th className="py-4 px-4 font-bold">Matching Skills</th>
-                      {isProjectManager && <th className="py-4 px-4 text-right font-bold">Actions</th>}
+                      {isProjectManager && project.status !== 'COMPLETED' && <th className="py-4 px-4 text-right font-bold">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${darkMode ? 'divide-slate-850' : 'divide-slate-50'}`}>
@@ -764,7 +770,7 @@ export default function ProjectDetail() {
                         <td className="py-4 px-4">
                           <span className="text-slate-400 font-bold">—</span>
                         </td>
-                        {isProjectManager && (
+                        {isProjectManager && project.status !== 'COMPLETED' && (
                           <td className="py-4 px-4 text-right">
                             <button
                               onClick={() => setShowEditLeadModal(true)}
@@ -830,7 +836,7 @@ export default function ProjectDetail() {
                             <span className="text-xs font-bold text-slate-400">—</span>
                           )}
                         </td>
-                        {isProjectManager && (
+                        {isProjectManager && project.status !== 'COMPLETED' && (
                           <td className="py-4 px-4 text-right">
                             <button
                               onClick={() => handleRemoveMember(member.id)}
@@ -931,26 +937,34 @@ export default function ProjectDetail() {
       </div>
 
       {/* 3. SPRINTS LIST VIEW */}
-      <div className={`mt-8 p-6 rounded-3xl border ${
+      <div className={`mt-8 rounded-3xl border overflow-hidden transition-all ${
         darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/40'
       }`}>
-        {/* Project Sub-Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
+        <button
+          onClick={() => setSprintsExpanded(!sprintsExpanded)}
+          className={`w-full p-6 flex justify-between items-center transition-colors cursor-pointer ${
+            darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center">
               <FolderKanban className="w-5 h-5 text-orange-500" />
             </div>
-            <div>
+            <div className="text-left">
               <h2 className="font-extrabold text-lg leading-tight text-left">Project Sprints & Milestones</h2>
               <p className="text-xs text-slate-400 mt-0.5 text-left">Browse active sprints and click to view detailed task distributions</p>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-slate-400 hidden sm:inline">
+              {sprintListDetails.length} Sprints Loaded
+            </span>
+            {sprintsExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+          </div>
+        </button>
 
-          <span className="text-xs font-semibold text-slate-400">
-            {sprintListDetails.length} Sprints Loaded
-          </span>
-        </div>
-
+        {sprintsExpanded && (
+          <div className="p-6 border-t border-slate-100 dark:border-slate-850">
         {/* SPRINTS LIST VIEW TABLE */}
         {sprintListDetails.length > 0 ? (
           <div className={`border rounded-3xl overflow-hidden ${
@@ -1037,6 +1051,8 @@ export default function ProjectDetail() {
             <Layers className="w-12 h-12 text-slate-350 dark:text-slate-750 mb-3 animate-pulse" />
             <h5 className="font-extrabold text-slate-400 text-sm">No Sprints Uploaded Yet</h5>
             <p className="text-xs text-slate-400 mt-1 mb-4">Click "Upload Sprint" at the top to import tasks from an Excel template.</p>
+          </div>
+        )}
           </div>
         )}
       </div>

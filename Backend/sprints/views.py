@@ -72,7 +72,7 @@ class SprintDownloadScheduleView(APIView):
             ws["E3"] = 1 # Display Week is normally 1
             
             # 2. Gather tasks and group by category
-            tasks = sprint.tasks.all().order_by('created_at')
+            tasks = sprint.tasks.filter(is_deleted=False).order_by('created_at')
             
             # Categories in required order
             category_mapping = [
@@ -330,7 +330,11 @@ class SprintListCreateView(APIView):
         except Project.DoesNotExist:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        from django.db.models import Prefetch
+        from sprints.models import SprintTask
+
         sprints = Sprint.objects.filter(project=project).select_related('project').prefetch_related(
+            Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
             'tasks__assigned_employee__user',
             'tasks__assigned_employee__employee_skill_relations__skill',
             'tasks__recommendations'
@@ -439,7 +443,11 @@ class SprintDetailView(APIView):
 
     def get(self, request, pk, *args, **kwargs):
         try:
+            from django.db.models import Prefetch
+            from sprints.models import SprintTask
+            
             sprint = Sprint.objects.select_related('project').prefetch_related(
+                Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
                 'tasks__assigned_employee__user',
                 'tasks__assigned_employee__employee_skill_relations__skill',
                 'tasks__recommendations'
@@ -506,11 +514,41 @@ class SprintTaskUpdateView(APIView):
             else:
                 task.assigned_employee = None
 
-        if 'planned_start_date' in data or 'startDate' in data:
+        start_changed = 'planned_start_date' in data or 'startDate' in data
+        end_changed = 'planned_end_date' in data or 'endDate' in data
+        hours_changed = 'estimated_hours' in data or 'estimatedHours' in data
+        sp_changed = 'story_points' in data or 'storyPoints' in data
+        
+        if start_changed:
             task.planned_start_date = data.get('planned_start_date') or data.get('startDate')
 
-        if 'planned_end_date' in data or 'endDate' in data:
+        if end_changed:
             task.planned_end_date = data.get('planned_end_date') or data.get('endDate')
+
+        if hours_changed:
+            task.estimated_hours = data.get('estimated_hours') if 'estimated_hours' in data else data.get('estimatedHours')
+        elif start_changed or end_changed:
+            if task.planned_start_date and task.planned_end_date:
+                from sprints.services.schedule_service import calculate_working_days
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
+                task.estimated_hours = wd * 8
+            
+        if sp_changed:
+            task.story_points = data.get('story_points') if 'story_points' in data else data.get('storyPoints')
+        elif start_changed or end_changed:
+            if task.planned_start_date and task.planned_end_date:
+                from sprints.services.schedule_service import calculate_working_days
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
+                task.story_points = wd * 2
+            
+        if 'title' in data:
+            task.title = data.get('title')
+            
+        if 'description' in data:
+            task.description = data.get('description')
+            
+        if 'priority' in data:
+            task.priority = data.get('priority')
 
         try:
             task.save()
@@ -531,7 +569,18 @@ class SprintTaskUpdateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        task.delete()
+        if task.backlog_task_id:
+            from backlog.services.backlog_client import BacklogService
+            try:
+                BacklogService().delete_issue(task.backlog_task_id)
+            except Exception as e:
+                return Response(
+                    {"detail": f"Failed to delete task from Backlog: {str(e)}"},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
+
+        task.is_deleted = True
+        task.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -554,7 +603,7 @@ class SprintTaskBulkDeleteView(APIView):
             )
 
         count = tasks.count()
-        tasks.delete()
+        tasks.update(is_deleted=True)
         return Response({"detail": f"Successfully deleted {count} tasks."}, status=status.HTTP_200_OK)
 
 # View endpoints delegated to services
@@ -583,9 +632,9 @@ class SprintAISuggestScheduleView(APIView):
 
         task_ids = request.data.get('task_ids', [])
         if task_ids:
-            tasks = sprint.tasks.filter(id__in=task_ids)
+            tasks = sprint.tasks.filter(id__in=task_ids, is_deleted=False)
         else:
-            tasks = sprint.tasks.all()
+            tasks = sprint.tasks.filter(is_deleted=False)
 
         if not tasks.exists():
             return Response(
@@ -660,8 +709,10 @@ class SprintTaskCreateView(APIView):
                 start_str = start_date.strftime("%Y-%m-%d")
                 end_str = end_date.strftime("%Y-%m-%d")
                 wd = calculate_working_days(start_str, end_str)
-                task.story_points = wd * 2
-                task.estimated_hours = wd * 8
+                if task.story_points is None:
+                    task.story_points = wd * 2
+                if task.estimated_hours is None:
+                    task.estimated_hours = wd * 8
                 task.save()
             
             # Update TaskRecommendation states if this task matches the assigned employee
