@@ -1318,7 +1318,7 @@ export default function SprintDetail() {
 
                                 {/* REMARKS */}
                                 <td
-                                  className={`py-4 px-2 sticky left-[650px] ${rowZIndexClass} border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
+                                  className={`py-4 px-2 sticky left-[650px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
                                   style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                                 >
                                   <div className="relative">

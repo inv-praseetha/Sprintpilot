@@ -30,14 +30,24 @@ export default function CustomDatePicker({ value, onChange, minDate, maxDate, da
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close calendar on scroll
+  // Update calendar coordinates on scroll or resize instead of closing it
   useEffect(() => {
     if (!isOpen) return;
-    const handleScroll = () => {
-      setIsOpen(false);
+    const handleUpdate = () => {
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom + window.scrollY + 6,
+          left: rect.left + window.scrollX
+        });
+      }
     };
-    window.addEventListener('scroll', handleScroll, true);
-    return () => window.removeEventListener('scroll', handleScroll, true);
+    window.addEventListener('scroll', handleUpdate, true);
+    window.addEventListener('resize', handleUpdate);
+    return () => {
+      window.removeEventListener('scroll', handleUpdate, true);
+      window.removeEventListener('resize', handleUpdate);
+    };
   }, [isOpen]);
 
   const toggleOpen = () => {
