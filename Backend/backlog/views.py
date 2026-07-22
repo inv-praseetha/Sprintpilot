@@ -25,7 +25,7 @@ class SprintSyncBacklogView(APIView):
         from backlog.services.backlog_client import BacklogService
         
         try:
-            backlog_service = BacklogService()
+            backlog_service = BacklogService(project_key=sprint.project.project_id)
         except Exception as e:
             return Response({"detail": f"Configuration error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             

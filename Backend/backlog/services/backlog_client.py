@@ -5,14 +5,14 @@ from decouple import config
 logger = logging.getLogger(__name__)
 
 class BacklogService:
-    def __init__(self):
+    def __init__(self, project_key=None):
         self.workspace_url = config('BACKLOG_WORKSPACE_URL', default='').rstrip('/')
         self.api_key = config('BACKLOG_API_KEY', default='')
-        self.project_key = config('BACKLOG_PROJECT_KEY', default='')
+        self.project_key = project_key or config('BACKLOG_PROJECT_KEY', default='')
         self.issue_type_id = config('BACKLOG_TASK_ISSUE_TYPE_ID', default='')
 
         if not all([self.workspace_url, self.api_key, self.project_key]):
-            logger.warning("Backlog integration is not fully configured in .env.")
+            logger.warning("Backlog integration is not fully configured in .env (or missing dynamic project_key).")
 
     def get_project_issue_types(self):
         """Fetch issue types to find the Task Issue Type ID dynamically if not provided."""
@@ -39,9 +39,13 @@ class BacklogService:
         
         # Determine issue type ID
         issue_type_id = None
-        # if the user provided it in env, use it (making sure it's an int)
-        if self.issue_type_id and str(self.issue_type_id).isdigit():
-            issue_type_id = int(self.issue_type_id)
+        
+        # Check if the env-provided issue type ID is valid for this specific project
+        valid_type_ids = [t.get('id') for t in types]
+        env_issue_type = int(self.issue_type_id) if self.issue_type_id and str(self.issue_type_id).isdigit() else None
+        
+        if env_issue_type and env_issue_type in valid_type_ids:
+            issue_type_id = env_issue_type
         else:
             for itype in types:
                 if 'task' in itype.get('name', '').lower():

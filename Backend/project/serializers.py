@@ -29,7 +29,11 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     """
     Serializer to validate Project creation input.
     """
-    project_id = serializers.CharField(required=True)
+    from rest_framework.validators import UniqueValidator
+    project_id = serializers.CharField(
+        required=True,
+        validators=[UniqueValidator(queryset=Project.objects.all(), message="A project with this Project ID already exists.")]
+    )
     team_lead = serializers.UUIDField(required=True)
     number_of_days = serializers.IntegerField(required=False, allow_null=True)
     team_size = serializers.IntegerField(required=False, default=0)
