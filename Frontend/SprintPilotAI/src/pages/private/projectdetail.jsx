@@ -322,7 +322,7 @@ export default function ProjectDetail() {
         goal: '',
         start_date: sprintStartDate,
         end_date: sprintEndDate,
-        status: 'PLANNED',
+        status: 'ACTIVE',
         tasks: tasks
       };
 

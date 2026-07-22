@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowUpRight, Search, SlidersHorizontal, MoreHorizontal, Loader2 } from 'lucide-react';
@@ -76,6 +77,7 @@ const getAvatarColorClass = (roleColor) => {
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const [hoveredSprint, setHoveredSprint] = useState(null);
@@ -146,6 +148,7 @@ const Dashboard = () => {
                     completedTasks,
                     activeTasks,
                     overdueTasks,
+                    workspaceUrl: s.workspace_url,
                     rawTasks: s.tasks || []
                   };
                 });
@@ -235,6 +238,10 @@ const Dashboard = () => {
 
   const maxSprintsCount = longestSprintsProject.length;
 
+  const chartWidth = useMemo(() => {
+    return maxSprintsCount > 6 ? 800 + (maxSprintsCount - 6) * 128 : 800;
+  }, [maxSprintsCount]);
+
   const getY = (tasks) => {
     const ratio = tasks / maxTasks;
     return 380 - ratio * (380 - 40);
@@ -242,7 +249,8 @@ const Dashboard = () => {
 
   const getX = (index) => {
     const divisor = maxSprintsCount > 1 ? maxSprintsCount - 1 : 1;
-    return 90 + (index / divisor) * 640;
+    const availableWidth = chartWidth - 160;
+    return 90 + (index / divisor) * availableWidth;
   };
 
   const yTicks = useMemo(() => {
@@ -290,7 +298,7 @@ const Dashboard = () => {
     setHoveredSprint({
       sprint,
       project,
-      xPercent: (x / 800) * 100,
+      xPercent: (x / chartWidth) * 100,
       yPercent: (y / 450) * 100
     });
   };
@@ -388,10 +396,16 @@ const Dashboard = () => {
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         
         {/* Card 1: Total Project */}
-        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-          }`}>
+        <div 
+          onClick={() => navigate('/projects')}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer hover:scale-[1.01] ${
+            darkMode 
+              ? 'bg-slate-900 border-slate-800 hover:border-slate-700' 
+              : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50 hover:border-slate-200'
+          }`}
+        >
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-slate-400">Total Project</span>
+            <span className="text-sm font-medium text-slate-400">Total Active Projects</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
               <ArrowUpRight className="w-4 h-4 text-slate-500" />
             </div>
@@ -484,10 +498,19 @@ const Dashboard = () => {
             sprintBoxesData.slice(0, 4).map((item, index) => {
               const config = dynamicProjectConfig[item.project] || { color: '#94a3b8' };
               const sprint = item.sprint;
+              const CardTag = sprint.workspaceUrl ? 'a' : 'div';
+              const cardProps = sprint.workspaceUrl ? {
+                href: sprint.workspaceUrl,
+                target: '_blank',
+                rel: 'noopener noreferrer'
+              } : {};
               return (
-                <div 
+                <CardTag 
                   key={`${item.project}-${sprint.name}`}
+                  {...cardProps}
                   className={`p-5 rounded-3xl border transition-all duration-300 flex flex-col justify-between ${
+                    sprint.workspaceUrl ? 'hover:scale-[1.01] hover:border-blue-500/50 cursor-pointer block' : ''
+                  } ${
                     sprint.status === 'Delayed'
                       ? (darkMode 
                           ? 'bg-slate-900 border-rose-500/40 text-white shadow-lg shadow-rose-950/20' 
@@ -564,7 +587,7 @@ const Dashboard = () => {
                       </span>
                     </div>
                   </div>
-                </div>
+                </CardTag>
               );
             })
           ) : (
@@ -627,208 +650,214 @@ const Dashboard = () => {
         </div>
 
         {/* SVG Timeline Chart Wrapper */}
-        <div className="relative w-full h-[450px] overflow-visible">
-          {longestSprintsProject.length > 0 ? (
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 800 450" preserveAspectRatio="none">
-              {/* Y-Axis Horizontal Grid Lines and Labels */}
-              {yTicks.map((tick, i) => (
-                <g key={i} className="text-[10px] font-bold fill-slate-400 select-none">
-                  <line
-                    x1="80"
-                    y1={tick.y}
-                    x2="750"
-                    y2={tick.y}
-                    className="stroke-slate-100 dark:stroke-slate-800/60"
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                  />
-                  <text
-                    x="70"
-                    y={tick.y + 3}
-                    textAnchor="end"
-                  >
-                    {tick.label}
-                  </text>
-                </g>
-              ))}
-
-              {/* Vertical grid lines mapping to Sprints */}
-              {longestSprintsProject.map((s, i) => {
-                const x = getX(i);
-                return (
-                  <line
-                    key={i}
-                    x1={x}
-                    y1="40"
-                    x2={x}
-                    y2="380"
-                    className="stroke-slate-100 dark:stroke-slate-800/40"
-                    strokeWidth="1"
-                  />
-                );
-              })}
-
-              {/* Connecting lines for each project */}
-              {Object.entries(projectsData).map(([projName, sprints]) => {
-                const config = dynamicProjectConfig[projName] || { color: '#94a3b8' };
-                const isHovered = hoveredSprint?.project === projName;
-                const hasActiveHover = hoveredSprint !== null;
-                const opacity = hasActiveHover ? (isHovered ? 'opacity-100' : 'opacity-20') : 'opacity-70';
-                const filteredSprints = sprints.filter(s => s.status !== 'Not Planned');
-                return (
-                  <path
-                    key={projName}
-                    d={filteredSprints.map((s, i) => {
-                      const x = getX(i);
-                      const y = getY(s.completedTasks);
-                      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-                    }).join(' ')}
-                    fill="none"
-                    stroke={config.color}
-                    strokeWidth="3"
-                    className={`transition-all duration-300 ${opacity}`}
-                  />
-                );
-              })}
-
-              {/* Interactive Sprint Dots for all projects */}
-              {Object.entries(projectsData).map(([projName, sprints]) => {
-                const isHoveredProj = hoveredSprint?.project === projName;
-                const hasActiveHover = hoveredSprint !== null;
-                const opacity = hasActiveHover ? (isHoveredProj ? 'opacity-100' : 'opacity-20') : 'opacity-100';
-                const filteredSprints = sprints.filter(s => s.status !== 'Not Planned');
-
-                return (
-                  <g
-                    key={projName}
-                    className={`transition-all duration-300 ${opacity}`}
-                  >
-                    {filteredSprints.map((s, i) => {
-                      const x = getX(i);
-                      const y = getY(s.completedTasks);
-                      const style = getStatusStyle(s.status);
-                      const isHoveredDot = hoveredSprint?.sprint === s;
-
-                      return (
-                        <g
-                          key={i}
-                          className="cursor-pointer group/dot"
-                          onMouseEnter={() => handleMouseEnter(s, i, projName)}
-                          onMouseLeave={() => setHoveredSprint(null)}
-                        >
-                          {/* Invisible hover detector target */}
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="16"
-                            fill="transparent"
-                          />
-
-                          {/* Outer Hover Ring (glow) */}
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="12"
-                            className={`transition-all duration-300 ${isHoveredDot ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}
-                            fill={style.stroke}
-                            fillOpacity="0.15"
-                            stroke={style.stroke}
-                            strokeOpacity="0.4"
-                            strokeWidth="1.5"
-                            style={{ transformOrigin: `${x}px ${y}px` }}
-                          />
-
-                          {/* Inner Glow Circle */}
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="6"
-                            fill={style.fill}
-                            className="transition-all duration-300 group-hover/dot:scale-110"
-                            style={{ transformOrigin: `${x}px ${y}px` }}
-                          />
-
-                          {/* Center core dot */}
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="3"
-                            fill={darkMode ? '#0f172a' : '#ffffff'}
-                          />
-                        </g>
-                      );
-                    })}
+        <div className="relative w-full h-[450px] overflow-x-auto overflow-y-hidden custom-scrollbar">
+          <div style={{ width: `${chartWidth}px`, height: '100%' }} className="relative">
+            {longestSprintsProject.length > 0 ? (
+              <svg 
+                style={{ width: `${chartWidth}px`, height: '100%' }}
+                viewBox={`0 0 ${chartWidth} 450`} 
+                className="overflow-visible"
+              >
+                {/* Y-Axis Horizontal Grid Lines and Labels */}
+                {yTicks.map((tick, i) => (
+                  <g key={i} className="text-[10px] font-bold fill-slate-400 select-none">
+                    <line
+                      x1="80"
+                      y1={tick.y}
+                      x2={chartWidth - 50}
+                      y2={tick.y}
+                      className="stroke-slate-100 dark:stroke-slate-800/60"
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                    />
+                    <text
+                      x="70"
+                      y={tick.y + 3}
+                      textAnchor="end"
+                    >
+                      {tick.label}
+                    </text>
                   </g>
-                );
-              })}
+                ))}
 
-              {/* X-Axis labels inside the SVG */}
-              {longestSprintsProject.map((s, i) => {
-                const x = getX(i);
-                return (
-                  <text
-                    key={i}
-                    x={x}
-                    y="415"
-                    textAnchor="middle"
-                    className="text-xs font-bold fill-slate-400 select-none"
-                  >
-                    Sprint {i + 1}
-                  </text>
-                );
-              })}
-            </svg>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-xs text-slate-400">No project timelines available to chart</span>
-            </div>
-          )}
+                {/* Vertical grid lines mapping to Sprints */}
+                {longestSprintsProject.map((s, i) => {
+                  const x = getX(i);
+                  return (
+                    <line
+                      key={i}
+                      x1={x}
+                      y1="40"
+                      x2={x}
+                      y2="380"
+                      className="stroke-slate-100 dark:stroke-slate-800/40"
+                      strokeWidth="1"
+                    />
+                  );
+                })}
 
-          {/* Floating Tooltip */}
-          {hoveredSprint && (
-            <div
-              className={`absolute p-4 rounded-2xl shadow-xl border z-20 pointer-events-none transition-all duration-200 text-left ${darkMode ? 'bg-slate-950/95 border-slate-800 text-white backdrop-blur-md' : 'bg-white/95 border-slate-100 text-slate-900 backdrop-blur-md'
-                }`}
-              style={{
-                left: `${hoveredSprint.xPercent}%`,
-                top: `${hoveredSprint.yPercent}%`,
-                transform: 'translate(-50%, -108%)',
-                minWidth: '200px'
-              }}
-            >
-              <div className="font-semibold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
-                {hoveredSprint.project}
+                {/* Connecting lines for each project */}
+                {Object.entries(projectsData).map(([projName, sprints]) => {
+                  const config = dynamicProjectConfig[projName] || { color: '#94a3b8' };
+                  const isHovered = hoveredSprint?.project === projName;
+                  const hasActiveHover = hoveredSprint !== null;
+                  const opacity = hasActiveHover ? (isHovered ? 'opacity-100' : 'opacity-20') : 'opacity-70';
+                  const filteredSprints = sprints.filter(s => s.status !== 'Not Planned');
+                  return (
+                    <path
+                      key={projName}
+                      d={filteredSprints.map((s, i) => {
+                        const x = getX(i);
+                        const y = getY(s.completedTasks);
+                        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+                      }).join(' ')}
+                      fill="none"
+                      stroke={config.color}
+                      strokeWidth="3"
+                      className={`transition-all duration-300 ${opacity}`}
+                    />
+                  );
+                })}
+
+                {/* Interactive Sprint Dots for all projects */}
+                {Object.entries(projectsData).map(([projName, sprints]) => {
+                  const isHoveredProj = hoveredSprint?.project === projName;
+                  const hasActiveHover = hoveredSprint !== null;
+                  const opacity = hasActiveHover ? (isHoveredProj ? 'opacity-100' : 'opacity-20') : 'opacity-100';
+                  const filteredSprints = sprints.filter(s => s.status !== 'Not Planned');
+
+                  return (
+                    <g
+                      key={projName}
+                      className={`transition-all duration-300 ${opacity}`}
+                    >
+                      {filteredSprints.map((s, i) => {
+                        const x = getX(i);
+                        const y = getY(s.completedTasks);
+                        const style = getStatusStyle(s.status);
+                        const isHoveredDot = hoveredSprint?.sprint === s;
+
+                        return (
+                          <g
+                            key={i}
+                            className="cursor-pointer group/dot"
+                            onMouseEnter={() => handleMouseEnter(s, i, projName)}
+                            onMouseLeave={() => setHoveredSprint(null)}
+                          >
+                            {/* Invisible hover detector target */}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r="16"
+                              fill="transparent"
+                            />
+
+                            {/* Outer Hover Ring (glow) */}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r="12"
+                              className={`transition-all duration-300 ${isHoveredDot ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}
+                              fill={style.stroke}
+                              fillOpacity="0.15"
+                              stroke={style.stroke}
+                              strokeOpacity="0.4"
+                              strokeWidth="1.5"
+                              style={{ transformOrigin: `${x}px ${y}px` }}
+                            />
+
+                            {/* Inner Glow Circle */}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r="6"
+                              fill={style.fill}
+                              className="transition-all duration-300 group-hover/dot:scale-110"
+                              style={{ transformOrigin: `${x}px ${y}px` }}
+                            />
+
+                            {/* Center core dot */}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r="3"
+                              fill={darkMode ? '#0f172a' : '#ffffff'}
+                            />
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })}
+
+                {/* X-Axis labels inside the SVG */}
+                {longestSprintsProject.map((s, i) => {
+                  const x = getX(i);
+                  return (
+                    <text
+                      key={i}
+                      x={x}
+                      y="415"
+                      textAnchor="middle"
+                      className="text-xs font-bold fill-slate-400 select-none"
+                    >
+                      Sprint {i + 1}
+                    </text>
+                  );
+                })}
+              </svg>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-xs text-slate-400">No project timelines available to chart</span>
               </div>
-              <div className="font-bold text-sm mb-1">{hoveredSprint.sprint.name}</div>
-              <div className="text-[10px] text-slate-400 mb-2">
-                {formatDate(hoveredSprint.sprint.startDate)} - {formatDate(hoveredSprint.sprint.endDate)}
-              </div>
+            )}
 
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className={`inline-block w-2 h-2 rounded-full ${hoveredSprint.sprint.status === 'Completed' ? 'bg-emerald-500' :
-                    hoveredSprint.sprint.status === 'In Progress' ? 'bg-indigo-500' :
-                      hoveredSprint.sprint.status === 'Delayed' ? 'bg-rose-500' :
-                        'bg-slate-400'
-                  }`} />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {hoveredSprint.sprint.status}
-                </span>
-              </div>
-
-              {hoveredSprint.sprint.status !== 'Planned' && (
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-tight">Completed</span>
-                    <span className="font-extrabold text-orange-500 text-sm">{hoveredSprint.sprint.completedTasks} Tasks</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-tight">Active</span>
-                    <span className="font-extrabold text-indigo-500 text-sm">{hoveredSprint.sprint.activeTasks} Tasks</span>
-                  </div>
+            {/* Floating Tooltip */}
+            {hoveredSprint && (
+              <div
+                className={`absolute p-4 rounded-2xl shadow-xl border z-20 pointer-events-none transition-all duration-200 text-left ${darkMode ? 'bg-slate-950/95 border-slate-800 text-white backdrop-blur-md' : 'bg-white/95 border-slate-100 text-slate-900 backdrop-blur-md'
+                  }`}
+                style={{
+                  left: `${hoveredSprint.xPercent}%`,
+                  top: `${hoveredSprint.yPercent}%`,
+                  transform: 'translate(-50%, -108%)',
+                  minWidth: '200px'
+                }}
+              >
+                <div className="font-semibold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
+                  {hoveredSprint.project}
                 </div>
-              )}
-            </div>
-          )}
+                <div className="font-bold text-sm mb-1">{hoveredSprint.sprint.name}</div>
+                <div className="text-[10px] text-slate-400 mb-2">
+                  {formatDate(hoveredSprint.sprint.startDate)} - {formatDate(hoveredSprint.sprint.endDate)}
+                </div>
+
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${hoveredSprint.sprint.status === 'Completed' ? 'bg-emerald-500' :
+                      hoveredSprint.sprint.status === 'In Progress' ? 'bg-indigo-500' :
+                        hoveredSprint.sprint.status === 'Delayed' ? 'bg-rose-500' :
+                          'bg-slate-400'
+                    }`} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    {hoveredSprint.sprint.status}
+                  </span>
+                </div>
+
+                {hoveredSprint.sprint.status !== 'Planned' && (
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-tight">Completed</span>
+                      <span className="font-extrabold text-orange-500 text-sm">{hoveredSprint.sprint.completedTasks} Tasks</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-tight">Active</span>
+                      <span className="font-extrabold text-indigo-500 text-sm">{hoveredSprint.sprint.activeTasks} Tasks</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
       </div>

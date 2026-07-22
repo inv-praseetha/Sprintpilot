@@ -406,7 +406,7 @@ class SprintListCreateView(APIView):
                     milestone=milestone,
                     start_date=start_date,
                     end_date=end_date,
-                    status=data.get('status') or 'PLANNED'
+                    status=data.get('status') or 'ACTIVE'
                 )
 
                 tasks_data = data.get('tasks') or []
