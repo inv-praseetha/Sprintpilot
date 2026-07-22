@@ -410,6 +410,10 @@ export default function SprintDetail() {
       const payload = selectedTaskIds.size > 0 ? { task_ids: Array.from(selectedTaskIds) } : {};
       const response = await apiClient.post(`sprints/${sprintId}/sync-backlog/`, payload);
       alert(`Success: ${response.data.detail}`);
+      
+      // Auto-refresh the page data so the Backlog link and statuses update immediately
+      await refreshSprint();
+      
     } catch (err) {
       console.error('[SprintDetail] Error syncing to Backlog:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Failed to sync tasks to Backlog.';

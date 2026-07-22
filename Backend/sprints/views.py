@@ -572,7 +572,7 @@ class SprintTaskUpdateView(APIView):
         if task.backlog_task_id:
             from backlog.services.backlog_client import BacklogService
             try:
-                BacklogService().delete_issue(task.backlog_task_id)
+                BacklogService(project_key=task.sprint.project.project_id).delete_issue(task.backlog_task_id)
             except Exception as e:
                 return Response(
                     {"detail": f"Failed to delete task from Backlog: {str(e)}"},

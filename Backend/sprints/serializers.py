@@ -103,12 +103,13 @@ class SprintSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'project', 'created_at']
 
     def get_workspace_url(self, obj):
+        if not obj.backlog_version_id or not obj.backlog_project_id:
+            return None
+            
         from decouple import config
         workspace = config('BACKLOG_WORKSPACE_URL', default='').rstrip('/')
-        project_key = config('BACKLOG_PROJECT_KEY', default='')
+        project_key = obj.project.project_id if obj.project and obj.project.project_id else config('BACKLOG_PROJECT_KEY', default='')
         
         if workspace and project_key:
-            if obj.backlog_version_id and obj.backlog_project_id:
-                return f"{workspace}/find/{project_key}?allOver=false&fixedVersionId={obj.backlog_version_id}&limit=20&offset=0&order=false&projectId={obj.backlog_project_id}&simpleSearch=true&sort=UPDATED&statusId=1&statusId=2&statusId=3"
-            return f"{workspace}/projects/{project_key}"
-        return workspace if workspace else None
+            return f"{workspace}/find/{project_key}?allOver=false&fixedVersionId={obj.backlog_version_id}&limit=20&offset=0&order=false&projectId={obj.backlog_project_id}&simpleSearch=true&sort=UPDATED&statusId=1&statusId=2&statusId=3"
+        return None
