@@ -199,8 +199,10 @@ const Dashboard = () => {
     Object.values(projectsData).forEach(sprints => {
       sprints.forEach(s => {
         totalTasks += (s.completedTasks + s.activeTasks);
-        tasksPending += s.activeTasks;
-        tasksOverdue += s.overdueTasks;
+        if (s.status === 'In Progress' || s.status === 'Delayed') {
+          tasksPending += s.activeTasks;
+          tasksOverdue += s.overdueTasks;
+        }
       });
     });
 
