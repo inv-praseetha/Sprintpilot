@@ -213,7 +213,41 @@ class SprintDownloadScheduleView(APIView):
                         cell.number_format = style_info['number_format']
 
                     # Write values
-                    ws.cell(row=current_row, column=2, value=task.title) # Column B: Task Name
+                    cell_b = ws.cell(row=current_row, column=2)
+                    if task.jira_id:
+                        from decouple import config
+                        jira_base = config('JIRA_WORKSPACE_URL', default=config('JIRA_BASE_URL', default='https://jira.atlassian.com'))
+                        clean_base = jira_base.rstrip('/')
+                        jira_url = task.jira_id if task.jira_id.startswith('http') else f"{clean_base}/browse/{task.jira_id}"
+                        
+                        # Use Excel HYPERLINK formula with CHAR(10) to force newline in all sheet viewers
+                        clean_title = task.title.replace('"', '""')
+                        cell_b.value = f'=HYPERLINK("{jira_url}", "{clean_title}" & CHAR(10) & "{jira_url}")'
+                        
+                        # Style the font to look like a hyperlink
+                        cell_b.font = openpyxl.styles.Font(
+                            name=cell_b.font.name if cell_b.font else 'Segoe UI',
+                            size=cell_b.font.size if cell_b.font else 10,
+                            bold=cell_b.font.bold if cell_b.font else False,
+                            italic=cell_b.font.italic if cell_b.font else False,
+                            underline='single',
+                            color='0563C1'
+                        )
+                        
+                        # Enable wrap text
+                        orig_align = cell_b.alignment
+                        cell_b.alignment = openpyxl.styles.Alignment(
+                            horizontal=orig_align.horizontal if orig_align else None,
+                            vertical=orig_align.vertical if orig_align else None,
+                            text_rotation=orig_align.text_rotation if orig_align else 0,
+                            wrap_text=True,
+                            shrink_to_fit=orig_align.shrink_to_fit if orig_align else False,
+                            indent=orig_align.indent if orig_align else 0
+                        )
+                        # Set height to accommodate two lines
+                        ws.row_dimensions[current_row].height = 28
+                    else:
+                        cell_b.value = task.title
                     
                     # Column C: Assigned To
                     assignee_name = ""

@@ -1327,11 +1327,11 @@ export default function SprintDetail() {
                                 >
                                   <div className="relative">
                                     <div className="truncate max-w-[200px]">
-                                      {task.recommendation_reason || task.jira_id || <span className="opacity-30">-</span>}
+                                      {task.recommendation_reason || <span className="opacity-30">-</span>}
                                     </div>
-                                    {(task.recommendation_reason || task.jira_id) && (
+                                    {(task.recommendation_reason) && (
                                       <div className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 absolute top-1/2 -translate-y-1/2 left-0 z-50 p-3 rounded-lg shadow-2xl border text-xs font-normal not-italic whitespace-normal break-words w-[400px] bg-slate-900 border-slate-750 text-white dark:bg-slate-850 dark:border-slate-700">
-                                        {task.recommendation_reason || task.jira_id}
+                                        {task.recommendation_reason}
                                       </div>
                                     )}
                                   </div>
