@@ -149,7 +149,8 @@ const Dashboard = () => {
                     activeTasks,
                     overdueTasks,
                     workspaceUrl: s.workspace_url,
-                    rawTasks: s.tasks || []
+                    rawTasks: s.tasks || [],
+                    createdAt: s.created_at
                   };
                 });
               } else {
@@ -330,7 +331,52 @@ const Dashboard = () => {
         }
       });
     });
-    return list;
+
+    // Group active sprints by project
+    const groups = {};
+    list.forEach(item => {
+      const proj = item.project;
+      if (!groups[proj]) {
+        groups[proj] = [];
+      }
+      groups[proj].push(item);
+    });
+
+    // Sort sprints within each project group descending by createdAt
+    Object.values(groups).forEach(projItems => {
+      projItems.sort((a, b) => {
+        const dateA = a.sprint.createdAt ? new Date(a.sprint.createdAt).getTime() : 0;
+        const dateB = b.sprint.createdAt ? new Date(b.sprint.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    });
+
+    // Separate into latest sprint per project and remaining (other) sprints
+    const latestSprintsPerProject = [];
+    const otherSprints = [];
+    Object.entries(groups).forEach(([_, projItems]) => {
+      if (projItems.length > 0) {
+        latestSprintsPerProject.push(projItems[0]);
+        otherSprints.push(...projItems.slice(1));
+      }
+    });
+
+    // Sort the latest-sprints list descending by createdAt
+    latestSprintsPerProject.sort((a, b) => {
+      const dateA = a.sprint.createdAt ? new Date(a.sprint.createdAt).getTime() : 0;
+      const dateB = b.sprint.createdAt ? new Date(b.sprint.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    // Sort the other-sprints list descending by createdAt
+    otherSprints.sort((a, b) => {
+      const dateA = a.sprint.createdAt ? new Date(a.sprint.createdAt).getTime() : 0;
+      const dateB = b.sprint.createdAt ? new Date(b.sprint.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    // Return the combined array
+    return [...latestSprintsPerProject, ...otherSprints];
   }, [projectsData]);
 
   const formatBoxDateRange = (start, end) => {
