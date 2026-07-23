@@ -632,6 +632,18 @@ export default function SprintDetail() {
 
   const isUnscheduled = tasks.length > 0 && tasks.every(t => !t.planned_start_date && !t.planned_end_date);
 
+  const checkSyncNeeded = (t) => {
+    if (!t.synced_at || t.synced_at === 'null' || t.synced_at === 'None') return true;
+    if (!t.updated_at) return false;
+    const updateTime = new Date(t.updated_at).getTime();
+    const syncTime = new Date(t.synced_at).getTime();
+    return updateTime > syncTime + 1000;
+  };
+
+  const isSyncNeeded = selectedTaskIds.size > 0 
+    ? tasks.filter(t => selectedTaskIds.has(t.id)).some(checkSyncNeeded)
+    : tasks.length > 0 && tasks.some(checkSyncNeeded);
+
   return (
     <div className={`p-6 sm:p-8 mx-auto min-h-screen ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'}`}>
 
@@ -756,7 +768,7 @@ export default function SprintDetail() {
                       </span>
                       <button
                         onClick={handleSyncClick}
-                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || !isSyncNeeded}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-655'
@@ -829,7 +841,7 @@ export default function SprintDetail() {
                       </button>
                       <button
                         onClick={handleSyncClick}
-                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || !isSyncNeeded}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-600'
