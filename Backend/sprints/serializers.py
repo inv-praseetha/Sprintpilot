@@ -51,11 +51,12 @@ class SprintTaskSerializer(serializers.ModelSerializer):
             'planned_end_date',
             'backlog_task_id',
             'backlog_task_url',
+            'synced_at',
             'created_at',
             'updated_at',
             'recommendation_reason'
         ]
-        read_only_fields = ['id', 'sprint', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'sprint', 'synced_at', 'created_at', 'updated_at']
 
     def get_backlog_task_url(self, obj):
         if obj.backlog_task_id:
