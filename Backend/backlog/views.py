@@ -45,9 +45,9 @@ class SprintSyncBacklogView(APIView):
         
         task_ids = request.data.get('task_ids', [])
         if task_ids:
-            tasks = sprint.tasks.filter(id__in=task_ids)
+            tasks = sprint.tasks.filter(id__in=task_ids, is_deleted=False)
         else:
-            tasks = sprint.tasks.all()
+            tasks = sprint.tasks.filter(is_deleted=False)
             
         errors = []
 
