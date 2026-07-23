@@ -101,14 +101,12 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-slate-950/40 backdrop-blur-md">
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-2xl rounded-3xl border shadow-2xl my-auto transform transition-all flex flex-col max-h-[90vh] ${
-          darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-850'
-        }`}
+        className={`w-full max-w-2xl rounded-3xl border shadow-2xl my-auto transform transition-all flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-850'
+          }`}
       >
         {/* Modal Header */}
-        <div className={`flex items-center justify-between px-6 py-5 border-b rounded-t-3xl ${
-          darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
-        }`}>
+        <div className={`flex items-center justify-between px-6 py-5 border-b rounded-t-3xl ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
+          }`}>
           <div className="text-left">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-orange-500 animate-pulse" />
@@ -118,9 +116,8 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-xl transition-colors cursor-pointer ${
-              darkMode ? 'bg-slate-800 text-slate-400 hover:text-slate-200' : 'bg-slate-100 text-slate-400 hover:text-slate-650'
-            }`}
+            className={`p-2 rounded-xl transition-colors cursor-pointer ${darkMode ? 'bg-slate-800 text-slate-400 hover:text-slate-200' : 'bg-slate-100 text-slate-400 hover:text-slate-650'
+              }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -145,11 +142,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
               value={formData.title}
               onChange={handleChange}
               placeholder="e.g. Implement User Authentication Flow"
-              className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                darkMode
+              className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
                   ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white placeholder-slate-600'
                   : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800 placeholder-slate-400'
-              }`}
+                }`}
               required
             />
           </div>
@@ -166,11 +162,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                 value={formData.jira_id}
                 onChange={handleChange}
                 placeholder="e.g. SP-101"
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                  darkMode
+                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white placeholder-slate-600'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800 placeholder-slate-400'
-                }`}
+                  }`}
               />
             </div>
             <div>
@@ -181,11 +176,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                  darkMode
+                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-                }`}
+                  }`}
                 required
               >
                 <option value="UI">UI Development</option>
@@ -202,11 +196,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                 name="priority"
                 value={formData.priority}
                 onChange={handleChange}
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                  darkMode
+                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-                }`}
+                  }`}
               >
                 <option value="Low">Low</option>
                 <option value="Normal">Normal</option>
@@ -226,11 +219,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                  darkMode
+                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-                }`}
+                  }`}
                 required
               >
                 <option value="OPEN">TODO / Open</option>
@@ -247,17 +239,16 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                 name="assigned_employee_id"
                 value={formData.assigned_employee_id}
                 onChange={handleChange}
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
-                  darkMode
+                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-                }`}
+                  }`}
                 required
               >
                 <option value="">Choose an assignee...</option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
-                    {emp.user.full_name} ({emp.role})
+                    {emp.user.full_name}
                   </option>
                 ))}
               </select>
@@ -309,11 +300,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
               onChange={handleChange}
               rows={3}
               placeholder="Enter task detailed description..."
-              className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors resize-none ${
-                darkMode
+              className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors resize-none ${darkMode
                   ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                   : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
-              }`}
+                }`}
               required
             />
           </div>
@@ -324,11 +314,10 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
               type="button"
               onClick={onClose}
               disabled={loading}
-              className={`px-5 py-2.5 text-xs font-bold rounded-xl border transition-colors ${
-                darkMode
+              className={`px-5 py-2.5 text-xs font-bold rounded-xl border transition-colors ${darkMode
                   ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                   : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-              }`}
+                }`}
             >
               Cancel
             </button>

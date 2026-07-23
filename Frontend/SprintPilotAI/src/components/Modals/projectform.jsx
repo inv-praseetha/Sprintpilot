@@ -96,7 +96,7 @@ export default function ProjectForm({
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2 text-left sm:col-span-1">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project ID *</label>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project ID <span className="text-rose-500">*</span></label>
             <input
               type="text"
               required
@@ -117,7 +117,7 @@ export default function ProjectForm({
           </div>
 
           <div className="space-y-2 text-left sm:col-span-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Name *</label>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Name <span className="text-rose-500">*</span></label>
             <input
               type="text"
               required
@@ -153,7 +153,7 @@ export default function ProjectForm({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {/* Type Selection */}
         <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Type *</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project Type <span className="text-rose-500">*</span></label>
           <div className="grid grid-cols-2 gap-3">
             {['AGILE', 'WATERFALL'].map((t) => {
               const isEditing = !!editingProjectId;
@@ -207,9 +207,10 @@ export default function ProjectForm({
 
         {/* Target Team Size */}
         <div className="space-y-2 text-left">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Target Team Size</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Target Team Size <span className="text-rose-500">*</span></label>
           <input
             type="number"
+            required
             min="0"
             placeholder="0"
             value={teamSize}
@@ -229,7 +230,7 @@ export default function ProjectForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Start Date *
+                Start Date <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
@@ -246,7 +247,7 @@ export default function ProjectForm({
 
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                End Date *
+                End Date <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
@@ -272,7 +273,7 @@ export default function ProjectForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Start Date *
+                Start Date <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
@@ -288,7 +289,7 @@ export default function ProjectForm({
             </div>
 
             <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Duration (Days) *</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Duration (Days) <span className="text-rose-500">*</span></label>
               <input
                 type="number"
                 required
@@ -313,7 +314,7 @@ export default function ProjectForm({
 
       {/* Team Lead Selection */}
       <div className="space-y-2 text-left">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Team Lead *</label>
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Team Lead <span className="text-rose-500">*</span></label>
         <select
           required
           value={teamLead}

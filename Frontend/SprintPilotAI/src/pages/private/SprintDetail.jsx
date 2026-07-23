@@ -403,6 +403,7 @@ export default function SprintDetail() {
     setShowSyncConfirm(true);
   };
 
+  
   const performSync = async () => {
     setShowSyncConfirm(false);
     setIsSyncing(true);

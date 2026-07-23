@@ -177,7 +177,7 @@ class ProjectDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        serializer = ProjectCreateSerializer(data=request.data)
+        serializer = ProjectCreateSerializer(instance=project, data=request.data)
         serializer.is_valid(raise_exception=True)
 
         updated_project = ProjectService.update_project(
