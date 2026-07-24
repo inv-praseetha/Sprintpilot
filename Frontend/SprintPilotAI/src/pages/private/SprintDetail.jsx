@@ -75,7 +75,7 @@ const getProgressPercentage = (status) => {
 };
 
 // Generates calendar columns starting from the Monday of the start date week to the Friday of the end date week
-const generateTimelineDays = (startStr, endStr) => {
+const generateTimelineDays = (startStr, endStr, holidays = []) => {
   const sStr = startStr || '2026-07-15';
   const eStr = endStr || '2026-07-28';
 
@@ -109,10 +109,14 @@ const generateTimelineDays = (startStr, endStr) => {
     const d = String(current.getDate()).padStart(2, '0');
     const dateStr = `${y}-${m}-${d}`;
 
+    const isHoliday = holidays.includes(dateStr);
+
     daysList.push({
       dayNum: dNum,
       dayName: dName,
       isWeekend,
+      isHoliday,
+      isNonWorkingDay: isWeekend || isHoliday,
       dateStr,
       isSprintStart: dateStr === sStr,
       isSprintEnd: dateStr === eStr
@@ -136,6 +140,7 @@ export default function SprintDetail() {
   const [originalTasks, setOriginalTasks] = useState([]); // to support Cancel action
   const [employees, setEmployees] = useState([]);
   const [timelineDaysList, setTimelineDaysList] = useState([]);
+  const [holidays, setHolidays] = useState([]);
 
   const [pageLoading, setPageLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -167,6 +172,18 @@ export default function SprintDetail() {
 
       setTasks(dbTasks);
       setOriginalTasks(JSON.parse(JSON.stringify(dbTasks)));
+      
+      let fetchedHolidays = holidays;
+      try {
+        const holidaysRes = await apiClient.get(`projects/${sprintData.project}/holidays/`);
+        fetchedHolidays = holidaysRes.data.map(h => h.date);
+        setHolidays(fetchedHolidays);
+      } catch (e) {
+        console.error("Failed to fetch holidays", e);
+      }
+
+      const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, fetchedHolidays);
+      setTimelineDaysList(days);
     } catch (err) {
       console.error('[SprintDetail] Error refreshing sprint details:', err);
     }
@@ -234,13 +251,23 @@ export default function SprintDetail() {
         setTasks(dbTasks);
         setOriginalTasks(JSON.parse(JSON.stringify(dbTasks))); // Deep clone for rollback
 
-        // Generate timeline range based on Sprint boundaries
-        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date);
-        setTimelineDaysList(days);
-
         // 2. Fetch Project details to get project members
         const projectRes = await apiClient.get(`projects/${sprintData.project}/`);
         setEmployees(projectRes.data?.members || []);
+
+        // 3. Fetch Project Holidays
+        let fetchedHolidays = [];
+        try {
+          const holidaysRes = await apiClient.get(`projects/${sprintData.project}/holidays/`);
+          fetchedHolidays = holidaysRes.data.map(h => h.date);
+          setHolidays(fetchedHolidays);
+        } catch (e) {
+          console.error("Failed to fetch holidays", e);
+        }
+
+        // Generate timeline range based on Sprint boundaries
+        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, fetchedHolidays);
+        setTimelineDaysList(days);
       } catch (err) {
         console.error('[SprintDetail] Error loading data:', err);
       } finally {
@@ -249,6 +276,18 @@ export default function SprintDetail() {
     };
     fetchData();
   }, [sprintId]);
+
+  const handleToggleHoliday = async (dateStr) => {
+    if (!sprint || sprint.project_status === 'COMPLETED' || sprint.status === 'COMPLETED') return;
+    
+    try {
+      await apiClient.post(`projects/${sprint.project}/holidays/`, { date: dateStr });
+      await refreshSprint();
+    } catch (err) {
+      console.error('Failed to toggle holiday', err);
+      alert('Failed to toggle holiday. Please try again.');
+    }
+  };
 
   const handleStartGeneration = async () => {
     setIsGenerating(true);
@@ -717,7 +756,7 @@ export default function SprintDetail() {
 
                 <button
                   onClick={handleStartGeneration}
-                  disabled={isGenerating || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                  disabled={isGenerating || isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
                   className="px-6 py-3 text-xs font-black tracking-wider uppercase rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md shadow-orange-500/25 dark:shadow-orange-500/15 hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 active:scale-98 cursor-pointer flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? (
@@ -783,7 +822,7 @@ export default function SprintDetail() {
                       </button>
                       <button
                         onClick={handleBulkDelete}
-                        disabled={sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                             ? 'border-red-950/40 hover:bg-red-900/20 text-red-400'
                             : 'border-red-200 hover:bg-red-50 text-red-600'
@@ -794,7 +833,8 @@ export default function SprintDetail() {
                       </button>
                       <button
                         onClick={() => setSelectedTaskIds(new Set())}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${darkMode
+                        disabled={isSyncing}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-655'
                           }`}
@@ -831,7 +871,8 @@ export default function SprintDetail() {
                     <>
                       <button
                         onClick={handleDownloadSchedule}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors ${darkMode
+                        disabled={isSyncing}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                           }`}
@@ -856,7 +897,7 @@ export default function SprintDetail() {
                       </button>
                       <button
                         onClick={() => setIsAddTaskModalOpen(true)}
-                        disabled={sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -867,7 +908,7 @@ export default function SprintDetail() {
                       </button>
                       <button
                         onClick={handleStartUpdateMode}
-                        disabled={sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
                         className="px-4 py-2 text-xs font-bold rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -877,18 +918,28 @@ export default function SprintDetail() {
                   )}
                 </div>
 
-                {/* Category Legend */}
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                  {Object.entries(categoryConfig).map(([cat, config]) => (
-                    <div key={cat} className="flex items-center gap-1.5">
-                      <div className={`w-2.5 h-2.5 rounded-md ${config.bar}`} />
-                      <span>{config.label}</span>
+                {/* Category Legend & Tips */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    {Object.entries(categoryConfig).map(([cat, config]) => (
+                      <div key={cat} className="flex items-center gap-1.5">
+                        <div className={`w-2.5 h-2.5 rounded-md ${config.bar}`} />
+                        <span>{config.label}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2.5 h-2.5 rounded-md border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-350'
+                        }`} />
+                      <span>Weekend</span>
                     </div>
-                  ))}
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-2.5 h-2.5 rounded-md border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-350'
-                      }`} />
-                    <span>Weekend</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2.5 h-2.5 rounded-md border ${darkMode ? 'bg-red-950 border-red-800' : 'bg-red-50 border-red-200'
+                        }`} />
+                      <span>Holiday</span>
+                    </div>
+                  </div>
+                  <div className="text-[10.5px] text-slate-500 font-semibold flex items-center gap-1">
+                    <span className="text-orange-500">💡 Tip:</span> Click on any Date Header (the numbers or day names) in the chart below to mark it as a Holiday.
                   </div>
                 </div>
               </div>
@@ -962,7 +1013,8 @@ export default function SprintDetail() {
                           type="checkbox"
                           checked={tasks.length > 0 && selectedTaskIds.size === tasks.length}
                           onChange={toggleSelectAll}
-                          className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer w-3.5 h-3.5"
+                          disabled={isSyncing}
+                          className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-3.5 h-3.5"
                         />
                       </th>
                       <th
@@ -1017,10 +1069,13 @@ export default function SprintDetail() {
 
                       {/* Dates */}
                       {timelineDaysList.map((day, idx) => {
-                        let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'
+                        let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 transition-colors ${!day.isWeekend ? 'cursor-pointer hover:bg-orange-500/10' : ''} ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'
                           }`;
                         if (day.isWeekend) {
-                          cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-500'
+                          cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-not-allowed ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-500'
+                            }`;
+                        } else if (day.isHoliday) {
+                          cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-pointer ${darkMode ? 'border-slate-800 bg-red-950/40 text-red-400 hover:bg-red-900/40' : 'border-slate-200 bg-red-50 text-red-500 hover:bg-red-100'
                             }`;
                         }
                         if (day.isSprintStart) {
@@ -1030,7 +1085,12 @@ export default function SprintDetail() {
                           cellStyle += ' border-r-2 border-r-orange-500';
                         }
                         return (
-                          <th key={`num-${day.dayNum}-${idx}`} className={cellStyle}>
+                          <th 
+                            key={`num-${day.dayNum}-${idx}`} 
+                            className={cellStyle}
+                            onClick={() => !day.isWeekend && handleToggleHoliday(day.dateStr)}
+                            title={!day.isWeekend ? (day.isHoliday ? 'Remove Holiday' : 'Mark as Holiday') : 'Weekend'}
+                          >
                             {day.dayNum}
                           </th>
                         );
@@ -1082,10 +1142,13 @@ export default function SprintDetail() {
 
                       {/* Day Names */}
                       {timelineDaysList.map((day, idx) => {
-                        let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-455'
+                        let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 transition-colors ${!day.isWeekend ? 'cursor-pointer hover:bg-orange-500/10' : ''} ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-455'
                           }`;
                         if (day.isWeekend) {
-                          cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
+                          cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-not-allowed ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`;
+                        } else if (day.isHoliday) {
+                          cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-pointer ${darkMode ? 'border-slate-800 bg-red-950/40 text-red-500 hover:bg-red-900/40' : 'border-slate-200 bg-red-50 text-red-400 hover:bg-red-100'
                             }`;
                         }
                         if (day.isSprintStart) {
@@ -1095,7 +1158,12 @@ export default function SprintDetail() {
                           cellStyle += ' border-r-2 border-r-orange-500';
                         }
                         return (
-                          <th key={`name-${day.dayNum}-${idx}`} className={cellStyle}>
+                          <th 
+                            key={`name-${day.dayNum}-${idx}`} 
+                            className={cellStyle}
+                            onClick={() => !day.isWeekend && handleToggleHoliday(day.dateStr)}
+                            title={!day.isWeekend ? (day.isHoliday ? 'Remove Holiday' : 'Mark as Holiday') : 'Weekend'}
+                          >
                             {day.dayName}
                           </th>
                         );
@@ -1168,6 +1236,8 @@ export default function SprintDetail() {
                                 }`;
                               if (day.isWeekend) {
                                 cellStyle += darkMode ? ' bg-slate-950/65' : ' bg-slate-100/65';
+                              } else if (day.isHoliday) {
+                                cellStyle += darkMode ? ' bg-red-950/20' : ' bg-red-50/50';
                               }
                               if (day.isSprintStart) {
                                 cellStyle += ' border-l-2 border-l-orange-500/20';
@@ -1224,7 +1294,8 @@ export default function SprintDetail() {
                                     type="checkbox"
                                     checked={selectedTaskIds.has(task.id)}
                                     onChange={() => toggleSelectTask(task.id)}
-                                    className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer w-3.5 h-3.5"
+                                    disabled={isSyncing}
+                                    className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-3.5 h-3.5"
                                   />
                                 </td>
 
@@ -1234,7 +1305,7 @@ export default function SprintDetail() {
                                   style={{ minWidth: '220px', maxWidth: '220px', width: '220px' }}
                                 >
                                   <div className="flex items-center gap-2">
-                                    <div className="truncate flex-1" title={task.title}>
+                                    <div className={`truncate flex-1 ${task.has_conflict ? 'text-red-500 font-bold' : ''}`} title={task.title}>
                                       {task.title}
                                     </div>
                                     {task.backlog_task_url && (
@@ -1357,7 +1428,7 @@ export default function SprintDetail() {
                                 >
                                   <button
                                     onClick={() => handleIndividualDelete(task.id)}
-                                    disabled={sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                                    disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
                                     className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                       darkMode 
                                         ? 'hover:bg-slate-800 text-red-400 hover:text-red-300' 
@@ -1373,7 +1444,7 @@ export default function SprintDetail() {
                                 {timelineDaysList.map((day, idx) => {
                                   const isDayInTaskRange = task.planned_start_date && task.planned_end_date &&
                                     day.dateStr >= task.planned_start_date && day.dateStr <= task.planned_end_date &&
-                                    !day.isWeekend;
+                                    !day.isWeekend && !day.isHoliday;
                                   const isBarStart = day.dateStr === task.planned_start_date;
                                   const isBarEnd = day.dateStr === task.planned_end_date;
 
@@ -1381,6 +1452,8 @@ export default function SprintDetail() {
                                     }`;
                                   if (day.isWeekend) {
                                     cellStyle += darkMode ? ' bg-slate-950/60' : ' bg-slate-100/60';
+                                  } else if (day.isHoliday) {
+                                    cellStyle += darkMode ? ' bg-red-950/20' : ' bg-red-50/50';
                                   }
                                   if (day.isSprintStart) {
                                     cellStyle += ' border-l-2 border-l-orange-500';
