@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, Code, Check, Users, Loader2, X } from 'lucide-react';
+import CustomDatePicker from '../Common/CustomDatePicker';
 
 export default function ProjectForm({
   handleSubmit,
@@ -42,6 +43,35 @@ export default function ProjectForm({
 }) {
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+
+  const getTodayStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const todayStr = getTodayStr();
+
+  const getNextDayStr = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const getPrevDayStr = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
 
   const displayedEmployees = useMemo(() => {
     if (!memberSearchQuery) return filteredEmployeesForSelection;
@@ -232,16 +262,12 @@ export default function ProjectForm({
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Start Date <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="date"
-                required
+              <CustomDatePicker
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-                  darkMode
-                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
-                }`}
+                onChange={setStartDate}
+                darkMode={darkMode}
+                minDate={editingProjectId && startDate && startDate < todayStr ? startDate : todayStr}
+                maxDate={endDate ? getPrevDayStr(endDate) : undefined}
               />
             </div>
 
@@ -249,16 +275,11 @@ export default function ProjectForm({
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 End Date <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="date"
-                required
+              <CustomDatePicker
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-                  darkMode
-                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
-                }`}
+                onChange={setEndDate}
+                darkMode={darkMode}
+                minDate={startDate ? getNextDayStr(startDate) : (editingProjectId ? undefined : getNextDayStr(todayStr))}
               />
             </div>
           </div>
@@ -275,16 +296,11 @@ export default function ProjectForm({
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Start Date <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="date"
-                required
+              <CustomDatePicker
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-                  darkMode
-                    ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-500 focus:bg-white'
-                }`}
+                onChange={setStartDate}
+                darkMode={darkMode}
+                minDate={editingProjectId && startDate && startDate < todayStr ? startDate : todayStr}
               />
             </div>
 

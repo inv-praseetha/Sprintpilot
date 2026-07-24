@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle } from 'lucide-react';
 import ProjectService from '../../services/ProjectService';
+import CustomDatePicker from '../Common/CustomDatePicker';
 
 // Category color mappings matching parent
 const categoryConfig = {
@@ -64,6 +65,35 @@ export default function TaskUploadModal({
     setErrorMsg('');
     setParsedProjectInfo({ id: '', name: '', matchedKey: '' });
     onClose();
+  };
+
+  const getTodayStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const todayStr = getTodayStr();
+
+  const getNextDayStr = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const getPrevDayStr = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
 
   const downloadSampleExcel = async () => {
@@ -385,13 +415,12 @@ export default function TaskUploadModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 block mb-1">Start Date</label>
-                      <input
-                        type="date"
+                      <CustomDatePicker
                         value={sprintStartDate}
-                        onChange={(e) => setSprintStartDate(e.target.value)}
-                        className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 focus:ring-orange-500 ${
-                          darkMode ? 'bg-slate-850 border-slate-700 text-white [color-scheme:dark]' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
+                        onChange={setSprintStartDate}
+                        darkMode={darkMode}
+                        minDate={todayStr}
+                        maxDate={projectType !== 'AGILE' && sprintEndDate ? getPrevDayStr(sprintEndDate) : undefined}
                       />
                     </div>
                     {projectType === 'AGILE' ? (
@@ -417,13 +446,11 @@ export default function TaskUploadModal({
                     ) : (
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 block mb-1">End Date</label>
-                        <input
-                          type="date"
+                        <CustomDatePicker
                           value={sprintEndDate}
-                          onChange={(e) => setSprintEndDate(e.target.value)}
-                          className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 focus:ring-orange-500 ${
-                            darkMode ? 'bg-slate-850 border-slate-700 text-white [color-scheme:dark]' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
+                          onChange={setSprintEndDate}
+                          darkMode={darkMode}
+                          minDate={sprintStartDate ? getNextDayStr(sprintStartDate) : getNextDayStr(todayStr)}
                         />
                       </div>
                     )}
