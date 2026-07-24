@@ -446,7 +446,7 @@ export default function ProjectCreation() {
         <div>
           <span className="text-sm font-semibold text-orange-500 uppercase tracking-wider">Create Project</span>
           <h1 className="text-4xl font-black tracking-tight mt-1">
-            Assign Your Sprints
+            Manage your Projects
           </h1>
         </div>
 
