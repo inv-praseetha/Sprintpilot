@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from accounts.models import Employee
 from accounts.models import EmployeeProfile
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, MinLengthValidator, MaxLengthValidator
 
 class Skill(models.Model):
     """
@@ -15,8 +15,8 @@ class Skill(models.Model):
         BACKEND = "BACKEND", "Backend"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(min_length=3,max_length=100, unique=True)
-    category = models.CharField(max_length=5, choices=Category.choices,validators=[MinLengthValidator(3)],)
+    name = models.CharField(max_length=100, unique=True, validators=[MinLengthValidator(3)])
+    category = models.CharField(max_length=10, choices=Category.choices, validators=[MinLengthValidator(2)])
     parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -47,23 +47,23 @@ class Project(models.Model):
         AGILE = "AGILE", "Agile"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project_id=models.CharField(min_length=3,max_length=10,unique=True)
-    name = models.CharField(min_length=3,max_length=255)
-    description = models.TextField(null=True, blank=True,validators=[MinValueValidator(10),MaxValue(100)])
+    project_id = models.CharField(max_length=10, validators=[MinLengthValidator(3)], unique=True)
+    name = models.CharField(max_length=255, validators=[MinLengthValidator(3)])
+    description = models.TextField(null=True, blank=True, validators=[MinLengthValidator(10), MaxLengthValidator(100)])
     created_by = models.ForeignKey(
         Employee, 
         on_delete=models.CASCADE, 
         related_name="created_projects"
     )
     status = models.CharField(
-        min_length=6,
         max_length=9, 
+        validators=[MinLengthValidator(6)],
         choices=Status.choices, 
         default=Status.ACTIVE
     )
     type = models.CharField(
-        min_length=5,
         max_length=9, 
+        validators=[MinLengthValidator(5)],
         choices=Type.choices
     )
     start_date = models.DateField(null=True, blank=True)
