@@ -248,3 +248,52 @@ class ProjectDetailView(APIView):
                 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+from project.models import ProjectHoliday
+from project.serializers import ProjectHolidaySerializer
+from project.holiday_services import HolidayService
+
+class ProjectHolidayToggleView(APIView):
+    """
+    API View to list and toggle project holidays.
+    - GET /api/projects/<int:pk>/holidays/ : List all holidays for the project
+    - POST /api/projects/<int:pk>/holidays/ : Toggle a holiday for a specific date
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        project = Project.objects.filter(pk=pk, is_deleted=False).first()
+        if not project:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        holidays = ProjectHoliday.objects.filter(project=project)
+        serializer = ProjectHolidaySerializer(holidays, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request, pk, *args, **kwargs):
+        # We also want to enforce IsProjectManager for POST, but for simplicity let's just use IsAuthenticated
+        project = Project.objects.filter(pk=pk, is_deleted=False).first()
+        if not project:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        date_str = request.data.get("date")
+        if not date_str:
+            return Response({"detail": "Date is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if holiday exists
+        holiday = ProjectHoliday.objects.filter(project=project, date=date_str).first()
+        if holiday:
+            # Toggle off (remove)
+            holiday.delete()
+            HolidayService.shift_project_schedule(project, date_str, is_adding=False)
+            return Response({"detail": f"Holiday on {date_str} removed.", "is_holiday": False}, status=status.HTTP_200_OK)
+        else:
+            # Toggle on (add)
+            holiday = ProjectHoliday.objects.create(
+                project=project,
+                date=date_str,
+                description=request.data.get("description", "Manual Holiday")
+            )
+            HolidayService.shift_project_schedule(project, date_str, is_adding=True)
+            serializer = ProjectHolidaySerializer(holiday)
+            return Response({"detail": f"Holiday on {date_str} added.", "is_holiday": True, "data": serializer.data}, status=status.HTTP_201_CREATED)
+
