@@ -280,13 +280,26 @@ export default function ProjectCreation() {
         setSubmitting(false);
         return;
       }
-      if (new Date(endDate) <= new Date(startDate)) {
-        setFormError("End Date must be greater than Start Date.");
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (end < start) {
+        setFormError("End Date must be greater than or equal to Start Date.");
         setSubmitting(false);
         return;
       }
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      if (start < today) {
+        setFormError("Start Date must be greater than or equal to today.");
+        setSubmitting(false);
+        return;
+      }
+      if (end < today) {
+        setFormError("End Date must be greater than or equal to today.");
+        setSubmitting(false);
+        return;
+      }
       const diffTime = Math.abs(end - start);
       computedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     } else {
@@ -296,6 +309,16 @@ export default function ProjectCreation() {
         setSubmitting(false);
         return;
       }
+      
+      const start = new Date(startDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (start < today) {
+        setFormError("Start Date must be greater than or equal to today.");
+        setSubmitting(false);
+        return;
+      }
+
       if (!numberOfDays || parseInt(numberOfDays, 10) <= 0) {
         setFormError("Number of days is required for Agile projects.");
         setSubmitting(false);

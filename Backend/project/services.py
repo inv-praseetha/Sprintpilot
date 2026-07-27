@@ -1,6 +1,7 @@
 from django.db import transaction
 from accounts.models import Employee, EmployeeProfile
 from project.models import Project, ProjectMember, ProjectStack, Skill
+from django.utils import timezone
 
 class ProjectService:
     """
@@ -41,8 +42,22 @@ class ProjectService:
             team_size=team_size,
             **validated_data
         )
+        #2. Project create start_Date and end_date validation check
+        start_date=validated_data.get("start_date")
+        end_date=validated_data.get("end_date")
+        today=timezone.localdate()
+        if start_date and end_date:
+            if end_date < start_date:
+                raise ValidationError("end_date must be greater than or equal to start_date")
+            if start_date < today:
+                raise ValidationError("start_date must be greater than or equal to today")
+            if end_date < today:
+                raise ValidationError("end_date must be greater than or equal to today")
+        
 
-        # 2. Bulk create Project Members using EmployeeProfile mapping
+
+
+        # 3. Bulk create Project Members using EmployeeProfile mapping
         if member_ids:
             profiles = EmployeeProfile.objects.filter(id__in=member_ids)
             member_instances = [
@@ -58,7 +73,7 @@ class ProjectService:
             profiles_to_sync.append(lead_profile.id)
         ProjectService.sync_employee_statuses(profiles_to_sync)
 
-        # 3. Bulk create Project Skills (Stack)
+        # 4. Bulk create Project Skills (Stack)
         if skill_ids:
             skills = Skill.objects.filter(id__in=skill_ids)
             stack_instances = [
