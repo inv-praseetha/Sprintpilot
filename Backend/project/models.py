@@ -142,26 +142,3 @@ class ProjectStack(models.Model):
 
     def __str__(self):
         return f"{self.project.name} - {self.skill.name}"
-
-
-class ProjectHoliday(models.Model):
-    """
-    Tracks unexpected manual holidays or non-working days for a project.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.CASCADE,
-        related_name="holidays"
-    )
-    date = models.DateField()
-    description = models.CharField(max_length=255, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "project_holidays"
-        unique_together = ("project", "date")
-        ordering = ["date"]
-
-    def __str__(self):
-        return f"{self.project.name} - {self.date}"

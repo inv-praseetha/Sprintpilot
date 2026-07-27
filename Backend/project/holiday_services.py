@@ -91,4 +91,7 @@ class HolidayService:
                     modified = True
             
             if modified:
-                task.save(update_fields=['planned_start_date', 'planned_end_date'])
+                SprintTask.objects.filter(pk=task.pk).update(
+                    planned_start_date=task.planned_start_date,
+                    planned_end_date=task.planned_end_date
+                )

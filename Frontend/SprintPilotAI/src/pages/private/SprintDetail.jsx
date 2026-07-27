@@ -75,7 +75,7 @@ const getProgressPercentage = (status) => {
 };
 
 // Generates calendar columns starting from the Monday of the start date week to the Friday of the end date week
-const generateTimelineDays = (startStr, endStr, holidays = []) => {
+const generateTimelineDays = (startStr, endStr) => {
   const sStr = startStr || '2026-07-15';
   const eStr = endStr || '2026-07-28';
 
@@ -109,14 +109,11 @@ const generateTimelineDays = (startStr, endStr, holidays = []) => {
     const d = String(current.getDate()).padStart(2, '0');
     const dateStr = `${y}-${m}-${d}`;
 
-    const isHoliday = holidays.includes(dateStr);
-
     daysList.push({
       dayNum: dNum,
       dayName: dName,
       isWeekend,
-      isHoliday,
-      isNonWorkingDay: isWeekend || isHoliday,
+      isNonWorkingDay: isWeekend,
       dateStr,
       isSprintStart: dateStr === sStr,
       isSprintEnd: dateStr === eStr
@@ -140,7 +137,7 @@ export default function SprintDetail() {
   const [originalTasks, setOriginalTasks] = useState([]); // to support Cancel action
   const [employees, setEmployees] = useState([]);
   const [timelineDaysList, setTimelineDaysList] = useState([]);
-  const [holidays, setHolidays] = useState([]);
+
 
   const [pageLoading, setPageLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -173,16 +170,7 @@ export default function SprintDetail() {
       setTasks(dbTasks);
       setOriginalTasks(JSON.parse(JSON.stringify(dbTasks)));
       
-      let fetchedHolidays = holidays;
-      try {
-        const holidaysRes = await apiClient.get(`projects/${sprintData.project}/holidays/`);
-        fetchedHolidays = holidaysRes.data.map(h => h.date);
-        setHolidays(fetchedHolidays);
-      } catch (e) {
-        console.error("Failed to fetch holidays", e);
-      }
-
-      const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, fetchedHolidays);
+      const days = generateTimelineDays(sprintData.start_date, sprintData.end_date);
       setTimelineDaysList(days);
     } catch (err) {
       console.error('[SprintDetail] Error refreshing sprint details:', err);
@@ -255,18 +243,8 @@ export default function SprintDetail() {
         const projectRes = await apiClient.get(`projects/${sprintData.project}/`);
         setEmployees(projectRes.data?.members || []);
 
-        // 3. Fetch Project Holidays
-        let fetchedHolidays = [];
-        try {
-          const holidaysRes = await apiClient.get(`projects/${sprintData.project}/holidays/`);
-          fetchedHolidays = holidaysRes.data.map(h => h.date);
-          setHolidays(fetchedHolidays);
-        } catch (e) {
-          console.error("Failed to fetch holidays", e);
-        }
-
         // Generate timeline range based on Sprint boundaries
-        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, fetchedHolidays);
+        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date);
         setTimelineDaysList(days);
       } catch (err) {
         console.error('[SprintDetail] Error loading data:', err);
@@ -277,17 +255,7 @@ export default function SprintDetail() {
     fetchData();
   }, [sprintId]);
 
-  const handleToggleHoliday = async (dateStr) => {
-    if (!sprint || sprint.project_status === 'COMPLETED' || sprint.status === 'COMPLETED') return;
-    
-    try {
-      await apiClient.post(`projects/${sprint.project}/holidays/`, { date: dateStr });
-      await refreshSprint();
-    } catch (err) {
-      console.error('Failed to toggle holiday', err);
-      alert('Failed to toggle holiday. Please try again.');
-    }
-  };
+
 
   const handleStartGeneration = async () => {
     setIsGenerating(true);
@@ -932,14 +900,6 @@ export default function SprintDetail() {
                         }`} />
                       <span>Weekend</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className={`w-2.5 h-2.5 rounded-md border ${darkMode ? 'bg-red-950 border-red-800' : 'bg-red-50 border-red-200'
-                        }`} />
-                      <span>Holiday</span>
-                    </div>
-                  </div>
-                  <div className="text-[10.5px] text-slate-500 font-semibold flex items-center gap-1">
-                    <span className="text-orange-500">💡 Tip:</span> Click on any Date Header (the numbers or day names) in the chart below to mark it as a Holiday.
                   </div>
                 </div>
               </div>
@@ -1069,13 +1029,10 @@ export default function SprintDetail() {
 
                       {/* Dates */}
                       {timelineDaysList.map((day, idx) => {
-                        let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 transition-colors ${!day.isWeekend ? 'cursor-pointer hover:bg-orange-500/10' : ''} ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'
+                        let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'
                           }`;
                         if (day.isWeekend) {
                           cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-not-allowed ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-500'
-                            }`;
-                        } else if (day.isHoliday) {
-                          cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-pointer ${darkMode ? 'border-slate-800 bg-red-950/40 text-red-400 hover:bg-red-900/40' : 'border-slate-200 bg-red-50 text-red-500 hover:bg-red-100'
                             }`;
                         }
                         if (day.isSprintStart) {
@@ -1088,8 +1045,7 @@ export default function SprintDetail() {
                           <th 
                             key={`num-${day.dayNum}-${idx}`} 
                             className={cellStyle}
-                            onClick={() => !day.isWeekend && handleToggleHoliday(day.dateStr)}
-                            title={!day.isWeekend ? (day.isHoliday ? 'Remove Holiday' : 'Mark as Holiday') : 'Weekend'}
+                            title={day.isWeekend ? 'Weekend' : ''}
                           >
                             {day.dayNum}
                           </th>
@@ -1142,13 +1098,10 @@ export default function SprintDetail() {
 
                       {/* Day Names */}
                       {timelineDaysList.map((day, idx) => {
-                        let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 transition-colors ${!day.isWeekend ? 'cursor-pointer hover:bg-orange-500/10' : ''} ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-455'
+                        let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-455'
                           }`;
                         if (day.isWeekend) {
                           cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-not-allowed ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
-                            }`;
-                        } else if (day.isHoliday) {
-                          cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-pointer ${darkMode ? 'border-slate-800 bg-red-950/40 text-red-500 hover:bg-red-900/40' : 'border-slate-200 bg-red-50 text-red-400 hover:bg-red-100'
                             }`;
                         }
                         if (day.isSprintStart) {
@@ -1161,8 +1114,7 @@ export default function SprintDetail() {
                           <th 
                             key={`name-${day.dayNum}-${idx}`} 
                             className={cellStyle}
-                            onClick={() => !day.isWeekend && handleToggleHoliday(day.dateStr)}
-                            title={!day.isWeekend ? (day.isHoliday ? 'Remove Holiday' : 'Mark as Holiday') : 'Weekend'}
+                            title={day.isWeekend ? 'Weekend' : ''}
                           >
                             {day.dayName}
                           </th>
@@ -1236,8 +1188,6 @@ export default function SprintDetail() {
                                 }`;
                               if (day.isWeekend) {
                                 cellStyle += darkMode ? ' bg-slate-950/65' : ' bg-slate-100/65';
-                              } else if (day.isHoliday) {
-                                cellStyle += darkMode ? ' bg-red-950/20' : ' bg-red-50/50';
                               }
                               if (day.isSprintStart) {
                                 cellStyle += ' border-l-2 border-l-orange-500/20';
@@ -1444,7 +1394,7 @@ export default function SprintDetail() {
                                 {timelineDaysList.map((day, idx) => {
                                   const isDayInTaskRange = task.planned_start_date && task.planned_end_date &&
                                     day.dateStr >= task.planned_start_date && day.dateStr <= task.planned_end_date &&
-                                    !day.isWeekend && !day.isHoliday;
+                                    !day.isWeekend;
                                   const isBarStart = day.dateStr === task.planned_start_date;
                                   const isBarEnd = day.dateStr === task.planned_end_date;
 
@@ -1452,8 +1402,6 @@ export default function SprintDetail() {
                                     }`;
                                   if (day.isWeekend) {
                                     cellStyle += darkMode ? ' bg-slate-950/60' : ' bg-slate-100/60';
-                                  } else if (day.isHoliday) {
-                                    cellStyle += darkMode ? ' bg-red-950/20' : ' bg-red-50/50';
                                   }
                                   if (day.isSprintStart) {
                                     cellStyle += ' border-l-2 border-l-orange-500';

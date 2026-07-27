@@ -171,10 +171,3 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         skills = [s.skill for s in obj.project_stack.all()]
         return SkillSerializer(skills, many=True).data
 
-from project.models import ProjectHoliday
-
-class ProjectHolidaySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectHoliday
-        fields = ["id", "project", "date", "description", "created_at"]
-        read_only_fields = ["id", "project", "created_at"]

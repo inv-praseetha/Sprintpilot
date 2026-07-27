@@ -122,24 +122,12 @@ class SprintTask(models.Model):
                 if end < sprint_start or end > sprint_end:
                     raise ValidationError({"planned_end_date": f"Task planned end date ({end}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
             
-            # 2.5 Validate dates are not on holidays or weekends
+            # 2.5 Validate dates are not on weekends
             if self.sprint.project and (start or end):
-                from project.models import ProjectHoliday
-                
-                check_dates = [d for d in [start, end] if d]
-                holidays = set(ProjectHoliday.objects.filter(
-                    project=self.sprint.project,
-                    date__in=check_dates
-                ).values_list('date', flat=True))
-
                 if start:
-                    if start in holidays:
-                        raise ValidationError({"planned_start_date": f"Task planned start date ({start}) falls on a project holiday."})
                     if start.weekday() >= 5:
                         raise ValidationError({"planned_start_date": f"Task planned start date ({start}) falls on a weekend."})
                 if end:
-                    if end in holidays:
-                        raise ValidationError({"planned_end_date": f"Task planned end date ({end}) falls on a project holiday."})
                     if end.weekday() >= 5:
                         raise ValidationError({"planned_end_date": f"Task planned end date ({end}) falls on a weekend."})
 
