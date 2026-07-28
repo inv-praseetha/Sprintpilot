@@ -322,7 +322,10 @@ const Dashboard = () => {
     const list = [];
     Object.entries(projectsData).forEach(([projName, sprints]) => {
       sprints.forEach((sprint) => {
-        if (sprint.status === 'In Progress' || sprint.status === 'Delayed') {
+        if (
+          (sprint.status === 'In Progress' || sprint.status === 'Delayed') &&
+          sprint.activeTasks > 0
+        ) {
           list.push({
             project: projName,
             sprint: sprint,
