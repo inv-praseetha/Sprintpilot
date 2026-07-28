@@ -290,12 +290,12 @@ export default function ProjectCreation() {
         setSubmitting(false);
         return;
       }
-      if (start < today) {
+      if (!editingProjectId && start < today) {
         setFormError("Start Date must be greater than or equal to today.");
         setSubmitting(false);
         return;
       }
-      if (end < today) {
+      if (!editingProjectId && end < today) {
         setFormError("End Date must be greater than or equal to today.");
         setSubmitting(false);
         return;
@@ -313,7 +313,7 @@ export default function ProjectCreation() {
       const start = new Date(startDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (start < today) {
+      if (!editingProjectId && start < today) {
         setFormError("Start Date must be greater than or equal to today.");
         setSubmitting(false);
         return;
@@ -840,6 +840,7 @@ export default function ProjectCreation() {
         show={showModal}
         onClose={() => setShowModal(false)}
         darkMode={darkMode}
+        title={editingProjectId ? 'Update your project' : 'Create New Project'}
       >
         <ProjectForm
           handleSubmit={handleSubmit}
