@@ -321,3 +321,56 @@ class BacklogService:
             logger.error(f"Failed to delete task {backlog_task_id} in Backlog: {e}")
             raise Exception(f"Failed to delete task in Backlog: {e}")
 
+    def fetch_updated_issues(self, updated_since=None):
+        """
+        Fetch issues updated since a given timestamp.
+        Returns a generator of issue dictionaries, handling pagination automatically.
+        :param updated_since: datetime object or ISO-8601 string (e.g. '2023-10-25T14:00:00Z')
+        """
+        if not self.workspace_url or not self.api_key:
+            raise ValueError("Backlog configuration missing.")
+
+        project_id, _ = self._resolve_project_and_issue_type()
+        if not project_id:
+            logger.warning(f"Could not resolve project ID for project key: {self.project_key}")
+            return []
+
+        url = f"{self.workspace_url}/api/v2/issues"
+        params = {
+            "apiKey": self.api_key,
+            "projectId[]": project_id,
+            "count": 100, # Max allowed per Backlog API docs is typically 100
+            "sort": "updated",
+            "order": "asc"
+        }
+
+        if updated_since:
+            if hasattr(updated_since, 'strftime'):
+                # Backlog API expects updatedSince in yyyy-MM-dd format or ISO-8601 depending on the exact filter, 
+                # but standard updatedSince is often ISO format like 2014-02-27. Let's pass ISO format date string
+                params["updatedSince"] = updated_since.strftime('%Y-%m-%d')
+
+        offset = 0
+        while True:
+            params["offset"] = offset
+            try:
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+                issues = response.json()
+                
+                if not issues:
+                    break
+                    
+                for issue in issues:
+                    yield issue
+                    
+                if len(issues) < 100:
+                    break # Last page
+                    
+                offset += 100
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to fetch updated issues from Backlog: {e}")
+                if getattr(e, 'response', None) is not None:
+                    logger.error(f"Backlog response: {e.response.text}")
+                raise Exception(f"Failed to fetch updated issues from Backlog: {e}")

@@ -146,6 +146,10 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (projectId) {
       fetchSprints();
+      const intervalId = setInterval(() => {
+        fetchSprints();
+      }, 15000);
+      return () => clearInterval(intervalId);
     }
   }, [projectId]);
 
@@ -154,7 +158,7 @@ export default function ProjectDetail() {
     if (!Array.isArray(sprints)) return [];
     return sprints.map((sprint) => {
       const totalTasks = sprint.tasks ? sprint.tasks.length : 0;
-      
+
       let startDate = 'N/A';
       let endDate = 'N/A';
       if (sprint.start_date) {
@@ -171,13 +175,15 @@ export default function ProjectDetail() {
           year: 'numeric'
         });
       }
-      
+
       return {
         id: sprint.id,
         name: sprint.milestone || sprint.name,
         totalTasks,
         startDate,
         endDate,
+        status: sprint.backlog_status,
+        progressPercentage: sprint.progress_percentage || 0,
         workspaceUrl: sprint.workspace_url,
         rawStartDate: sprint.start_date,
         createdAt: sprint.created_at
@@ -346,7 +352,7 @@ export default function ProjectDetail() {
       const isLead = project.team_lead?.id === emp.user.id;
       const isMember = currentMemberUserIds.includes(emp.user.id);
       const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-                            emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
+        emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
 
       // Only show employees with matching skills if project has required skills
       const projectSkills = project.skills || [];
@@ -370,7 +376,7 @@ export default function ProjectDetail() {
         setModalError(null);
         return prev.filter(id => id !== profileId);
       }
-      
+
       const currentCount = (project.members || []).length;
       const limit = project.team_size || 0;
       if (currentCount + prev.length >= limit) {
@@ -410,14 +416,13 @@ export default function ProjectDetail() {
 
   return (
     <div className={`p-6 sm:p-8 max-w-7xl mx-auto min-h-screen ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-      
+
       {/* Back navigation */}
       <div className="mb-6 flex justify-between items-center">
         <Link
           to="/projects"
-          className={`inline-flex items-center gap-2 text-xs font-black tracking-wider uppercase transition-colors ${
-            darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
-          }`}
+          className={`inline-flex items-center gap-2 text-xs font-black tracking-wider uppercase transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+            }`}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Projects List
@@ -425,21 +430,19 @@ export default function ProjectDetail() {
       </div>
 
       {/* Main header banner */}
-      <div className={`p-6 sm:p-8 rounded-3xl border mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-      }`}>
+      <div className={`p-6 sm:p-8 rounded-3xl border mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+        }`}>
         <div className="text-left space-y-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               {project.name}
             </h1>
-            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-              project.status === 'ACTIVE'
+            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${project.status === 'ACTIVE'
                 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                 : project.status === 'ON_HOLD'
                   ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                   : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
-            }`}>
+              }`}>
               {project.status.replace('_', ' ')}
             </span>
           </div>
@@ -454,11 +457,10 @@ export default function ProjectDetail() {
             <button
               onClick={() => setShowAddMembersModal(true)}
               disabled={project.status === 'COMPLETED'}
-              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${
-                project.status === 'COMPLETED'
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${project.status === 'COMPLETED'
                   ? 'bg-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 cursor-pointer'
-              }`}
+                }`}
               title={project.status === 'COMPLETED' ? "Cannot add members to a completed project" : ""}
             >
               <UserPlus className="w-4 h-4" />
@@ -467,11 +469,10 @@ export default function ProjectDetail() {
             <button
               onClick={() => setShowUploadSprintModal(true)}
               disabled={project.status === 'COMPLETED'}
-              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${
-                project.status === 'COMPLETED'
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${project.status === 'COMPLETED'
                   ? 'bg-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/10 cursor-pointer'
-              }`}
+                }`}
               title={project.status === 'COMPLETED' ? "Cannot upload sprints to a completed project" : ""}
             >
               <UploadCloud className="w-4 h-4" />
@@ -482,14 +483,12 @@ export default function ProjectDetail() {
       </div>
 
       {/* 1. COLLAPSIBLE PROJECT DETAILS ACCORDION */}
-      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-      }`}>
+      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+        }`}>
         <button
           onClick={() => setDetailsExpanded(!detailsExpanded)}
-          className={`w-full p-6 flex justify-between items-center transition-colors ${
-            darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
-          }`}
+          className={`w-full p-6 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
+            }`}
         >
           <div className="flex items-center gap-3">
             <Briefcase className="w-5 h-5 text-orange-500" />
@@ -501,20 +500,19 @@ export default function ProjectDetail() {
         {detailsExpanded && (
           <div className="p-6 border-t border-slate-100 dark:border-slate-850 text-left">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              
+
               {/* Type, Timeline, Duration */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Timeline & Model</h4>
-                
+
                 <div className="flex items-start gap-3">
                   <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
                   <div>
                     <span className="block text-xs text-slate-400 font-bold">Project Type</span>
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-                      project.type === 'AGILE'
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${project.type === 'AGILE'
                         ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
                         : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
-                    }`}>
+                      }`}>
                       {project.type}
                     </span>
                   </div>
@@ -539,7 +537,7 @@ export default function ProjectDetail() {
               {/* Stakeholders (Lead & Creator) */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Stakeholders</h4>
-                
+
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-xs">
                     {getInitials(project.team_lead?.full_name)}
@@ -576,7 +574,7 @@ export default function ProjectDetail() {
               {/* Tech Stack Skills */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Required Skills</h4>
-                
+
                 {(() => {
                   const effectiveSkills = getEffectiveSkills(project);
                   const uniqueCats = Array.from(new Set(effectiveSkills.map(s => s.category).filter(Boolean)));
@@ -651,14 +649,12 @@ export default function ProjectDetail() {
       </div>
 
       {/* 2. TEAM MEMBERS ACTIVE ROSTER */}
-      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-      }`}>
+      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+        }`}>
         <button
           onClick={() => setRosterExpanded(!rosterExpanded)}
-          className={`w-full p-6 flex justify-between items-center transition-colors ${
-            darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
-          }`}
+          className={`w-full p-6 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
+            }`}
         >
           <div className="flex items-center gap-3">
             <Users className="w-5 h-5 text-orange-500" />
@@ -678,204 +674,198 @@ export default function ProjectDetail() {
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-xs">
-                  <thead>
-                    <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'} uppercase font-black tracking-wider text-[10px]`}>
-                      <th className="py-4 px-4 font-bold">Member</th>
-                      <th className="py-4 px-4 font-bold">Role</th>
-                      <th className="py-4 px-4 font-bold">Status</th>
-                      <th className="py-4 px-4 font-bold">Matching Skills</th>
-                      {isProjectManager && project.status !== 'COMPLETED' && <th className="py-4 px-4 text-right font-bold">Actions</th>}
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${darkMode ? 'divide-slate-850' : 'divide-slate-50'}`}>
-                    {/* Team Lead Row */}
-                    {project.team_lead && (
-                      <tr className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
-                              {getInitials(project.team_lead.full_name)}
-                            </div>
-                            <div>
-                              <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                                {project.team_lead.full_name}
-                              </span>
-                              <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
-                                {project.team_lead.email}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                            Team Lead
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          {(() => {
-                            const leadProfile = employees.find(emp => emp.user.id === project.team_lead?.id);
-                            const leadStatus = leadProfile?.status || 'ACTIVE';
-                            return (
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                                leadStatus === 'BUSY'
-                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                                  : leadStatus === 'ACTIVE'
-                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                    : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                              }`}>
-                                {leadStatus}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-slate-400 font-bold">—</span>
-                        </td>
-                        {isProjectManager && project.status !== 'COMPLETED' && (
-                          <td className="py-4 px-4 text-right">
-                            <button
-                              onClick={() => setShowEditLeadModal(true)}
-                              className="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
-                              title="Edit Team Lead"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          </td>
-                        )}
+                    <thead>
+                      <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'} uppercase font-black tracking-wider text-[10px]`}>
+                        <th className="py-4 px-4 font-bold">Member</th>
+                        <th className="py-4 px-4 font-bold">Role</th>
+                        <th className="py-4 px-4 font-bold">Status</th>
+                        <th className="py-4 px-4 font-bold">Matching Skills</th>
+                        {isProjectManager && project.status !== 'COMPLETED' && <th className="py-4 px-4 text-right font-bold">Actions</th>}
                       </tr>
-                    )}
-
-                    {/* Members Rows */}
-                    {paginatedMembers && paginatedMembers.map((member) => (
-                      <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
-                              {getInitials(member.user.full_name)}
+                    </thead>
+                    <tbody className={`divide-y ${darkMode ? 'divide-slate-850' : 'divide-slate-50'}`}>
+                      {/* Team Lead Row */}
+                      {project.team_lead && (
+                        <tr className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
+                                {getInitials(project.team_lead.full_name)}
+                              </div>
+                              <div>
+                                <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                  {project.team_lead.full_name}
+                                </span>
+                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                                  {project.team_lead.email}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                                {member.user.full_name}
-                              </span>
-                              <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
-                                {member.user.email}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350">
-                            {member.designation || 'Team Member'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                            member.status === 'BUSY'
-                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                              : member.status === 'ACTIVE'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                          }`}>
-                            {member.status || 'ACTIVE'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          {project.skills && project.skills.length > 0 && member.skills && member.skills.some(s => project.skills.some(ps => ps.id === s.id)) ? (
-                            <div className="flex flex-wrap gap-1">
-                              {member.skills
-                                .filter((s) => project.skills.some((ps) => ps.id === s.id))
-                                .map((s) => (
-                                  <span
-                                    key={s.id}
-                                    className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
-                                  >
-                                    {s.name}
-                                  </span>
-                                ))}
-                            </div>
-                          ) : (
-                            <span className="text-xs font-bold text-slate-400">—</span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                              Team Lead
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            {(() => {
+                              const leadProfile = employees.find(emp => emp.user.id === project.team_lead?.id);
+                              const leadStatus = leadProfile?.status || 'ACTIVE';
+                              return (
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${leadStatus === 'BUSY'
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                                    : leadStatus === 'ACTIVE'
+                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                      : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                                  }`}>
+                                  {leadStatus}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="text-slate-400 font-bold">—</span>
+                          </td>
+                          {isProjectManager && project.status !== 'COMPLETED' && (
+                            <td className="py-4 px-4 text-right">
+                              <button
+                                onClick={() => setShowEditLeadModal(true)}
+                                className="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
+                                title="Edit Team Lead"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            </td>
                           )}
-                        </td>
-                        {isProjectManager && project.status !== 'COMPLETED' && (
-                          <td className="py-4 px-4 text-right">
-                            <button
-                              onClick={() => handleRemoveMember(member.id)}
-                              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                              title="Remove Member"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                        </tr>
+                      )}
+
+                      {/* Members Rows */}
+                      {paginatedMembers && paginatedMembers.map((member) => (
+                        <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
+                                {getInitials(member.user.full_name)}
+                              </div>
+                              <div>
+                                <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                  {member.user.full_name}
+                                </span>
+                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                                  {member.user.email}
+                                </span>
+                              </div>
+                            </div>
                           </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Pagination Controls */}
-              {project.members && project.members.length > rosterPageSize && (
-                <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${
-                  darkMode ? 'border-slate-850 bg-slate-900/60' : 'border-slate-100 bg-slate-50/30'
-                }`}>
-                  <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{rosterPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{totalRosterPages}</span> ({project.members.length} members)
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRosterPage(p => Math.max(1, p - 1))}
-                      disabled={rosterPage === 1}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${
-                        rosterPage > 1
-                          ? darkMode
-                            ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
-                            : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-705 cursor-pointer shadow-sm shadow-slate-100/50'
-                          : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                      }`}
-                    >
-                      Previous
-                    </button>
-
-                    {/* Dynamic Page Numbers */}
-                    {Array.from({ length: totalRosterPages }, (_, i) => i + 1).map((p) => {
-                      const isSelected = p === rosterPage;
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setRosterPage(p)}
-                          className={`w-8 h-8 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
-                              : darkMode
-                                ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
-                                : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
-                      disabled={rosterPage === totalRosterPages}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${
-                        rosterPage < totalRosterPages
-                          ? darkMode
-                            ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
-                            : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-750 cursor-pointer shadow-sm shadow-slate-100/50'
-                          : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                      }`}
-                    >
-                      Next
-                    </button>
-                  </div>
+                          <td className="py-4 px-4">
+                            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350">
+                              {member.designation || 'Team Member'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${member.status === 'BUSY'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                                : member.status === 'ACTIVE'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                              }`}>
+                              {member.status || 'ACTIVE'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            {project.skills && project.skills.length > 0 && member.skills && member.skills.some(s => project.skills.some(ps => ps.id === s.id)) ? (
+                              <div className="flex flex-wrap gap-1">
+                                {member.skills
+                                  .filter((s) => project.skills.some((ps) => ps.id === s.id))
+                                  .map((s) => (
+                                    <span
+                                      key={s.id}
+                                      className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
+                                    >
+                                      {s.name}
+                                    </span>
+                                  ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-400">—</span>
+                            )}
+                          </td>
+                          {isProjectManager && project.status !== 'COMPLETED' && (
+                            <td className="py-4 px-4 text-right">
+                              <button
+                                onClick={() => handleRemoveMember(member.id)}
+                                className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                title="Remove Member"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+
+                {/* Pagination Controls */}
+                {project.members && project.members.length > rosterPageSize && (
+                  <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${darkMode ? 'border-slate-850 bg-slate-900/60' : 'border-slate-100 bg-slate-50/30'
+                    }`}>
+                    <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{rosterPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{totalRosterPages}</span> ({project.members.length} members)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRosterPage(p => Math.max(1, p - 1))}
+                        disabled={rosterPage === 1}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${rosterPage > 1
+                            ? darkMode
+                              ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                              : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-705 cursor-pointer shadow-sm shadow-slate-100/50'
+                            : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                          }`}
+                      >
+                        Previous
+                      </button>
+
+                      {/* Dynamic Page Numbers */}
+                      {Array.from({ length: totalRosterPages }, (_, i) => i + 1).map((p) => {
+                        const isSelected = p === rosterPage;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setRosterPage(p)}
+                            className={`w-8 h-8 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${isSelected
+                                ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
+                                : darkMode
+                                  ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
+                                  : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
+                              }`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
+                        disabled={rosterPage === totalRosterPages}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${rosterPage < totalRosterPages
+                            ? darkMode
+                              ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                              : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-750 cursor-pointer shadow-sm shadow-slate-100/50'
+                            : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                          }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center">
@@ -898,14 +888,12 @@ export default function ProjectDetail() {
       </div>
 
       {/* 3. SPRINTS LIST VIEW */}
-      <div className={`mt-8 rounded-3xl border overflow-hidden transition-all ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/40'
-      }`}>
+      <div className={`mt-8 rounded-3xl border overflow-hidden transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/40'
+        }`}>
         <button
           onClick={() => setSprintsExpanded(!sprintsExpanded)}
-          className={`w-full p-6 flex justify-between items-center transition-colors cursor-pointer ${
-            darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
-          }`}
+          className={`w-full p-6 flex justify-between items-center transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
+            }`}
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center">
@@ -926,94 +914,123 @@ export default function ProjectDetail() {
 
         {sprintsExpanded && (
           <div className="p-6 border-t border-slate-100 dark:border-slate-850">
-        {/* SPRINTS LIST VIEW TABLE */}
-        {sprintListDetails.length > 0 ? (
-          <div className={`border rounded-3xl overflow-hidden ${
-            darkMode ? 'border-slate-800' : 'border-slate-100'
-          }`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[600px]">
-                <thead>
-                  <tr className={`text-[10px] font-black tracking-wider uppercase border-b ${
-                    darkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
-                  }`}>
-                    <th className="py-4 px-5">Sprint / Milestone Name</th>
-                    <th className="py-4 px-5 w-32 text-center">Total Tasks</th>
-                    <th className="py-4 px-5 w-40">Start Date</th>
-                    <th className="py-4 px-5 w-40">End Date</th>
-                    <th className="py-4 px-5 w-24"></th>
-                  </tr>
-                </thead>
-                <tbody className={`divide-y text-xs text-left ${
-                  darkMode ? 'divide-slate-800/60' : 'divide-slate-100'
+            {/* SPRINTS LIST VIEW TABLE */}
+            {sprintListDetails.length > 0 ? (
+              <div className={`border rounded-3xl overflow-hidden ${darkMode ? 'border-slate-800' : 'border-slate-100'
                 }`}>
-                  {sprintListDetails.map((sprint, idx) => (
-                    <tr 
-                      key={idx} 
-                      onClick={() => navigate(`/projects/${projectId}/sprints/${sprint.id}`)}
-                      className={`transition-all duration-150 cursor-pointer ${
-                        darkMode ? 'bg-slate-900/40 hover:bg-slate-850/60 text-slate-330' : 'bg-white hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      {/* Name */}
-                      <td className={`py-4 px-5 font-extrabold text-sm ${
-                        darkMode ? 'text-white' : 'text-slate-800'
-                      }`}>
-                        <div className="flex items-center gap-2">
-                          <span>{sprint.milestone || sprint.name}</span>
-                          {sprint.workspaceUrl && (
-                            <a 
-                              href={sprint.workspaceUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-blue-400' : 'bg-slate-100 hover:bg-slate-200 text-blue-600'}`}
-                              title="View Milestone Issues in Backlog"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Total Tasks */}
-                      <td className="py-4 px-5 text-center font-bold">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
-                          darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className={`text-[10px] font-black tracking-wider uppercase border-b ${darkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
                         }`}>
-                          {sprint.totalTasks}
-                        </span>
-                      </td>
+                        <th className="py-4 px-5">Sprint / Milestone Name</th>
+                        <th className="py-4 px-5 w-32 text-center">Total Tasks</th>
+                        <th className="py-4 px-5 w-40">Start Date</th>
+                        <th className="py-4 px-5 w-40">End Date</th>
+                        <th className="py-4 px-5 w-40 text-center">Progress</th>
+                        <th className="py-4 px-5 w-32">Status</th>
+                        <th className="py-4 px-5 w-24"></th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y text-xs text-left ${darkMode ? 'divide-slate-800/60' : 'divide-slate-100'
+                      }`}>
+                      {sprintListDetails.map((sprint, idx) => (
+                        <tr
+                          key={idx}
+                          onClick={() => navigate(`/projects/${projectId}/sprints/${sprint.id}`)}
+                          className={`transition-all duration-150 cursor-pointer ${darkMode ? 'bg-slate-900/40 hover:bg-slate-850/60 text-slate-330' : 'bg-white hover:bg-slate-50 text-slate-700'
+                            }`}
+                        >
+                          {/* Name */}
+                          <td className={`py-4 px-5 font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'
+                            }`}>
+                            <div className="flex items-center gap-2">
+                              <span>{sprint.milestone || sprint.name}</span>
+                              {sprint.workspaceUrl && (
+                                <a
+                                  href={sprint.workspaceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-blue-400' : 'bg-slate-100 hover:bg-slate-200 text-blue-600'}`}
+                                  title="View Milestone Issues in Backlog"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          </td>
 
-                      {/* Start Date */}
-                      <td className="py-4 px-5 font-semibold text-slate-400">
-                        {sprint.startDate}
-                      </td>
+                          {/* Total Tasks */}
+                          <td className="py-4 px-5 text-center font-bold">
+                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold ${darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'
+                              }`}>
+                              {sprint.totalTasks}
+                            </span>
+                          </td>
 
-                      {/* End Date */}
-                      <td className="py-4 px-5 font-semibold text-slate-400">
-                        {sprint.endDate}
-                      </td>
+                          {/* Start Date */}
+                          <td className="py-4 px-5 font-semibold text-slate-400">
+                            {sprint.startDate}
+                          </td>
 
-                      {/* Chevron Link indicator */}
-                      <td className="py-4 px-5 text-right">
-                        <div className="flex justify-end">
-                          <ChevronRight className="w-5 h-5 text-slate-400 hover:text-orange-500 transition-colors" />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="py-16 flex flex-col items-center justify-center text-center">
-            <Layers className="w-12 h-12 text-slate-350 dark:text-slate-750 mb-3 animate-pulse" />
-            <h5 className="font-extrabold text-slate-400 text-sm">No Sprints Uploaded Yet</h5>
-            <p className="text-xs text-slate-400 mt-1 mb-4">Click "Upload Sprint" at the top to import tasks from an Excel template.</p>
-          </div>
-        )}
+                          {/* End Date */}
+                          <td className="py-4 px-5 font-semibold text-slate-400">
+                            {sprint.endDate}
+                          </td>
+
+                          {/* Progress */}
+                          <td className="py-4 px-5 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-16 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${
+                                    sprint.progressPercentage === 100 ? 'bg-emerald-500' :
+                                    sprint.progressPercentage > 0 ? 'bg-blue-500' : 'bg-slate-400'
+                                  }`} 
+                                  style={{ width: `${sprint.progressPercentage}%` }}
+                                ></div>
+                              </div>
+                              <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                {sprint.progressPercentage}%
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-4 px-5">
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                              sprint.status === 'CLOSED'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                : sprint.status === 'IN PROGRESS'
+                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
+                                  : sprint.status === 'NO TASKS'
+                                    ? 'bg-slate-500/10 text-slate-600 dark:text-slate-455 border border-slate-500/20'
+                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                            }`}>
+                              {sprint.status || 'OPEN'}
+                            </span>
+                          </td>
+
+                          {/* Chevron Link indicator */}
+                          <td className="py-4 px-5 text-right">
+                            <div className="flex justify-end">
+                              <ChevronRight className="w-5 h-5 text-slate-400 hover:text-orange-500 transition-colors" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="py-16 flex flex-col items-center justify-center text-center">
+                <Layers className="w-12 h-12 text-slate-350 dark:text-slate-750 mb-3 animate-pulse" />
+                <h5 className="font-extrabold text-slate-400 text-sm">No Sprints Uploaded Yet</h5>
+                <p className="text-xs text-slate-400 mt-1 mb-4">Click "Upload Sprint" at the top to import tasks from an Excel template.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1021,9 +1038,8 @@ export default function ProjectDetail() {
       {/* 3. MODAL: ADD MEMBERS */}
       {showAddMembersModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             {/* Header */}
             <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
               <div className="text-left">
@@ -1037,9 +1053,8 @@ export default function ProjectDetail() {
                   setMemberSearchQuery('');
                   setModalError(null);
                 }}
-                className={`p-2 rounded-xl transition-colors ${
-                  darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-                }`}
+                className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                  }`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1055,11 +1070,10 @@ export default function ProjectDetail() {
                     placeholder="Search by name or role..."
                     value={memberSearchQuery}
                     onChange={(e) => setMemberSearchQuery(e.target.value)}
-                    className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-indigo-500 transition-colors ${
-                      darkMode
+                    className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-indigo-500 transition-colors ${darkMode
                         ? 'bg-slate-950 border-slate-800 text-white'
                         : 'bg-white border-slate-200 text-slate-800'
-                    }`}
+                      }`}
                   />
                 </div>
 
@@ -1147,37 +1161,33 @@ export default function ProjectDetail() {
                         <div
                           key={emp.id}
                           onClick={() => toggleSelectNewMember(emp.id)}
-                          className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
-                            isSelected
+                          className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isSelected
                               ? 'border-orange-500 bg-orange-500/5'
                               : darkMode
                                 ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
                                 : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-3 text-left">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                              darkMode ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-800'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${darkMode ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-800'
+                              }`}>
                               {getInitials(emp.user.full_name)}
                             </div>
                             <div>
-                              <span className={`block text-xs font-black ${
-                                darkMode ? 'text-white' : 'text-slate-800'
-                              }`}>
+                              <span className={`block text-xs font-black ${darkMode ? 'text-white' : 'text-slate-800'
+                                }`}>
                                 {emp.user.full_name}
                               </span>
                               <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                 <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                   {emp.designation}
                                 </span>
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                  emp.status === 'BUSY'
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${emp.status === 'BUSY'
                                     ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
                                     : emp.status === 'ACTIVE'
                                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
                                       : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                                }`}>
+                                  }`}>
                                   {emp.status || 'ACTIVE'}
                                 </span>
                                 {project.skills && project.skills.length > 0 && emp.skills && (
@@ -1199,11 +1209,10 @@ export default function ProjectDetail() {
                           </div>
 
                           {/* Selected Check Indicator */}
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
-                            isSelected
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${isSelected
                               ? 'bg-orange-500 border-orange-500 text-white'
                               : 'border-slate-300 dark:border-slate-700'
-                          }`}>
+                            }`}>
                             {isSelected && <Check className="w-3 h-3" />}
                           </div>
                         </div>
@@ -1227,9 +1236,8 @@ export default function ProjectDetail() {
                     setMemberSearchQuery('');
                     setModalError(null);
                   }}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
-                    darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-                  }`}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
+                    }`}
                 >
                   Cancel
                 </button>
@@ -1286,9 +1294,8 @@ export default function ProjectDetail() {
       {/* 4. MODAL: EDIT TEAM LEAD */}
       {showEditLeadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             {/* Header */}
             <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
               <div className="text-left">
@@ -1297,9 +1304,8 @@ export default function ProjectDetail() {
               </div>
               <button
                 onClick={() => setShowEditLeadModal(false)}
-                className={`p-2 rounded-xl transition-colors ${
-                  darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-                }`}
+                className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                  }`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1317,11 +1323,10 @@ export default function ProjectDetail() {
                       handleChangeTeamLead(newLeadId);
                     }
                   }}
-                  className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-                    darkMode
+                  className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
                       ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                       : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                  }`}
+                    }`}
                 >
                   <option value="">Select Team Lead...</option>
                   {teamLeads.map((lead) => (
@@ -1337,9 +1342,8 @@ export default function ProjectDetail() {
             <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end bg-slate-50/50 dark:bg-slate-100/30">
               <button
                 onClick={() => setShowEditLeadModal(false)}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${
-                  darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-                }`}
+                className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
+                  }`}
               >
                 Close
               </button>

@@ -84,6 +84,8 @@ class SprintSerializer(serializers.ModelSerializer):
     project_custom_id = serializers.CharField(source='project.project_id', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
     workspace_url = serializers.SerializerMethodField()
+    backlog_status = serializers.SerializerMethodField()
+    progress_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = Sprint
@@ -99,6 +101,8 @@ class SprintSerializer(serializers.ModelSerializer):
             'tasks',
             'project_custom_id',
             'workspace_url',
+            'backlog_status',
+            'progress_percentage',
             'created_at'
         ]
         read_only_fields = ['id', 'project', 'created_at']
@@ -114,3 +118,38 @@ class SprintSerializer(serializers.ModelSerializer):
         if workspace and project_key:
             return f"{workspace}/find/{project_key}?allOver=false&fixedVersionId={obj.backlog_version_id}&limit=20&offset=0&order=false&projectId={obj.backlog_project_id}&simpleSearch=true&sort=UPDATED&statusId=1&statusId=2&statusId=3"
         return None
+
+    def get_backlog_status(self, obj):
+        tasks = obj.tasks.filter(is_deleted=False)
+        if not tasks.exists():
+            return "NO TASKS"
+        
+        statuses = [t.status for t in tasks]
+        
+        if all(s in ['CLOSED', 'RESOLVED', 'COMPLETED', 'DONE'] for s in statuses):
+            return "CLOSED"
+            
+        if any(s in ['IN_PROGRESS', 'RESOLVED', 'QA', 'IN_REVIEW'] for s in statuses):
+            return "IN PROGRESS"
+            
+        return "OPEN"
+
+    def get_progress_percentage(self, obj):
+        tasks = obj.tasks.filter(is_deleted=False)
+        total_tasks = tasks.count()
+        if total_tasks == 0:
+            return 0
+            
+        total_weight = 0
+        for task in tasks:
+            status = str(task.status).upper().strip()
+            if status in ('CLOSED', 'DONE', 'COMPLETED'):
+                total_weight += 100
+            elif status in ('RESOLVED', 'IN_REVIEW', 'QA'):
+                total_weight += 90
+            elif status == 'IN_PROGRESS':
+                total_weight += 50
+            # Open and others are 0%
+            
+        return round(total_weight / total_tasks)
+

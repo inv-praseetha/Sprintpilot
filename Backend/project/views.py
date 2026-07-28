@@ -249,3 +249,67 @@ class ProjectDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+
+
+from datetime import date, timedelta
+from sprints.models import SprintTask
+from django.db.models import Count
+
+class DashboardView(APIView):
+    """
+    API View to retrieve dashboard metrics including Backlog task status distribution
+    and tasks that are due today and tomorrow.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        tasks = SprintTask.objects.filter(is_deleted=False)
+        
+        user = request.user
+        if user.role != 'PROJECT_MANAGER':
+            tasks = tasks.filter(sprint__project__members__employee_profile__user=user)
+
+        # Status distribution
+        status_counts = tasks.values('status').annotate(count=Count('status'))
+        status_distribution = {item['status']: item['count'] for item in status_counts}
+        
+        for s in SprintTask.Status.values:
+            if s not in status_distribution:
+                status_distribution[s] = 0
+
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+
+        # Due Today
+        due_today_qs = tasks.filter(planned_end_date=today).select_related('sprint__project', 'assigned_employee__user')
+        due_today = [
+            {
+                'id': str(task.id),
+                'title': task.title,
+                'project_name': task.sprint.project.name,
+                'sprint_name': task.sprint.milestone,
+                'status': task.status,
+                'assignee': task.assigned_employee.user.full_name if task.assigned_employee else 'Unassigned',
+                'due_date': task.planned_end_date.isoformat() if task.planned_end_date else None
+            } for task in due_today_qs
+        ]
+
+        # Due Tomorrow
+        due_tomorrow_qs = tasks.filter(planned_end_date=tomorrow).select_related('sprint__project', 'assigned_employee__user')
+        due_tomorrow = [
+            {
+                'id': str(task.id),
+                'title': task.title,
+                'project_name': task.sprint.project.name,
+                'sprint_name': task.sprint.milestone,
+                'status': task.status,
+                'assignee': task.assigned_employee.user.full_name if task.assigned_employee else 'Unassigned',
+                'due_date': task.planned_end_date.isoformat() if task.planned_end_date else None
+            } for task in due_tomorrow_qs
+        ]
+
+        return Response({
+            'status_distribution': status_distribution,
+            'due_today': due_today,
+            'due_tomorrow': due_tomorrow
+        }, status=status.HTTP_200_OK)

@@ -112,7 +112,8 @@ class SprintTask(models.Model):
                 raise ValidationError({"planned_end_date": "Task planned end date cannot be before planned start date."})
 
         # 2. Validate dates are within sprint bounds
-        if self.sprint:
+        skip_validation = getattr(self, '_skip_sync_validation', False)
+        if self.sprint and not skip_validation:
             sprint_start = to_date(self.sprint.start_date)
             sprint_end = to_date(self.sprint.end_date)
             if start:
@@ -132,7 +133,7 @@ class SprintTask(models.Model):
                         raise ValidationError({"planned_end_date": f"Task planned end date ({end}) falls on a weekend."})
 
         # 3. Validate assigned employee is a project member
-        if self.assigned_employee and self.sprint and self.sprint.project:
+        if self.assigned_employee and self.sprint and self.sprint.project and not skip_validation:
             from project.models import ProjectMember
             is_member = ProjectMember.objects.filter(
                 project=self.sprint.project,
