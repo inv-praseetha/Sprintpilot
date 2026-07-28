@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class BacklogSyncService:
     def __init__(self):
-        self.backlog_client = BacklogService()
+        pass
 
     def _map_status(self, backlog_status_id):
         # Backlog default status IDs: 1 (Open), 2 (In Progress), 3 (Resolved), 4 (Closed)
@@ -32,7 +32,7 @@ class BacklogSyncService:
 
     def sync_daily_updates(self):
         """
-        Synchronize updated issues from Backlog to SprintPilot.
+        Synchronize updated issues from Backlog to SprintPilot across all active projects.
         Uses updatedSince to fetch only recent changes.
         """
         logger.info("Synchronization Started")
@@ -41,75 +41,80 @@ class BacklogSyncService:
         # Calculate updatedSince: 24 hours ago
         updated_since = start_time - timedelta(hours=24)
         
-        try:
-            issues = list(self.backlog_client.fetch_updated_issues(updated_since=updated_since))
-        except Exception as e:
-            logger.error(f"API failure during synchronization: {e}")
-            return {"status": "error", "message": str(e)}
-
-        logger.info(f"Fetched {len(issues)} updated issues from Backlog")
-
+        from project.models import Project
+        projects = Project.objects.filter(is_deleted=False)
+        
+        total_fetched = 0
         updated_count = 0
         skipped_count = 0
         failed_count = 0
 
-        for issue in issues:
-            issue_key = issue.get("issueKey")
+        for project in projects:
+            if not project.project_id:
+                continue
+                
+            backlog_client = BacklogService(project_key=project.project_id)
             
-            # Find matching SprintTask
-            task = SprintTask.objects.filter(backlog_task_id=issue_key).first()
-            if not task:
-                logger.info(f"Skipped Backlog Issue {issue_key} (Task not found in Sprintpilot)")
-                skipped_count += 1
+            try:
+                issues = list(backlog_client.fetch_updated_issues(updated_since=updated_since))
+            except Exception as e:
+                logger.error(f"API failure during synchronization for project {project.project_id}: {e}")
                 continue
 
-            try:
-                # Update task fields from Backlog
-                task.title = issue.get("summary", task.title)
+            total_fetched += len(issues)
+            logger.info(f"Fetched {len(issues)} updated issues from Backlog for project {project.project_id}")
+
+            for issue in issues:
+                issue_key = issue.get("issueKey")
                 
-                # Description might contain our appended assignee info, but Backlog is source of truth here
-                if "description" in issue:
-                    # Strip the extra text we appended in sync_task if necessary, but for now we just take what Backlog gives
-                    raw_desc = issue.get("description") or ""
-                    task.description = raw_desc.split("\n\n---")[0] if "\n\n---" in raw_desc else raw_desc
+                # Find matching SprintTask, restricting to the current project
+                task = SprintTask.objects.filter(backlog_task_id=issue_key, sprint__project=project).first()
+                if not task:
+                    logger.info(f"Skipped Backlog Issue {issue_key} (Task not found in Sprintpilot under project {project.project_id})")
+                    skipped_count += 1
+                    continue
 
-                # Status
-                status_obj = issue.get("status")
-                if status_obj and "id" in status_obj:
-                    task.status = self._map_status(status_obj["id"])
-
-                # Priority
-                priority_obj = issue.get("priority")
-                if priority_obj and "id" in priority_obj:
-                    task.priority = self._map_priority(priority_obj["id"])
-
-                # Dates
-                start_date_str = issue.get("startDate")
-                if start_date_str:
-                    task.planned_start_date = start_date_str[:10]
+                try:
+                    # Update task fields from Backlog
+                    task.title = issue.get("summary", task.title)
                     
-                due_date_str = issue.get("dueDate")
-                if due_date_str:
-                    task.planned_end_date = due_date_str[:10]
+                    if "description" in issue:
+                        raw_desc = issue.get("description") or ""
+                        task.description = raw_desc.split("\n\n---")[0] if "\n\n---" in raw_desc else raw_desc
 
-                # Assignee mapping (assuming assignee's email matches Employee.user.email)
-                assignee_obj = issue.get("assignee")
-                if assignee_obj and "mailAddress" in assignee_obj:
-                    email = assignee_obj["mailAddress"]
-                    emp = EmployeeProfile.objects.filter(user__email=email).first()
-                    if emp:
-                        task.assigned_employee = emp
+                    status_obj = issue.get("status")
+                    if status_obj and "id" in status_obj:
+                        task.status = self._map_status(status_obj["id"])
 
-                task.synced_at = timezone.now()
-                task._skip_sync_validation = True
-                task.save()
-                
-                logger.info(f"Updated SprintTask #{task.id} (Backlog Key: {issue_key})")
-                updated_count += 1
-                
-            except Exception as e:
-                logger.error(f"Database/Validation failure for SprintTask {issue_key}: {e}")
-                failed_count += 1
+                    priority_obj = issue.get("priority")
+                    if priority_obj and "id" in priority_obj:
+                        task.priority = self._map_priority(priority_obj["id"])
+
+                    start_date_str = issue.get("startDate")
+                    if start_date_str:
+                        task.planned_start_date = start_date_str[:10]
+                        
+                    due_date_str = issue.get("dueDate")
+                    if due_date_str:
+                        task.planned_end_date = due_date_str[:10]
+
+                    assignee_obj = issue.get("assignee")
+                    if assignee_obj and "mailAddress" in assignee_obj:
+                        email = assignee_obj["mailAddress"]
+                        emp = EmployeeProfile.objects.filter(user__email=email).first()
+                        if emp:
+                            task.assigned_employee = emp
+
+                    task.synced_at = timezone.now()
+                    task._skip_sync_validation = True
+                    task.save()
+                    
+                    logger.info(f"Updated SprintTask #{task.id} (Backlog Key: {issue_key})")
+                    updated_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"Database/Validation failure for SprintTask {issue_key}: {e}")
+                    failed_count += 1
 
         duration = (timezone.now() - start_time).total_seconds()
         
@@ -118,7 +123,7 @@ class BacklogSyncService:
         
         summary = {
             "status": "success",
-            "fetched": len(issues),
+            "fetched": total_fetched,
             "updated": updated_count,
             "skipped": skipped_count,
             "failed": failed_count,
