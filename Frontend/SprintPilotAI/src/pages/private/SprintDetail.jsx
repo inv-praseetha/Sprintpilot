@@ -255,6 +255,18 @@ export default function SprintDetail() {
     fetchData();
   }, [sprintId]);
 
+  // Live polling for Backlog changes
+  useEffect(() => {
+    if (!sprintId) return;
+    const intervalId = setInterval(() => {
+      // Skip polling if the user is actively making changes or syncing
+      if (!isGenerating && !isEditing && !isSaving && !isSyncing) {
+        refreshSprint();
+      }
+    }, 15000);
+    return () => clearInterval(intervalId);
+  }, [sprintId, isGenerating, isEditing, isSaving, isSyncing]);
+
 
 
   const handleStartGeneration = async () => {
@@ -999,21 +1011,28 @@ export default function SprintDetail() {
                         PROGRESS
                       </th>
                       <th
-                        className={`py-2 px-3 sticky left-[470px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-3 sticky left-[470px] top-[36px] z-40 w-24 border-r text-center ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       >
-                        START
+                        STATUS
                       </th>
                       <th
                         className={`py-2 px-3 sticky left-[560px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       >
+                        START
+                      </th>
+                      <th
+                        className={`py-2 px-3 sticky left-[650px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                          }`}
+                        style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                      >
                         END
                       </th>
                       <th
-                        className={`py-2 px-4 sticky left-[650px] top-[36px] z-40 border-r w-52 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-4 sticky left-[740px] top-[36px] z-40 border-r w-52 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                       >
@@ -1086,12 +1105,17 @@ export default function SprintDetail() {
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       />
                       <th
-                        className={`py-1 px-4 sticky left-[650px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        className={`py-1 px-3 sticky left-[650px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                          }`}
+                        style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                      />
+                      <th
+                        className={`py-1 px-4 sticky left-[740px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                       />
                       <th
-                        className={`py-1 px-3 sticky left-[860px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        className={`py-1 px-3 sticky left-[950px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       />
@@ -1174,10 +1198,15 @@ export default function SprintDetail() {
                             <td
                               className={`py-3 px-4 sticky left-[650px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
+                              style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                            />
+                            <td
+                              className={`py-3 px-4 sticky left-[740px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                                }`}
                               style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                             />
                             <td
-                              className={`py-3 px-3 sticky left-[860px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                              className={`py-3 px-3 sticky left-[950px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
                               style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                             />
@@ -1308,9 +1337,25 @@ export default function SprintDetail() {
                                   {getProgressPercentage(task.status)}
                                 </td>
 
+                                {/* STATUS */}
+                                <td
+                                  className={`py-4 px-2 sticky left-[470px] ${rowZIndexClass} text-center border-r align-middle font-extrabold text-[9px] ${stickyNormalBgClass}`}
+                                  style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                                >
+                                  <span className={`px-2 py-1 rounded-md uppercase tracking-wider ${
+                                    task.status === 'CLOSED' || task.status === 'RESOLVED' || task.status === 'DONE' || task.status === 'COMPLETED'
+                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
+                                      : task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'QA'
+                                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
+                                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
+                                  }`}>
+                                    {(task.status === 'TODO' ? 'OPEN' : task.status?.replace('_', ' ')) || 'OPEN'}
+                                  </span>
+                                </td>
+
                                 {/* START */}
                                 <td
-                                  className={`py-4 px-1 sticky left-[470px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-start` ? 'z-50' : rowZIndexClass
+                                  className={`py-4 px-1 sticky left-[560px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-start` ? 'z-50' : rowZIndexClass
                                     } ${stickyNormalBgClass}`}
                                   style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                                 >
@@ -1333,7 +1378,7 @@ export default function SprintDetail() {
 
                                 {/* END */}
                                 <td
-                                  className={`py-4 px-1 sticky left-[560px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-end` ? 'z-50' : rowZIndexClass
+                                  className={`py-4 px-1 sticky left-[650px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-end` ? 'z-50' : rowZIndexClass
                                     } ${stickyNormalBgClass}`}
                                   style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                                 >
@@ -1354,9 +1399,9 @@ export default function SprintDetail() {
                                   )}
                                 </td>
 
-                                {/* REMARKS */}
+                                {/* REASON */}
                                 <td
-                                  className={`py-4 px-2 sticky left-[650px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
+                                  className={`py-4 px-2 sticky left-[740px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
                                   style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                                 >
                                   <div className="relative">
@@ -1373,7 +1418,7 @@ export default function SprintDetail() {
 
                                 {/* ACTIONS */}
                                 <td
-                                  className={`py-4 px-2 sticky left-[860px] ${rowZIndexClass} text-center border-r align-middle ${stickyNormalBgClass}`}
+                                  className={`py-4 px-2 sticky left-[950px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
                                   style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                                 >
                                   <button
