@@ -130,6 +130,8 @@ export default function ProjectForm({
             <input
               type="text"
               required
+              minLength={3}
+              maxLength={10}
               disabled={!!editingProjectId}
               placeholder="e.g. PRJ-001"
               value={projectId}
@@ -151,6 +153,8 @@ export default function ProjectForm({
             <input
               type="text"
               required
+              minLength={3}
+              maxLength={255}
               placeholder="Enter project name..."
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -167,6 +171,8 @@ export default function ProjectForm({
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description</label>
           <textarea
             rows="3"
+            minLength={10}
+            maxLength={100}
             placeholder="Brief description of the project scope and deliverables..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -267,7 +273,7 @@ export default function ProjectForm({
                 onChange={setStartDate}
                 darkMode={darkMode}
                 minDate={editingProjectId && startDate && startDate < todayStr ? startDate : todayStr}
-                maxDate={endDate ? getPrevDayStr(endDate) : undefined}
+                maxDate={endDate ? endDate : undefined}
               />
             </div>
 
@@ -279,7 +285,7 @@ export default function ProjectForm({
                 value={endDate}
                 onChange={setEndDate}
                 darkMode={darkMode}
-                minDate={startDate ? getNextDayStr(startDate) : (editingProjectId ? undefined : getNextDayStr(todayStr))}
+                minDate={startDate ? startDate : (editingProjectId ? undefined : todayStr)}
               />
             </div>
           </div>
