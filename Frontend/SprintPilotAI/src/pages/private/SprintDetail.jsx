@@ -666,6 +666,17 @@ export default function SprintDetail() {
   return (
     <div className={`p-6 sm:p-8 mx-auto min-h-screen ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'}`}>
 
+      {/* Syncing Overlay Modal */}
+      {isSyncing && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/40 backdrop-blur-md">
+          <div className={`p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-4 ${darkMode ? 'bg-slate-900 border border-slate-800 text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
+            <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
+            <h3 className="text-xl font-extrabold tracking-tight">Syncing with Backlog</h3>
+            <p className="text-xs font-medium opacity-60">Please wait while tasks are being synchronized...</p>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Breadcrumb */}
       <div className="mb-6 flex justify-between items-center">
         <Link
