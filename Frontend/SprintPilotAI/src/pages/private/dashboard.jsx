@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import { useAuth } from '../../context/AuthContext';
-import { ArrowUpRight, Search, SlidersHorizontal, MoreHorizontal, Loader2 } from 'lucide-react';
+import { ArrowUpRight,AlertTriangle, Search, SlidersHorizontal, MoreHorizontal, Loader2, Calendar, Clock } from 'lucide-react';
 import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
 
@@ -322,7 +322,10 @@ const Dashboard = () => {
     const list = [];
     Object.entries(projectsData).forEach(([projName, sprints]) => {
       sprints.forEach((sprint) => {
-        if (sprint.status === 'In Progress' || sprint.status === 'Delayed') {
+        if (
+          (sprint.status === 'In Progress' || sprint.status === 'Delayed') &&
+          sprint.activeTasks > 0
+        ) {
           list.push({
             project: projName,
             sprint: sprint,
@@ -377,6 +380,63 @@ const Dashboard = () => {
 
     // Return the combined array
     return [...latestSprintsPerProject, ...otherSprints];
+  }, [projectsData]);
+
+  const getLocalDateString = (offsetDays = 0) => {
+    const d = new Date();
+    if (offsetDays !== 0) {
+      d.setDate(d.getDate() + offsetDays);
+    }
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const tasksEndingToday = useMemo(() => {
+    const todayStr = getLocalDateString(0);
+    const list = [];
+    Object.entries(projectsData).forEach(([projectName, sprints]) => {
+      sprints.forEach(sprint => {
+        if (sprint.rawTasks) {
+          sprint.rawTasks.forEach(task => {
+            const isCompleted = task.status === 'CLOSED' || task.status === 'RESOLVED';
+            const endStr = task.planned_end_date ? task.planned_end_date.substring(0, 10) : '';
+            if (!isCompleted && endStr === todayStr) {
+              list.push({
+                ...task,
+                projectName,
+                sprintName: sprint.name
+              });
+            }
+          });
+        }
+      });
+    });
+    return list;
+  }, [projectsData]);
+
+  const tasksEndingTomorrow = useMemo(() => {
+    const tomorrowStr = getLocalDateString(1);
+    const list = [];
+    Object.entries(projectsData).forEach(([projectName, sprints]) => {
+      sprints.forEach(sprint => {
+        if (sprint.rawTasks) {
+          sprint.rawTasks.forEach(task => {
+            const isCompleted = task.status === 'CLOSED' || task.status === 'RESOLVED';
+            const endStr = task.planned_end_date ? task.planned_end_date.substring(0, 10) : '';
+            if (!isCompleted && endStr === tomorrowStr) {
+              list.push({
+                ...task,
+                projectName,
+                sprintName: sprint.name
+              });
+            }
+          });
+        }
+      });
+    });
+    return list;
   }, [projectsData]);
 
   const formatBoxDateRange = (start, end) => {
@@ -469,17 +529,17 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Card 2: Total Tasks */}
+        {/* Card 2: Tasks End Today */}
         <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
           }`}>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-slate-400">Total Tasks</span>
+            <span className="text-sm font-medium text-slate-400">Due Today</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-              <ArrowUpRight className="w-4 h-4 text-slate-500" />
+              <Calendar className="w-4 h-4 text-orange-500" />
             </div>
           </div>
           <div className="flex items-end justify-between">
-            <span className="text-4xl font-extrabold tracking-tight">{metrics.totalTasks}</span>
+            <span className="text-4xl font-extrabold tracking-tight">{tasksEndingToday.length}</span>
             {/* Dotted sparkline visual */}
             <div className="flex items-end gap-[3px] h-8 pb-2">
               {[2, 3, 2, 4, 3, 5, 4, 6, 5, 4, 3, 2, 3, 4, 3, 5].map((h, i) => (
@@ -493,20 +553,20 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Card 3: Tasks Pending */}
+        {/* Card 3: Tasks End Tomorrow */}
         <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
           }`}>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-slate-400">Tasks Pending</span>
+            <span className="text-sm font-medium text-slate-400">Due Tomorrow</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-              <ArrowUpRight className="w-4 h-4 text-slate-500" />
+              <Clock className="w-4 h-4 text-blue-500" />
             </div>
           </div>
           <div className="flex items-end justify-between">
-            <span className="text-4xl font-extrabold tracking-tight">{metrics.tasksPending}</span>
+            <span className="text-4xl font-extrabold tracking-tight">{tasksEndingTomorrow.length}</span>
             {/* Thick block visual */}
             <div className="flex items-end gap-1.5 h-8 pb-1">
-              <div className="w-3 h-7 bg-orange-500 rounded-sm" />
+              <div className="w-3 h-7 bg-blue-500 rounded-sm" />
               <div className="w-3 h-5 bg-slate-200 dark:bg-slate-700 rounded-sm" />
               <div className="w-16 h-[2px] bg-slate-100 dark:bg-slate-800 self-center rounded" />
             </div>
@@ -519,7 +579,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Tasks Overdue</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-              <ArrowUpRight className="w-4 h-4 text-slate-500" />
+            <AlertTriangle className="w-4 h-4 text-rose-500" />
             </div>
           </div>
           <div className="flex items-end justify-between">
