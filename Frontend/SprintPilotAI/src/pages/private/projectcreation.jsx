@@ -309,7 +309,7 @@ export default function ProjectCreation() {
         setSubmitting(false);
         return;
       }
-      
+
       const start = new Date(startDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -498,12 +498,12 @@ export default function ProjectCreation() {
           <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search projects by name, description..."
+            placeholder="Search projects by name........."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
-                ? 'bg-slate-900 border-slate-800/60 text-slate-200 placeholder-slate-500 focus:border-orange-500'
-                : 'bg-white border-slate-100 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:shadow-md'
+              ? 'bg-slate-900 border-slate-800/60 text-slate-200 placeholder-slate-500 focus:border-orange-500'
+              : 'bg-white border-slate-100 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:shadow-md'
               }`}
           />
         </div>
@@ -515,10 +515,10 @@ export default function ProjectCreation() {
               key={filter}
               onClick={() => setStatusFilter(filter)}
               className={`px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${statusFilter === filter
-                  ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/10'
-                  : darkMode
-                    ? 'bg-slate-900 border-slate-800/60 text-slate-400 hover:text-slate-200'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/10'
+                : darkMode
+                  ? 'bg-slate-900 border-slate-800/60 text-slate-400 hover:text-slate-200'
+                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                 }`}
             >
               {filter === 'ALL' ? 'All Projects' : filter.replace('_', ' ')}
@@ -622,8 +622,8 @@ export default function ProjectCreation() {
                     {/* Type Badge */}
                     <td className="py-5 px-4 whitespace-nowrap">
                       <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${project.type === 'AGILE'
-                          ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
-                          : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
+                        ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+                        : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
                         }`}>
                         {project.type}
                       </span>
@@ -636,10 +636,10 @@ export default function ProjectCreation() {
                           value={project.status}
                           onChange={(e) => handleStatusChange(project.id, e.target.value)}
                           className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer transition-all outline-none ${project.status === 'ACTIVE'
-                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20'
-                              : project.status === 'ON_HOLD'
-                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/25 hover:bg-amber-500/20'
-                                : 'bg-slate-500/10 text-slate-700 border-slate-500/25 hover:bg-slate-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20'
+                            : project.status === 'ON_HOLD'
+                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/25 hover:bg-amber-500/20'
+                              : 'bg-slate-500/10 text-slate-700 border-slate-500/25 hover:bg-slate-500/20'
                             }`}
                         >
                           <option value="ACTIVE" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">ACTIVE</option>
@@ -648,10 +648,10 @@ export default function ProjectCreation() {
                         </select>
                       ) : (
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${project.status === 'ACTIVE'
-                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                            : project.status === 'ON_HOLD'
-                              ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                              : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : project.status === 'ON_HOLD'
+                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
                           }`}>
                           {project.status.replace('_', ' ')}
                         </span>
@@ -747,8 +747,8 @@ export default function ProjectCreation() {
                             onClick={() => handleEditProject(project)}
                             disabled={project.status === 'COMPLETED'}
                             className={`p-2 rounded-xl border transition-all ${project.status === 'COMPLETED'
-                                ? 'bg-blue-500/5 text-blue-400/50 dark:text-blue-400/40 border-blue-500/10 cursor-not-allowed'
-                                : 'bg-blue-500/10 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border-blue-500/20 cursor-pointer'
+                              ? 'bg-blue-500/5 text-blue-400/50 dark:text-blue-400/40 border-blue-500/10 cursor-not-allowed'
+                              : 'bg-blue-500/10 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border-blue-500/20 cursor-pointer'
                               }`}
                             title={project.status === 'COMPLETED' ? "Completed projects cannot be edited" : "Edit Project"}
                           >
@@ -758,8 +758,8 @@ export default function ProjectCreation() {
                             onClick={() => handleDeleteProject(project.id)}
                             disabled={project.status === 'COMPLETED'}
                             className={`p-2 rounded-xl border transition-all ${project.status === 'COMPLETED'
-                                ? 'bg-rose-500/5 text-rose-400/50 dark:text-rose-400/40 border-rose-500/10 cursor-not-allowed'
-                                : 'bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border-rose-500/20 cursor-pointer'
+                              ? 'bg-rose-500/5 text-rose-400/50 dark:text-rose-400/40 border-rose-500/10 cursor-not-allowed'
+                              : 'bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border-rose-500/20 cursor-pointer'
                               }`}
                             title={project.status === 'COMPLETED' ? "Completed projects cannot be deleted" : "Delete Project"}
                           >
@@ -776,8 +776,8 @@ export default function ProjectCreation() {
 
           {/* Pagination Controls */}
           <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${darkMode
-              ? 'border-slate-800 bg-slate-900/60'
-              : 'border-slate-100 bg-slate-50/30'
+            ? 'border-slate-800 bg-slate-900/60'
+            : 'border-slate-100 bg-slate-50/30'
             }`}>
             <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
               Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{Math.ceil(totalCount / 5) || 1}</span> ({totalCount} total projects)
@@ -788,10 +788,10 @@ export default function ProjectCreation() {
                 onClick={() => fetchProjects(currentPage - 1)}
                 disabled={!hasPrevPage}
                 className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${hasPrevPage
-                    ? darkMode
-                      ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
-                      : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 cursor-pointer shadow-sm shadow-slate-100/50'
-                    : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                  ? darkMode
+                    ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                    : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 cursor-pointer shadow-sm shadow-slate-100/50'
+                  : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
                   }`}
               >
                 Previous
@@ -806,10 +806,10 @@ export default function ProjectCreation() {
                     type="button"
                     onClick={() => fetchProjects(p)}
                     className={`w-8.5 h-8.5 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${isSelected
-                        ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
-                        : darkMode
-                          ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
-                          : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
+                      ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
+                      : darkMode
+                        ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
+                        : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
                       }`}
                   >
                     {p}
@@ -822,10 +822,10 @@ export default function ProjectCreation() {
                 onClick={() => fetchProjects(currentPage + 1)}
                 disabled={!hasNextPage}
                 className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${hasNextPage
-                    ? darkMode
-                      ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
-                      : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 cursor-pointer shadow-sm shadow-slate-100/50'
-                    : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                  ? darkMode
+                    ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                    : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 cursor-pointer shadow-sm shadow-slate-100/50'
+                  : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
                   }`}
               >
                 Next
