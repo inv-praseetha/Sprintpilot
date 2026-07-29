@@ -48,6 +48,7 @@ export default function TaskUploadModal({
 }) {
   const [excelFile, setExcelFile] = useState(null);
   const [excelData, setExcelData] = useState([]);
+  const [excelHolidays, setExcelHolidays] = useState([]);
   const [milestoneName, setMilestoneName] = useState('');
   const [sprintStartDate, setSprintStartDate] = useState('');
   const [sprintEndDate, setSprintEndDate] = useState('');
@@ -59,6 +60,7 @@ export default function TaskUploadModal({
   const closeModal = () => {
     setExcelFile(null);
     setExcelData([]);
+    setExcelHolidays([]);
     setMilestoneName('');
     setSprintStartDate('');
     setSprintEndDate('');
@@ -117,7 +119,7 @@ export default function TaskUploadModal({
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -177,12 +179,94 @@ export default function TaskUploadModal({
           return;
         }
 
+        // Helper to format date values into YYYY-MM-DD
+        const formatDateValue = (val) => {
+          if (!val) return '';
+          if (val instanceof Date) {
+            // Add 12 hours to avoid timezone shifting/rounding issues that pull it to the previous day (e.g. 23:59:50)
+            const adjustedDate = new Date(val.getTime() + 12 * 60 * 60 * 1000);
+            const y = adjustedDate.getFullYear();
+            const m = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+            const d = String(adjustedDate.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          if (typeof val === 'number') {
+            const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+            const adjustedDate = new Date(date.getTime() + 12 * 60 * 60 * 1000);
+            const y = adjustedDate.getFullYear();
+            const m = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+            const d = String(adjustedDate.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          const str = val.toString().trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            return str;
+          }
+          const parts = str.split(/[-/]/);
+          if (parts.length === 3) {
+            if (parts[0].length === 4) {
+              return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            }
+            if (parts[2].length === 4) {
+              return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+          }
+          const parsedDate = new Date(str);
+          if (!isNaN(parsedDate.getTime())) {
+            const adjustedDate = new Date(parsedDate.getTime() + 12 * 60 * 60 * 1000);
+            const y = adjustedDate.getFullYear();
+            const m = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+            const d = String(adjustedDate.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          return '';
+        };
+
+        // Parse Holidays from Column F (dynamically detected index) starting from row 4 (index 3)
+        const parsedHolidays = [];
+        const row3 = rows[2] || [];
+        let holidayColIndex = row3.findIndex(cell => 
+          cell && cell.toString().toLowerCase().includes('holiday')
+        );
+        if (holidayColIndex === -1) {
+          // Fallback check in first 5 rows
+          for (let r = 0; r < Math.min(5, rows.length); r++) {
+            const idx = (rows[r] || []).findIndex(cell => 
+              cell && cell.toString().toLowerCase().includes('holiday')
+            );
+            if (idx !== -1) {
+              holidayColIndex = idx;
+              break;
+            }
+          }
+        }
+        if (holidayColIndex === -1) {
+          holidayColIndex = rows[3] && rows[3].length > 5 ? 5 : 4;
+        }
+
+        for (let i = 3; i < rows.length; i++) {
+          const row = rows[i];
+          if (row && row[holidayColIndex] !== undefined && row[holidayColIndex] !== null) {
+            const hVal = row[holidayColIndex];
+            const formatted = formatDateValue(hVal);
+            if (formatted) {
+              parsedHolidays.push(formatted);
+            }
+          }
+        }
+        setExcelHolidays(parsedHolidays);
+
+        // Parse Tasks, skipping rows with empty task title (preventing junk tasks)
         const parsedRows = [];
         for (let i = 4; i < rows.length; i++) {
           const row = rows[i];
-          if (!row || row.length === 0 || row.every(val => val === null || val === '' || val === undefined)) continue;
+          if (!row || row.length === 0) continue;
 
           const titleVal = row[titleIndex] !== undefined ? row[titleIndex] : '';
+          if (!titleVal || titleVal.toString().trim() === '') {
+            continue;
+          }
+
           const descVal = row[descIndex] !== undefined ? row[descIndex] : '';
           const catVal = row[catIndex] !== undefined ? row[catIndex] : '';
           const jiraVal = jiraIndex !== -1 && row[jiraIndex] !== undefined ? row[jiraIndex] : '';
@@ -191,7 +275,7 @@ export default function TaskUploadModal({
           const validCats = ['UI', 'BACKEND', 'INFRA', 'QA'];
 
           parsedRows.push({
-            title: (titleVal || 'Untitled Task').toString().trim(),
+            title: titleVal.toString().trim(),
             desc: (descVal || 'No description provided.').toString().trim(),
             category: validCats.includes(cat) ? cat : 'UI',
             status: 'OPEN',
@@ -247,6 +331,7 @@ export default function TaskUploadModal({
     onImportSuccess({
       milestoneName,
       tasks: excelData,
+      holidays: excelHolidays,
       sprintStartDate,
       sprintEndDate: finalEndDate,
       targetProjectKey

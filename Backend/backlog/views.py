@@ -28,7 +28,7 @@ class SprintSyncBacklogView(APIView):
             backlog_service = BacklogService(project_key=sprint.project.project_id)
         except Exception as e:
             return Response({"detail": f"Configuration error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
+
         try:
             project_id, _ = backlog_service._resolve_project_and_issue_type()
             if project_id:
@@ -60,8 +60,9 @@ class SprintSyncBacklogView(APIView):
                     issue_key = backlog_service.sync_task(task)
                     if issue_key:
                         task.backlog_task_id = issue_key
-                        task.synced_at = timezone.now()
-                        task.save(update_fields=['backlog_task_id', 'synced_at', 'updated_at'])
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
                         created_count += 1
                 except Exception as e:
                     errors.append(f"Task '{task.title}' (Create): {str(e)}")
@@ -74,13 +75,15 @@ class SprintSyncBacklogView(APIView):
                 try:
                     issue_key = backlog_service.update_task(task)
                     if issue_key:
-                        task.synced_at = timezone.now()
-                        task.save(update_fields=['synced_at', 'updated_at'])
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
                         updated_count += 1
                 except Exception as e:
                     if str(e) == "NO_CHANGES_DETECTED":
-                        task.synced_at = timezone.now()
-                        task.save(update_fields=['synced_at', 'updated_at'])
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
                         up_to_date_count += 1
                     else:
                         errors.append(f"Task '{task.title}' (Update): {str(e)}")

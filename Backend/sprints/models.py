@@ -189,3 +189,19 @@ class TaskRecommendation(models.Model):
     def __str__(self):
         emp_name = self.recommended_employee.user.full_name if self.recommended_employee else "Unassigned"
         return f"Recommendation for {self.task.title} -> {emp_name}"
+
+class SprintHoliday(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sprint = models.ForeignKey(Sprint, on_delete=models.CASCADE, related_name='holidays')
+    date = models.DateField()
+    description = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'sprint_holidays'
+        ordering = ['date']
+        unique_together = (('sprint', 'date'),)
+
+    def __str__(self):
+        return f"{self.sprint.milestone} - {self.date}"
+

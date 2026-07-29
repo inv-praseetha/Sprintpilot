@@ -321,7 +321,7 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleImportSuccess = async ({ milestoneName, tasks, sprintStartDate, sprintEndDate, targetProjectKey }) => {
+  const handleImportSuccess = async ({ milestoneName, tasks, holidays, sprintStartDate, sprintEndDate, targetProjectKey }) => {
     try {
       const sprintData = {
         name: milestoneName,
@@ -329,7 +329,8 @@ export default function ProjectDetail() {
         start_date: sprintStartDate,
         end_date: sprintEndDate,
         status: 'ACTIVE',
-        tasks: tasks
+        tasks: tasks,
+        holidays: holidays
       };
 
       await SprintServices.createSprint(projectId, sprintData);

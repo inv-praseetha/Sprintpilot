@@ -43,12 +43,17 @@ class BacklogSyncService:
         
         from project.models import Project
         # Only fetch issues for projects that have at least one synced task
-        projects = Project.objects.filter(
-            is_deleted=False, 
-            sprints__tasks__backlog_task_id__isnull=False
+        active_project_ids = SprintTask.objects.filter(
+            is_deleted=False,
+            backlog_task_id__isnull=False
         ).exclude(
-            sprints__tasks__backlog_task_id=''
-        ).distinct()
+            backlog_task_id=''
+        ).values_list('sprint__project_id', flat=True).distinct()
+
+        projects = Project.objects.filter(
+            id__in=active_project_ids,
+            is_deleted=False
+        )
         
         total_fetched = 0
         updated_count = 0

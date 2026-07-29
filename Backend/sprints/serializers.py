@@ -1,7 +1,12 @@
 from rest_framework import serializers
 from accounts.serializers import EmployeeProfileSerializer
-from sprints.models import Sprint, SprintTask
+from sprints.models import Sprint, SprintTask, SprintHoliday
 from accounts.models import EmployeeProfile
+
+class SprintHolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SprintHoliday
+        fields = ['id', 'date', 'description']
 
 class SprintTaskSerializer(serializers.ModelSerializer):
     assigned_employee = EmployeeProfileSerializer(read_only=True)
@@ -80,6 +85,7 @@ class SprintTaskSerializer(serializers.ModelSerializer):
 
 class SprintSerializer(serializers.ModelSerializer):
     tasks = SprintTaskSerializer(many=True, read_only=True)
+    holidays = SprintHolidaySerializer(many=True, read_only=True)
     project_status = serializers.CharField(source='project.status', read_only=True)
     project_custom_id = serializers.CharField(source='project.project_id', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
@@ -99,6 +105,7 @@ class SprintSerializer(serializers.ModelSerializer):
             'end_date',
             'status',
             'tasks',
+            'holidays',
             'project_custom_id',
             'workspace_url',
             'backlog_status',
