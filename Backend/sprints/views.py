@@ -166,6 +166,30 @@ class SprintDownloadScheduleView(APIView):
                     'alignment': copy.copy(cell.alignment) if cell.alignment else None,
                     'number_format': cell.number_format
                 })
+
+            # Save UAT Release row style (using Row 50)
+            styles['UAT_Release'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=50, column=col)
+                styles['UAT_Release'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+
+            # Save Production Release row style (using Row 51)
+            styles['Production_Release'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=51, column=col)
+                styles['Production_Release'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
                 
             # 3. Clear schedule area columns B to G in rows 7 to 51
             for r in range(7, 52):
@@ -299,6 +323,52 @@ class SprintDownloadScheduleView(APIView):
             # Ensure other columns in this row are empty (no remarks etc.)
             for col_idx in range(3, 8):
                 ws.cell(row=current_row, column=col_idx, value=None)
+            
+            current_row += 1
+
+            # Write "UAT Release" task row
+            sprint_end_dt = sprint.end_date
+            if isinstance(sprint_end_dt, str):
+                sprint_end_dt = datetime.date.fromisoformat(sprint_end_dt)
+            second_last_day = sprint_end_dt - datetime.timedelta(days=1)
+            last_day = sprint_end_dt
+
+            style_list = styles['UAT_Release']
+            for col_idx in range(2, 8):
+                cell = ws.cell(row=current_row, column=col_idx)
+                style_info = style_list[col_idx - 2]
+                if style_info['fill']: cell.fill = style_info['fill']
+                if style_info['font']: cell.font = style_info['font']
+                if style_info['border']: cell.border = style_info['border']
+                if style_info['alignment']: cell.alignment = style_info['alignment']
+                cell.number_format = style_info['number_format']
+            
+            ws.cell(row=current_row, column=2, value='UAT Release')
+            ws.cell(row=current_row, column=3, value=None) # Assigned To: leave empty
+            ws.cell(row=current_row, column=4, value=0.0)  # Progress: 0%
+            ws.cell(row=current_row, column=5, value=second_last_day) # Start Date
+            ws.cell(row=current_row, column=6, value=second_last_day) # End Date
+            ws.cell(row=current_row, column=7, value=None) # Remarks
+            
+            current_row += 1
+
+            # Write "Production Release" task row
+            style_list = styles['Production_Release']
+            for col_idx in range(2, 8):
+                cell = ws.cell(row=current_row, column=col_idx)
+                style_info = style_list[col_idx - 2]
+                if style_info['fill']: cell.fill = style_info['fill']
+                if style_info['font']: cell.font = style_info['font']
+                if style_info['border']: cell.border = style_info['border']
+                if style_info['alignment']: cell.alignment = style_info['alignment']
+                cell.number_format = style_info['number_format']
+            
+            ws.cell(row=current_row, column=2, value='Production Release')
+            ws.cell(row=current_row, column=3, value=None) # Assigned To: leave empty
+            ws.cell(row=current_row, column=4, value=0.0)  # Progress: 0%
+            ws.cell(row=current_row, column=5, value=last_day) # Start Date
+            ws.cell(row=current_row, column=6, value=last_day) # End Date
+            ws.cell(row=current_row, column=7, value=None) # Remarks
             
             current_row += 1
 
