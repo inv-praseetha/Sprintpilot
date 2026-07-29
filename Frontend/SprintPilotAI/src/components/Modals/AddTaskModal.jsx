@@ -225,7 +225,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                   }`}
                 required
               >
-                <option value="OPEN">TODO / Open</option>
+                <option value="OPEN">Open</option>
                 <option value="IN_PROGRESS">In Progress</option>
                 <option value="RESOLVED">In Review / Resolved</option>
                 <option value="CLOSED">Completed / Closed</option>
