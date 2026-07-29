@@ -21,6 +21,17 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
 
   if (!show) return null;
 
+  const getSchedulingEndDate = (endDateStr) => {
+    if (!endDateStr) return '';
+    const date = new Date(endDateStr);
+    date.setDate(date.getDate() - 2);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const schedulingEndDate = sprintEndDate ? getSchedulingEndDate(sprintEndDate) : '';
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => {
@@ -267,7 +278,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                   handleChange({ target: { name: 'planned_start_date', value: val } });
                 }}
                 minDate={sprintStartDate}
-                maxDate={sprintEndDate}
+                maxDate={schedulingEndDate}
                 darkMode={darkMode}
               />
             </div>
@@ -281,7 +292,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                   handleChange({ target: { name: 'planned_end_date', value: val } });
                 }}
                 minDate={formData.planned_start_date || sprintStartDate}
-                maxDate={sprintEndDate}
+                maxDate={schedulingEndDate}
                 darkMode={darkMode}
               />
             </div>
