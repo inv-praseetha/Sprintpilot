@@ -42,7 +42,13 @@ class BacklogSyncService:
         updated_since = start_time - timedelta(hours=24)
         
         from project.models import Project
-        projects = Project.objects.filter(is_deleted=False)
+        # Only fetch issues for projects that have at least one synced task
+        projects = Project.objects.filter(
+            is_deleted=False, 
+            sprints__tasks__backlog_task_id__isnull=False
+        ).exclude(
+            sprints__tasks__backlog_task_id=''
+        ).distinct()
         
         total_fetched = 0
         updated_count = 0
