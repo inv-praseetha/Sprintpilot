@@ -159,6 +159,17 @@ export default function SprintDetail() {
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
+  const getSchedulingEndDate = (endDateStr) => {
+    if (!endDateStr) return '';
+    const date = new Date(endDateStr);
+    date.setDate(date.getDate() - 2);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const schedulingEndDate = sprint?.end_date ? getSchedulingEndDate(sprint.end_date) : '';
+
   const refreshSprint = async () => {
     try {
       const sprintData = await SprintServices.getSprintDetails(sprintId);
@@ -1406,7 +1417,7 @@ export default function SprintDetail() {
                                     <CustomDatePicker
                                       value={task.planned_start_date}
                                       minDate={sprint?.start_date}
-                                      maxDate={task.planned_end_date || sprint?.end_date}
+                                      maxDate={task.planned_end_date || schedulingEndDate}
                                       onChange={(newDate) => handleStartDateChange(task.id, newDate)}
                                       darkMode={darkMode}
                                       onOpen={() => setActiveDatePickerId(`${task.id}-start`)}
@@ -1429,7 +1440,7 @@ export default function SprintDetail() {
                                     <CustomDatePicker
                                       value={task.planned_end_date}
                                       minDate={task.planned_start_date || sprint?.start_date}
-                                      maxDate={sprint?.end_date}
+                                      maxDate={schedulingEndDate}
                                       onChange={(newDate) => handleEndDateChange(task.id, newDate)}
                                       darkMode={darkMode}
                                       onOpen={() => setActiveDatePickerId(`${task.id}-end`)}
