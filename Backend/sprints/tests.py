@@ -483,6 +483,35 @@ class SprintServiceTests(APITestCase):
         # Add profile as member of self.project
         ProjectMember.objects.create(project=self.project, employee_profile=self.profile)
 
+    def test_calculate_working_days_with_holidays(self):
+        # 2026-07-20 is Monday, 2026-07-24 is Friday. Total standard working days = 5.
+        # Let's add holidays on 2026-07-21 (Tuesday) and 2026-07-23 (Thursday).
+        # Working days should be 5 - 2 = 3.
+        holidays = ["2026-07-21", "2026-07-23"]
+        self.assertEqual(calculate_working_days("2026-07-20", "2026-07-24", holidays=holidays), 3)
+
+        # Holiday falling on a weekend should have no impact on weekdays
+        holidays_weekend = ["2026-07-21", "2026-07-25"] # 25th is Saturday
+        self.assertEqual(calculate_working_days("2026-07-20", "2026-07-24", holidays=holidays_weekend), 4)
+
+    def test_sprint_holiday_saving_and_serialisation(self):
+        from sprints.models import SprintHoliday
+        from sprints.serializers import SprintSerializer
+        
+        holiday = SprintHoliday.objects.create(
+            sprint=self.sprint,
+            date=datetime.date(2026, 7, 21),
+            description="Vishu"
+        )
+        self.assertEqual(self.sprint.holidays.count(), 1)
+        self.assertEqual(self.sprint.holidays.first().date.strftime("%Y-%m-%d"), "2026-07-21")
+        
+        # Verify serialized representation includes holidays
+        serializer = SprintSerializer(self.sprint)
+        self.assertIn('holidays', serializer.data)
+        self.assertEqual(len(serializer.data['holidays']), 1)
+        self.assertEqual(serializer.data['holidays'][0]['date'], "2026-07-21")
+
     def test_calculate_working_days_edge_cases(self):
         # None cases
         self.assertEqual(calculate_working_days(None, "2026-07-20"), 0)

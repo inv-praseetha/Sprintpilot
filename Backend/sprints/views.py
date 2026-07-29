@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from project.models import Project
 from accounts.models import EmployeeProfile
-from sprints.models import Sprint, SprintTask
+from sprints.models import Sprint, SprintTask, SprintHoliday
 from sprints.serializers import SprintSerializer, SprintTaskSerializer
 
 class SprintDownloadTemplateView(APIView):
@@ -166,6 +166,30 @@ class SprintDownloadScheduleView(APIView):
                     'alignment': copy.copy(cell.alignment) if cell.alignment else None,
                     'number_format': cell.number_format
                 })
+
+            # Save UAT Release row style (using Row 50)
+            styles['UAT_Release'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=50, column=col)
+                styles['UAT_Release'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
+
+            # Save Production Release row style (using Row 51)
+            styles['Production_Release'] = []
+            for col in range(2, 8):
+                cell = ws.cell(row=51, column=col)
+                styles['Production_Release'].append({
+                    'fill': copy.copy(cell.fill) if cell.fill else None,
+                    'font': copy.copy(cell.font) if cell.font else None,
+                    'border': copy.copy(cell.border) if cell.border else None,
+                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
+                    'number_format': cell.number_format
+                })
                 
             # 3. Clear schedule area columns B to G in rows 7 to 51
             for r in range(7, 52):
@@ -302,6 +326,52 @@ class SprintDownloadScheduleView(APIView):
             
             current_row += 1
 
+            # Write "UAT Release" task row
+            sprint_end_dt = sprint.end_date
+            if isinstance(sprint_end_dt, str):
+                sprint_end_dt = datetime.date.fromisoformat(sprint_end_dt)
+            second_last_day = sprint_end_dt - datetime.timedelta(days=1)
+            last_day = sprint_end_dt
+
+            style_list = styles['UAT_Release']
+            for col_idx in range(2, 8):
+                cell = ws.cell(row=current_row, column=col_idx)
+                style_info = style_list[col_idx - 2]
+                if style_info['fill']: cell.fill = style_info['fill']
+                if style_info['font']: cell.font = style_info['font']
+                if style_info['border']: cell.border = style_info['border']
+                if style_info['alignment']: cell.alignment = style_info['alignment']
+                cell.number_format = style_info['number_format']
+            
+            ws.cell(row=current_row, column=2, value='UAT Release')
+            ws.cell(row=current_row, column=3, value=None) # Assigned To: leave empty
+            ws.cell(row=current_row, column=4, value=0.0)  # Progress: 0%
+            ws.cell(row=current_row, column=5, value=second_last_day) # Start Date
+            ws.cell(row=current_row, column=6, value=second_last_day) # End Date
+            ws.cell(row=current_row, column=7, value=None) # Remarks
+            
+            current_row += 1
+
+            # Write "Production Release" task row
+            style_list = styles['Production_Release']
+            for col_idx in range(2, 8):
+                cell = ws.cell(row=current_row, column=col_idx)
+                style_info = style_list[col_idx - 2]
+                if style_info['fill']: cell.fill = style_info['fill']
+                if style_info['font']: cell.font = style_info['font']
+                if style_info['border']: cell.border = style_info['border']
+                if style_info['alignment']: cell.alignment = style_info['alignment']
+                cell.number_format = style_info['number_format']
+            
+            ws.cell(row=current_row, column=2, value='Production Release')
+            ws.cell(row=current_row, column=3, value=None) # Assigned To: leave empty
+            ws.cell(row=current_row, column=4, value=0.0)  # Progress: 0%
+            ws.cell(row=current_row, column=5, value=last_day) # Start Date
+            ws.cell(row=current_row, column=6, value=last_day) # End Date
+            ws.cell(row=current_row, column=7, value=None) # Remarks
+            
+            current_row += 1
+
             # Remove the old conditional formatting rule for the Gantt chart area
             keys_to_remove = []
             for key in list(ws.conditional_formatting._cf_rules.keys()):
@@ -409,6 +479,18 @@ class SprintListCreateView(APIView):
                     status=data.get('status') or 'ACTIVE'
                 )
 
+                holidays_data = data.get('holidays') or []
+                for holiday_str in holidays_data:
+                    try:
+                        h_date = datetime.datetime.strptime(holiday_str, "%Y-%m-%d").date()
+                        SprintHoliday.objects.get_or_create(
+                            sprint=sprint,
+                            date=h_date,
+                            defaults={'description': 'Sprint Holiday'}
+                        )
+                    except Exception:
+                        pass
+
                 tasks_data = data.get('tasks') or []
                 for task_item in tasks_data:
                     title = task_item.get('title')
@@ -432,22 +514,18 @@ class SprintListCreateView(APIView):
                     if priority not in ['Low', 'Normal', 'High', 'Critical']:
                         priority = 'Normal'
 
-                    status_val = task_item.get('status', 'TODO')
+                    status_val = task_item.get('status', 'OPEN')
                     status_val_clean = str(status_val).upper().replace(' ', '_').strip()
                     if status_val_clean == 'IN_PROGRESS':
                         status_val = 'IN_PROGRESS'
-                    elif status_val_clean == 'COMPLETED' or status_val_clean == 'DONE':
-                        status_val = 'DONE'
-                    elif status_val_clean == 'TODO':
-                        status_val = 'TODO'
-                    elif status_val_clean == 'IN_REVIEW':
-                        status_val = 'IN_REVIEW'
-                    elif status_val_clean == 'QA':
-                        status_val = 'QA'
-                    elif status_val_clean == 'BLOCKED':
-                        status_val = 'BLOCKED'
+                    elif status_val_clean in ('COMPLETED', 'DONE', 'CLOSED'):
+                        status_val = 'CLOSED'
+                    elif status_val_clean in ('TODO', 'OPEN'):
+                        status_val = 'OPEN'
+                    elif status_val_clean in ('IN_REVIEW', 'QA', 'RESOLVED'):
+                        status_val = 'RESOLVED'
                     else:
-                        status_val = 'TODO'
+                        status_val = 'OPEN'
 
                     SprintTask.objects.create(
                         sprint=sprint,
@@ -564,7 +642,8 @@ class SprintTaskUpdateView(APIView):
         elif start_changed or end_changed:
             if task.planned_start_date and task.planned_end_date:
                 from sprints.services.schedule_service import calculate_working_days
-                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
+                holidays = list(task.sprint.holidays.values_list('date', flat=True)) if task.sprint else None
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)
                 task.estimated_hours = wd * 8
             
         if sp_changed:
@@ -572,7 +651,8 @@ class SprintTaskUpdateView(APIView):
         elif start_changed or end_changed:
             if task.planned_start_date and task.planned_end_date:
                 from sprints.services.schedule_service import calculate_working_days
-                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date))
+                holidays = list(task.sprint.holidays.values_list('date', flat=True)) if task.sprint else None
+                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)
                 task.story_points = wd * 2
             
         if 'title' in data:
@@ -742,7 +822,8 @@ class SprintTaskCreateView(APIView):
                 from sprints.services.schedule_service import calculate_working_days
                 start_str = start_date.strftime("%Y-%m-%d")
                 end_str = end_date.strftime("%Y-%m-%d")
-                wd = calculate_working_days(start_str, end_str)
+                holidays = list(sprint.holidays.values_list('date', flat=True)) if sprint else None
+                wd = calculate_working_days(start_str, end_str, holidays=holidays)
                 if task.story_points is None:
                     task.story_points = wd * 2
                 if task.estimated_hours is None:

@@ -70,12 +70,12 @@ const getProgressPercentage = (status) => {
   if (s === 'QA') return '80%';
   if (s === 'IN_PROGRESS') return '50%';
   if (s === 'BLOCKED') return '10%';
-  if (s === 'OPEN' || s === 'TODO') return '0%';
+  if (s === 'OPEN') return '0%';
   return '0%';
 };
 
 // Generates calendar columns starting from the Monday of the start date week to the Friday of the end date week
-const generateTimelineDays = (startStr, endStr) => {
+const generateTimelineDays = (startStr, endStr, holidaysMap = new Map()) => {
   const sStr = startStr || '2026-07-15';
   const eStr = endStr || '2026-07-28';
 
@@ -108,12 +108,16 @@ const generateTimelineDays = (startStr, endStr) => {
     const m = String(current.getMonth() + 1).padStart(2, '0');
     const d = String(current.getDate()).padStart(2, '0');
     const dateStr = `${y}-${m}-${d}`;
+    const isHoliday = holidaysMap.has(dateStr);
+    const holidayDescription = isHoliday ? (holidaysMap.get(dateStr) || '') : '';
 
     daysList.push({
       dayNum: dNum,
       dayName: dName,
       isWeekend,
-      isNonWorkingDay: isWeekend,
+      isHoliday,
+      holidayDescription,
+      isNonWorkingDay: isWeekend || isHoliday,
       dateStr,
       isSprintStart: dateStr === sStr,
       isSprintEnd: dateStr === eStr
@@ -155,6 +159,17 @@ export default function SprintDetail() {
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
+  const getSchedulingEndDate = (endDateStr) => {
+    if (!endDateStr) return '';
+    const date = new Date(endDateStr);
+    date.setDate(date.getDate() - 2);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const schedulingEndDate = sprint?.end_date ? getSchedulingEndDate(sprint.end_date) : '';
+
   const refreshSprint = async () => {
     try {
       const sprintData = await SprintServices.getSprintDetails(sprintId);
@@ -170,7 +185,8 @@ export default function SprintDetail() {
       setTasks(dbTasks);
       setOriginalTasks(JSON.parse(JSON.stringify(dbTasks)));
       
-      const days = generateTimelineDays(sprintData.start_date, sprintData.end_date);
+      const holidaysMap = new Map((sprintData.holidays || []).map(h => [h.date, h.description || '']));
+      const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, holidaysMap);
       setTimelineDaysList(days);
     } catch (err) {
       console.error('[SprintDetail] Error refreshing sprint details:', err);
@@ -244,7 +260,8 @@ export default function SprintDetail() {
         setEmployees(projectRes.data?.members || []);
 
         // Generate timeline range based on Sprint boundaries
-        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date);
+        const holidaysMap = new Map((sprintData.holidays || []).map(h => [h.date, h.description || '']));
+        const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, holidaysMap);
         setTimelineDaysList(days);
       } catch (err) {
         console.error('[SprintDetail] Error loading data:', err);
@@ -773,7 +790,7 @@ export default function SprintDetail() {
               <p className="text-[11px] font-semibold leading-relaxed">
                 {isGenerating
                   ? `AI Suggested Scheduling: ${loadingText}`
-                  : "Below is the workload schedule grouped by developmental categories. Saturdays and Sundays are shaded gray to indicate non-working weekends."}
+                  : "Below is the workload schedule grouped by developmental categories. Saturdays, Sundays, and sprint holidays are highlighted to indicate non-working days."}
               </p>
             </div>
 
@@ -923,6 +940,11 @@ export default function SprintDetail() {
                         }`} />
                       <span>Weekend</span>
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2.5 h-2.5 rounded-md border ${darkMode ? 'bg-red-950/80 border-red-800' : 'bg-red-100 border-red-300'
+                        }`} />
+                      <span>Holiday</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1022,35 +1044,35 @@ export default function SprintDetail() {
                         PROGRESS
                       </th>
                       <th
-                        className={`py-2 px-3 sticky left-[470px] top-[36px] z-40 w-24 border-r text-center ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-3 sticky left-[470px] top-[36px] z-40 w-28 border-r text-center ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
-                        style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                        style={{ minWidth: '110px', maxWidth: '110px', width: '110px' }}
                       >
                         STATUS
                       </th>
                       <th
-                        className={`py-2 px-3 sticky left-[560px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-3 sticky left-[580px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       >
                         START
                       </th>
                       <th
-                        className={`py-2 px-3 sticky left-[650px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-3 sticky left-[670px] top-[36px] z-40 w-24 border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       >
                         END
                       </th>
                       <th
-                        className={`py-2 px-4 sticky left-[740px] top-[36px] z-40 border-r w-52 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-4 sticky left-[760px] top-[36px] z-40 border-r w-52 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                       >
                         RECOMMENDATION REASON
                       </th>
                       <th
-                        className={`py-2 px-3 sticky left-[860px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                        className={`py-2 px-3 sticky left-[970px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
                           }`}
                         style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       >
@@ -1061,9 +1083,12 @@ export default function SprintDetail() {
                       {timelineDaysList.map((day, idx) => {
                         let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'
                           }`;
-                        if (day.isWeekend) {
-                          cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-not-allowed ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-500'
-                            }`;
+                        if (day.isWeekend || day.isHoliday) {
+                          cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-not-allowed ${
+                            day.isHoliday
+                              ? darkMode ? 'border-slate-800 bg-red-950/80 text-red-200' : 'border-slate-200 bg-red-100/90 text-red-700 font-bold'
+                              : darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-500'
+                          }`;
                         }
                         if (day.isSprintStart) {
                           cellStyle += ' border-l-2 border-l-orange-500';
@@ -1075,7 +1100,7 @@ export default function SprintDetail() {
                           <th 
                             key={`num-${day.dayNum}-${idx}`} 
                             className={cellStyle}
-                            title={day.isWeekend ? 'Weekend' : ''}
+                            title={day.isWeekend ? 'Weekend' : day.isHoliday ? 'Holiday' : ''}
                           >
                             {day.dayNum}
                           </th>
@@ -1108,36 +1133,39 @@ export default function SprintDetail() {
                       <th
                         className={`py-1 px-3 sticky left-[470px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
-                        style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                        style={{ minWidth: '110px', maxWidth: '110px', width: '110px' }}
                       />
                       <th
-                        className={`py-1 px-3 sticky left-[560px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        className={`py-1 px-3 sticky left-[580px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       />
                       <th
-                        className={`py-1 px-3 sticky left-[650px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        className={`py-1 px-3 sticky left-[670px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                       />
                       <th
-                        className={`py-1 px-4 sticky left-[740px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        className={`py-1 px-4 sticky left-[760px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                       />
                       <th
-                        className={`py-1 px-3 sticky left-[950px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        className={`py-1 px-3 sticky left-[970px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                           }`}
                         style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       />
 
                       {/* Day Names */}
                       {timelineDaysList.map((day, idx) => {
-                        let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-455'
+                        let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-white text-slate-455'
                           }`;
-                        if (day.isWeekend) {
-                          cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-not-allowed ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
-                            }`;
+                        if (day.isWeekend || day.isHoliday) {
+                          cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-not-allowed ${
+                            day.isHoliday
+                              ? darkMode ? 'border-slate-800 bg-red-950/80 text-red-200' : 'border-slate-200 bg-red-100/90 text-red-700 font-bold'
+                              : darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
+                          }`;
                         }
                         if (day.isSprintStart) {
                           cellStyle += ' border-l-2 border-l-orange-500';
@@ -1149,7 +1177,7 @@ export default function SprintDetail() {
                           <th 
                             key={`name-${day.dayNum}-${idx}`} 
                             className={cellStyle}
-                            title={day.isWeekend ? 'Weekend' : ''}
+                            title={day.isWeekend ? 'Weekend' : day.isHoliday ? 'Holiday' : ''}
                           >
                             {day.dayName}
                           </th>
@@ -1199,25 +1227,25 @@ export default function SprintDetail() {
                             <td
                               className={`py-3 px-3 sticky left-[470px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
-                              style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                              style={{ minWidth: '110px', maxWidth: '110px', width: '110px' }}
                             />
                             <td
-                              className={`py-3 px-3 sticky left-[560px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                              className={`py-3 px-3 sticky left-[580px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
                               style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                             />
                             <td
-                              className={`py-3 px-4 sticky left-[650px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                              className={`py-3 px-4 sticky left-[670px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
                               style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                             />
                             <td
-                              className={`py-3 px-4 sticky left-[740px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                              className={`py-3 px-4 sticky left-[760px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
                               style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                             />
                             <td
-                              className={`py-3 px-3 sticky left-[950px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
+                              className={`py-3 px-3 sticky left-[970px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'
                                 }`}
                               style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                             />
@@ -1228,6 +1256,8 @@ export default function SprintDetail() {
                                 }`;
                               if (day.isWeekend) {
                                 cellStyle += darkMode ? ' bg-slate-950/65' : ' bg-slate-100/65';
+                              } else if (day.isHoliday) {
+                                cellStyle += (darkMode ? ' bg-red-950/50' : ' bg-red-100/50') + ' relative';
                               }
                               if (day.isSprintStart) {
                                 cellStyle += ' border-l-2 border-l-orange-500/20';
@@ -1235,7 +1265,20 @@ export default function SprintDetail() {
                               if (day.isSprintEnd) {
                                 cellStyle += ' border-r-2 border-r-orange-500/20';
                               }
-                              return <td key={`sec-${category}-${idx}`} className={cellStyle} />;
+                              return (
+                                <td key={`sec-${category}-${idx}`} className={cellStyle}>
+                                  {day.isHoliday && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-visible">
+                                      <span 
+                                        className="text-[7.5px] font-black uppercase tracking-widest text-red-600 dark:text-red-300 font-bold opacity-100 whitespace-nowrap"
+                                        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                                      >
+                                        {day.holidayDescription || 'HOLIDAY'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                              );
                             })}
                           </tr>
 
@@ -1351,22 +1394,22 @@ export default function SprintDetail() {
                                 {/* STATUS */}
                                 <td
                                   className={`py-4 px-2 sticky left-[470px] ${rowZIndexClass} text-center border-r align-middle font-extrabold text-[9px] ${stickyNormalBgClass}`}
-                                  style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
+                                  style={{ minWidth: '110px', maxWidth: '110px', width: '110px' }}
                                 >
-                                  <span className={`px-2 py-1 rounded-md uppercase tracking-wider ${
+                                  <span className={`whitespace-nowrap px-2 py-1 rounded-md uppercase tracking-wider ${
                                     task.status === 'CLOSED' || task.status === 'RESOLVED' || task.status === 'DONE' || task.status === 'COMPLETED'
                                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
                                       : task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'QA'
                                         ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
                                         : 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
                                   }`}>
-                                    {(task.status === 'TODO' ? 'OPEN' : task.status?.replace('_', ' ')) || 'OPEN'}
+                                    {task.status?.replace('_', ' ') || 'OPEN'}
                                   </span>
                                 </td>
 
                                 {/* START */}
                                 <td
-                                  className={`py-4 px-1 sticky left-[560px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-start` ? 'z-50' : rowZIndexClass
+                                  className={`py-4 px-1 sticky left-[580px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-start` ? 'z-50' : rowZIndexClass
                                     } ${stickyNormalBgClass}`}
                                   style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                                 >
@@ -1374,7 +1417,7 @@ export default function SprintDetail() {
                                     <CustomDatePicker
                                       value={task.planned_start_date}
                                       minDate={sprint?.start_date}
-                                      maxDate={task.planned_end_date || sprint?.end_date}
+                                      maxDate={task.planned_end_date || schedulingEndDate}
                                       onChange={(newDate) => handleStartDateChange(task.id, newDate)}
                                       darkMode={darkMode}
                                       onOpen={() => setActiveDatePickerId(`${task.id}-start`)}
@@ -1389,7 +1432,7 @@ export default function SprintDetail() {
 
                                 {/* END */}
                                 <td
-                                  className={`py-4 px-1 sticky left-[650px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-end` ? 'z-50' : rowZIndexClass
+                                  className={`py-4 px-1 sticky left-[670px] border-r align-middle text-[10px] ${activeDatePickerId === `${task.id}-end` ? 'z-50' : rowZIndexClass
                                     } ${stickyNormalBgClass}`}
                                   style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                                 >
@@ -1397,7 +1440,7 @@ export default function SprintDetail() {
                                     <CustomDatePicker
                                       value={task.planned_end_date}
                                       minDate={task.planned_start_date || sprint?.start_date}
-                                      maxDate={sprint?.end_date}
+                                      maxDate={schedulingEndDate}
                                       onChange={(newDate) => handleEndDateChange(task.id, newDate)}
                                       darkMode={darkMode}
                                       onOpen={() => setActiveDatePickerId(`${task.id}-end`)}
@@ -1412,7 +1455,7 @@ export default function SprintDetail() {
 
                                 {/* REASON */}
                                 <td
-                                  className={`py-4 px-2 sticky left-[740px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
+                                  className={`py-4 px-2 sticky left-[760px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
                                   style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                                 >
                                   <div className="relative">
@@ -1429,7 +1472,7 @@ export default function SprintDetail() {
 
                                 {/* ACTIONS */}
                                 <td
-                                  className={`py-4 px-2 sticky left-[950px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
+                                  className={`py-4 px-2 sticky left-[970px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
                                   style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                                 >
                                   <button
@@ -1450,7 +1493,7 @@ export default function SprintDetail() {
                                 {timelineDaysList.map((day, idx) => {
                                   const isDayInTaskRange = task.planned_start_date && task.planned_end_date &&
                                     day.dateStr >= task.planned_start_date && day.dateStr <= task.planned_end_date &&
-                                    !day.isWeekend;
+                                    !day.isWeekend && !day.isHoliday;
                                   const isBarStart = day.dateStr === task.planned_start_date;
                                   const isBarEnd = day.dateStr === task.planned_end_date;
 
@@ -1458,6 +1501,8 @@ export default function SprintDetail() {
                                     }`;
                                   if (day.isWeekend) {
                                     cellStyle += darkMode ? ' bg-slate-950/60' : ' bg-slate-100/60';
+                                  } else if (day.isHoliday) {
+                                    cellStyle += darkMode ? ' bg-red-950/50' : ' bg-red-100/50';
                                   }
                                   if (day.isSprintStart) {
                                     cellStyle += ' border-l-2 border-l-orange-500';
@@ -1466,7 +1511,7 @@ export default function SprintDetail() {
                                     cellStyle += ' border-r-2 border-r-orange-500';
                                   }
 
-                                  return (
+                                   return (
                                     <td key={`cell-${task.id}-${day.dayNum}-${idx}`} className={cellStyle}>
                                       {isDayInTaskRange && (
                                         <div
@@ -1484,6 +1529,16 @@ export default function SprintDetail() {
                                           {isBarStart && (
                                             <Lock className="w-2.5 h-2.5 text-white shrink-0" />
                                           )}
+                                        </div>
+                                      )}
+                                      {!isDayInTaskRange && day.isHoliday && (
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-visible">
+                                          <span 
+                                            className="text-[7px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400 opacity-60 whitespace-nowrap"
+                                            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                                          >
+                                            {day.holidayDescription || 'HOLIDAY'}
+                                          </span>
                                         </div>
                                       )}
                                     </td>

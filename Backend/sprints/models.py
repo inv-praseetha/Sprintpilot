@@ -93,7 +93,7 @@ class SprintTask(models.Model):
 
     def clean(self):
         from django.core.exceptions import ValidationError
-        from datetime import datetime, date
+        from datetime import datetime, date, timedelta
 
         def to_date(d):
             if isinstance(d, str):
@@ -116,12 +116,13 @@ class SprintTask(models.Model):
         if self.sprint and not skip_validation:
             sprint_start = to_date(self.sprint.start_date)
             sprint_end = to_date(self.sprint.end_date)
+            effective_end = sprint_end - timedelta(days=2)
             if start:
-                if start < sprint_start or start > sprint_end:
-                    raise ValidationError({"planned_start_date": f"Task planned start date ({start}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
+                if start < sprint_start or start > effective_end:
+                    raise ValidationError({"planned_start_date": f"Task planned start date ({start}) must be within the valid scheduling duration ({sprint_start} to {effective_end})."})
             if end:
-                if end < sprint_start or end > sprint_end:
-                    raise ValidationError({"planned_end_date": f"Task planned end date ({end}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
+                if end < sprint_start or end > effective_end:
+                    raise ValidationError({"planned_end_date": f"Task planned end date ({end}) must be within the valid scheduling duration ({sprint_start} to {effective_end})."})
             
             # 2.5 Validate dates are not on weekends
             if self.sprint.project and (start or end):
@@ -189,3 +190,19 @@ class TaskRecommendation(models.Model):
     def __str__(self):
         emp_name = self.recommended_employee.user.full_name if self.recommended_employee else "Unassigned"
         return f"Recommendation for {self.task.title} -> {emp_name}"
+
+class SprintHoliday(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sprint = models.ForeignKey(Sprint, on_delete=models.CASCADE, related_name='holidays')
+    date = models.DateField()
+    description = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'sprint_holidays'
+        ordering = ['date']
+        unique_together = (('sprint', 'date'),)
+
+    def __str__(self):
+        return f"{self.sprint.milestone} - {self.date}"
+
