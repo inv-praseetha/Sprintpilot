@@ -148,10 +148,6 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (projectId) {
       fetchSprints();
-      const intervalId = setInterval(() => {
-        fetchSprints();
-      }, 15000);
-      return () => clearInterval(intervalId);
     }
   }, [projectId]);
 
@@ -435,7 +431,7 @@ export default function ProjectDetail() {
       {/* Main header banner */}
       <div className={`p-6 sm:p-8 rounded-3xl border mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
         }`}>
-        <div className="text-left space-y-2">
+        <div className="text-left space-y-2 flex-1 min-w-0 w-full">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight break-all">
               {project.name}
@@ -456,30 +452,30 @@ export default function ProjectDetail() {
 
         {/* Action Button Row */}
         {isProjectManager && (
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto shrink-0 min-w-0">
             <button
               onClick={() => setShowAddMembersModal(true)}
               disabled={project.status === 'COMPLETED'}
-              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${project.status === 'COMPLETED'
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg min-w-0 ${project.status === 'COMPLETED'
                   ? 'bg-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 cursor-pointer'
                 }`}
               title={project.status === 'COMPLETED' ? "Cannot add members to a completed project" : ""}
             >
-              <UserPlus className="w-4 h-4" />
-              Add Members
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span className="truncate">Add Members</span>
             </button>
             <button
               onClick={() => setShowUploadSprintModal(true)}
               disabled={project.status === 'COMPLETED'}
-              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${project.status === 'COMPLETED'
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg min-w-0 ${project.status === 'COMPLETED'
                   ? 'bg-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/10 cursor-pointer'
                 }`}
               title={project.status === 'COMPLETED' ? "Cannot upload sprints to a completed project" : ""}
             >
-              <UploadCloud className="w-4 h-4" />
-              Upload Sprint
+              <UploadCloud className="w-4 h-4 shrink-0" />
+              <span className="truncate">Upload Sprint</span>
             </button>
           </div>
         )}
