@@ -414,7 +414,7 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className={`p-6 sm:p-8 max-w-7xl mx-auto min-h-screen ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+    <div className={`p-6 sm:p-8 max-w-7xl mx-auto min-h-screen overflow-x-hidden ${darkMode ? 'text-white' : 'text-slate-800'}`}>
 
       {/* Back navigation */}
       <div className="mb-6 flex justify-between items-center">
