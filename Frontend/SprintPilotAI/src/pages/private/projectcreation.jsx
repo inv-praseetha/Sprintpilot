@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import ProjectModal from '../../components/Modals/projectmodal';
 import ProjectForm from '../../components/Modals/projectform';
+import { useValidationLimits } from '../../hooks/useValidationLimits';
 import apiClient from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -86,6 +87,7 @@ export default function ProjectCreation() {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const limits = useValidationLimits();
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
@@ -501,6 +503,7 @@ export default function ProjectCreation() {
             placeholder="Search projects by name........."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            maxLength={limits.general.search.maxLength}
             className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
               ? 'bg-slate-900 border-slate-800/60 text-slate-200 placeholder-slate-500 focus:border-orange-500'
               : 'bg-white border-slate-100 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:shadow-md'
@@ -604,7 +607,7 @@ export default function ProjectCreation() {
                     {/* Project Title & Description */}
                     <td className="py-5 px-6 max-w-sm">
                       <div className="space-y-1">
-                        <span className={`block font-extrabold text-base tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'
+                        <span className={`block font-extrabold text-base tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'
                           }`}>
                           <Link
                             to={`/projects/${project.id}`}
@@ -621,7 +624,7 @@ export default function ProjectCreation() {
 
                     {/* Type Badge */}
                     <td className="py-5 px-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${project.type === 'AGILE'
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest truncate max-w-[100px] inline-block ${project.type === 'AGILE'
                         ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
                         : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
                         }`}>
@@ -647,7 +650,7 @@ export default function ProjectCreation() {
                           <option value="COMPLETED" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">COMPLETED</option>
                         </select>
                       ) : (
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${project.status === 'ACTIVE'
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest truncate max-w-[100px] inline-block ${project.status === 'ACTIVE'
                           ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                           : project.status === 'ON_HOLD'
                             ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
@@ -663,7 +666,7 @@ export default function ProjectCreation() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>
+                          <span className="truncate max-w-[150px]">
                             {project.start_date ? `${project.start_date} - ${project.end_date || 'Ongoing'}` : 'No timeline set'}
                           </span>
                         </div>
@@ -682,7 +685,7 @@ export default function ProjectCreation() {
                         <div className="w-7 h-7 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-[10px] border border-orange-500/20 shadow-sm">
                           {project.team_lead?.full_name ? project.team_lead.full_name.charAt(0) : 'TL'}
                         </div>
-                        <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className={`text-xs font-bold truncate max-w-[120px] ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           {project.team_lead?.full_name || 'Unassigned'}
                         </span>
                       </div>
@@ -734,7 +737,7 @@ export default function ProjectCreation() {
 
                     {/* Team Size Column */}
                     <td className="py-5 px-6 whitespace-nowrap text-right">
-                      <span className="text-[10px] font-black px-2.5 py-1.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20 shadow-sm">
+                      <span className="text-[10px] font-black px-2.5 py-1.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20 shadow-sm truncate max-w-[100px] inline-block">
                         {project.team_size || 0} Members
                       </span>
                     </td>

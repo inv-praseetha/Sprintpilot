@@ -45,6 +45,7 @@ class ProjectCreateView(APIView):
         # Apply filters based on query parameters
         name = request.query_params.get('name')
         if name:
+            name = name[:100]
             projects = projects.filter(name__icontains=name)
         status_param = request.query_params.get('status')
         if status_param:
@@ -122,6 +123,7 @@ class EmployeeProfileListView(APIView):
         # Apply filters based on query parameters
         skill = request.query_params.get('skill')
         if skill:
+            skill = skill[:100]
             profiles = profiles.filter(skills__name__icontains=skill)
         serializer = EmployeeProfileSerializer(profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

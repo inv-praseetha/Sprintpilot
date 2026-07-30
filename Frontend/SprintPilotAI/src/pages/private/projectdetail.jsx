@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
+import { useValidationLimits } from '../../hooks/useValidationLimits';
 import apiClient from '../../api/apiClient';
 import TaskUploadModal from '../../components/Modals/TaskUploadModal';
 import { getEffectiveSkills } from './projectcreation';
@@ -51,6 +52,7 @@ export default function ProjectDetail() {
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
   const [showEditLeadModal, setShowEditLeadModal] = useState(false);
+  const limits = useValidationLimits();
 
   // Add Member State
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
@@ -146,10 +148,6 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (projectId) {
       fetchSprints();
-      const intervalId = setInterval(() => {
-        fetchSprints();
-      }, 15000);
-      return () => clearInterval(intervalId);
     }
   }, [projectId]);
 
@@ -433,12 +431,12 @@ export default function ProjectDetail() {
       {/* Main header banner */}
       <div className={`p-6 sm:p-8 rounded-3xl border mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
         }`}>
-        <div className="text-left space-y-2">
+        <div className="text-left space-y-2 flex-1 min-w-0 w-full">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight break-all">
               {project.name}
             </h1>
-            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${project.status === 'ACTIVE'
+            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider truncate max-w-[150px] inline-block ${project.status === 'ACTIVE'
                 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                 : project.status === 'ON_HOLD'
                   ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
@@ -447,37 +445,37 @@ export default function ProjectDetail() {
               {project.status.replace('_', ' ')}
             </span>
           </div>
-          <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
+          <p className="text-sm text-slate-400 max-w-2xl leading-relaxed truncate">
             {project.description || 'No project description is available. Add description from edit panel.'}
           </p>
         </div>
 
         {/* Action Button Row */}
         {isProjectManager && (
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto shrink-0 min-w-0">
             <button
               onClick={() => setShowAddMembersModal(true)}
               disabled={project.status === 'COMPLETED'}
-              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${project.status === 'COMPLETED'
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg min-w-0 ${project.status === 'COMPLETED'
                   ? 'bg-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 cursor-pointer'
                 }`}
               title={project.status === 'COMPLETED' ? "Cannot add members to a completed project" : ""}
             >
-              <UserPlus className="w-4 h-4" />
-              Add Members
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span className="truncate">Add Members</span>
             </button>
             <button
               onClick={() => setShowUploadSprintModal(true)}
               disabled={project.status === 'COMPLETED'}
-              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg ${project.status === 'COMPLETED'
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg min-w-0 ${project.status === 'COMPLETED'
                   ? 'bg-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/10 cursor-pointer'
                 }`}
               title={project.status === 'COMPLETED' ? "Cannot upload sprints to a completed project" : ""}
             >
-              <UploadCloud className="w-4 h-4" />
-              Upload Sprint
+              <UploadCloud className="w-4 h-4 shrink-0" />
+              <span className="truncate">Upload Sprint</span>
             </button>
           </div>
         )}
@@ -504,13 +502,13 @@ export default function ProjectDetail() {
 
               {/* Type, Timeline, Duration */}
               <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Timeline & Model</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Timeline & Model</h4>
 
                 <div className="flex items-start gap-3">
                   <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
-                  <div>
-                    <span className="block text-xs text-slate-400 font-bold">Project Type</span>
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${project.type === 'AGILE'
+                  <div className="min-w-0">
+                    <span className="block text-xs text-slate-400 font-bold truncate">Project Type</span>
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider truncate max-w-[150px] ${project.type === 'AGILE'
                         ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
                         : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
                       }`}>
@@ -521,11 +519,11 @@ export default function ProjectDetail() {
 
                 <div className="flex items-start gap-3">
                   <Calendar className="w-4 h-4 text-slate-400 mt-0.5" />
-                  <div>
-                    <span className="block text-xs text-slate-400 font-bold">
+                  <div className="min-w-0">
+                    <span className="block text-xs text-slate-400 font-bold truncate">
                       {project.type === 'AGILE' ? 'Agile Duration' : 'Waterfall Timeline'}
                     </span>
-                    <span className="text-sm font-extrabold mt-0.5 block">
+                    <span className="text-sm font-extrabold mt-0.5 block truncate max-w-[250px]">
                       {project.type === 'AGILE'
                         ? `${project.number_of_days} Days`
                         : `${project.start_date || 'N/A'} to ${project.end_date || 'N/A'}`
@@ -537,15 +535,15 @@ export default function ProjectDetail() {
 
               {/* Stakeholders (Lead & Creator) */}
               <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Stakeholders</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Stakeholders</h4>
 
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-xs">
                     {getInitials(project.team_lead?.full_name)}
                   </div>
-                  <div>
-                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Team Lead</span>
-                    <span className="text-sm font-extrabold block">
+                  <div className="min-w-0">
+                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Team Lead</span>
+                    <span className="text-sm font-extrabold block truncate max-w-[200px]">
                       {project.team_lead?.full_name || 'Unassigned'}
                     </span>
                     <span className="text-[10px] text-slate-450 dark:text-slate-400 font-medium block truncate max-w-[150px]" title={project.team_lead?.email}>
@@ -559,9 +557,9 @@ export default function ProjectDetail() {
                     <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-500 font-black text-xs">
                       {getInitials(project.created_by.full_name)}
                     </div>
-                    <div>
-                      <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Created By</span>
-                      <span className="text-sm font-extrabold block">
+                    <div className="min-w-0">
+                      <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Created By</span>
+                      <span className="text-sm font-extrabold block truncate max-w-[200px]">
                         {project.created_by.full_name}
                       </span>
                       <span className="text-[10px] text-slate-450 dark:text-slate-400 font-medium block truncate max-w-[150px]" title={project.created_by.email}>
@@ -574,7 +572,7 @@ export default function ProjectDetail() {
 
               {/* Tech Stack Skills */}
               <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Required Skills</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Required Skills</h4>
 
                 {(() => {
                   const effectiveSkills = getEffectiveSkills(project);
@@ -619,26 +617,26 @@ export default function ProjectDetail() {
 
               {/* Administrative metadata / limits */}
               <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Properties & Allocation</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Properties & Allocation</h4>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Created On</span>
+                  <div className="min-w-0">
+                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Created On</span>
                     <span className="text-xs font-extrabold block mt-0.5">
                       {project.created_at ? new Date(project.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                     </span>
                   </div>
-                  <div>
-                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Last Updated</span>
+                  <div className="min-w-0">
+                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Last Updated</span>
                     <span className="text-xs font-extrabold block mt-0.5">
                       {project.updated_at ? new Date(project.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                     </span>
                   </div>
                 </div>
 
-                <div>
-                  <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Allocation Capacity</span>
-                  <span className="inline-block text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 mt-1">
+                <div className="min-w-0">
+                  <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Allocation Capacity</span>
+                  <span className="inline-block text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 mt-1 truncate max-w-[150px]">
                     {project.members?.length || 0} / {project.team_size || 0} Members
                   </span>
                 </div>
@@ -694,17 +692,17 @@ export default function ProjectDetail() {
                                 {getInitials(project.team_lead.full_name)}
                               </div>
                               <div>
-                                <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                <span className={`block font-extrabold text-sm truncate max-w-[150px] ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                                   {project.team_lead.full_name}
                                 </span>
-                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[150px]">
                                   {project.team_lead.email}
                                 </span>
                               </div>
                             </div>
                           </td>
                           <td className="py-4 px-4">
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20 truncate max-w-[100px] inline-block">
                               Team Lead
                             </span>
                           </td>
@@ -713,7 +711,7 @@ export default function ProjectDetail() {
                               const leadProfile = employees.find(emp => emp.user.id === project.team_lead?.id);
                               const leadStatus = leadProfile?.status || 'ACTIVE';
                               return (
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${leadStatus === 'BUSY'
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider truncate max-w-[100px] inline-block ${leadStatus === 'BUSY'
                                     ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
                                     : leadStatus === 'ACTIVE'
                                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
@@ -750,17 +748,17 @@ export default function ProjectDetail() {
                                 {getInitials(member.user.full_name)}
                               </div>
                               <div>
-                                <span className={`block font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                <span className={`block font-extrabold text-sm truncate max-w-[150px] ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                                   {member.user.full_name}
                                 </span>
-                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[150px]">
                                   {member.user.email}
                                 </span>
                               </div>
                             </div>
                           </td>
                           <td className="py-4 px-4">
-                            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350">
+                            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350 truncate max-w-[150px] inline-block">
                               {member.designation || 'Team Member'}
                             </span>
                           </td>
@@ -946,7 +944,7 @@ export default function ProjectDetail() {
                           <td className={`py-4 px-5 font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'
                             }`}>
                             <div className="flex items-center gap-2">
-                              <span>{sprint.milestone || sprint.name}</span>
+                              <span className="truncate max-w-[200px] inline-block">{sprint.milestone || sprint.name}</span>
                               {sprint.workspaceUrl && (
                                 <a
                                   href={sprint.workspaceUrl}
@@ -1071,6 +1069,7 @@ export default function ProjectDetail() {
                     placeholder="Search by name or role..."
                     value={memberSearchQuery}
                     onChange={(e) => setMemberSearchQuery(e.target.value)}
+                    maxLength={limits.general.search.maxLength}
                     className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-indigo-500 transition-colors ${darkMode
                         ? 'bg-slate-950 border-slate-800 text-white'
                         : 'bg-white border-slate-200 text-slate-800'
