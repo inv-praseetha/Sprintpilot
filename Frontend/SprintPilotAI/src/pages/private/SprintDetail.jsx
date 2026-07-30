@@ -272,17 +272,7 @@ export default function SprintDetail() {
     fetchData();
   }, [sprintId]);
 
-  // Live polling for Backlog changes
-  useEffect(() => {
-    if (!sprintId) return;
-    const intervalId = setInterval(() => {
-      // Skip polling if the user is actively making changes or syncing
-      if (!isGenerating && !isEditing && !isSaving && !isSyncing) {
-        refreshSprint();
-      }
-    }, 15000);
-    return () => clearInterval(intervalId);
-  }, [sprintId, isGenerating, isEditing, isSaving, isSyncing]);
+
 
 
 
