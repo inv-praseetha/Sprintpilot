@@ -20,6 +20,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Download,
   Plus,
   ExternalLink,
@@ -158,6 +160,7 @@ export default function SprintDetail() {
   const [modifiedTaskIds, setModifiedTaskIds] = useState(new Set());
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+  const [chartExpanded, setChartExpanded] = useState(true);
 
   const getSchedulingEndDate = (endDateStr) => {
     if (!endDateStr) return '';
@@ -787,13 +790,29 @@ export default function SprintDetail() {
             {/* Unified Card Container */}
             <div className={`rounded-3xl border overflow-hidden shadow-xl ${darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-200'
               }`}>
-              {/* Header with Title, Actions & Legend */}
-              <div className={`p-5 border-b flex flex-col lg:flex-row gap-4 justify-between lg:items-center ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
-                }`}>
+              {/* Header with Title & Collapse Toggle */}
+              <button
+                onClick={() => setChartExpanded(!chartExpanded)}
+                className={`w-full p-5 flex justify-between items-center transition-colors cursor-pointer text-left focus:outline-none ${
+                  chartExpanded ? 'border-b' : ''
+                } ${
+                  darkMode 
+                    ? 'border-slate-800 bg-slate-900 hover:bg-slate-850/30' 
+                    : 'border-slate-200 bg-white hover:bg-slate-50/50'
+                }`}
+              >
                 <div>
                   <h3 className="font-extrabold text-base tracking-tight">AI Optimised Gantt Schedule</h3>
                   <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider mt-0.5">Sprint Duration: {sprint.start_date} to {sprint.end_date}</p>
                 </div>
+                {chartExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+              </button>
+
+              {chartExpanded && (
+                <div>
+                  {/* Actions & Legend Row */}
+                  <div className={`p-5 border-b flex flex-col lg:flex-row gap-4 justify-between lg:items-center ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+                    }`}>
 
                 {/* Action Buttons: Update / Save & Sync */}
                 <div className="flex items-center gap-2">
@@ -1544,8 +1563,10 @@ export default function SprintDetail() {
                 </table>
               </div>
             </div>
-          </>
-        )}
+          )}
+        </div>
+      </>
+    )}
 
         <AddTaskModal
           show={isAddTaskModalOpen}
