@@ -90,8 +90,8 @@ class SprintAPITests(APITestCase):
         self.sprint = Sprint.objects.create(
             project=self.active_project,
             milestone="Sprint 1",
-            start_date=datetime.date.today(),
-            end_date=datetime.date.today() + datetime.timedelta(days=14),
+            start_date=datetime.date(2026, 7, 20),
+            end_date=datetime.date(2026, 8, 7),
             status="ACTIVE"
         )
 
@@ -126,8 +126,8 @@ class SprintAPITests(APITestCase):
             status="IN_PROGRESS",
             category="Backend",
             assigned_employee=self.profile,
-            planned_start_date=datetime.date.today(),
-            planned_end_date=datetime.date.today() + datetime.timedelta(days=2),
+            planned_start_date=self.sprint.start_date,
+            planned_end_date=self.sprint.start_date + datetime.timedelta(days=2),
             description="Test task 2 description"
         )
         url = reverse('sprint_download_schedule', kwargs={'sprint_id': self.sprint.id})
@@ -247,7 +247,7 @@ class SprintAPITests(APITestCase):
     def test_task_update_assignee_and_dates(self):
         url = reverse('sprint_task_update', kwargs={'pk': self.task.id})
         start_date = self.sprint.start_date
-        end_date = self.sprint.start_date + datetime.timedelta(days=5)
+        end_date = self.sprint.start_date + datetime.timedelta(days=4)
         data = {
             "assigned_employee_id": str(self.profile.id),
             "planned_start_date": str(start_date),
@@ -469,8 +469,8 @@ class SprintServiceTests(APITestCase):
         self.sprint = Sprint.objects.create(
             project=self.project,
             milestone="Sprint 1",
-            start_date=datetime.date.today(),
-            end_date=datetime.date.today() + datetime.timedelta(days=14),
+            start_date=datetime.date(2026, 7, 20),
+            end_date=datetime.date(2026, 8, 7),
             status="ACTIVE"
         )
         self.task = SprintTask.objects.create(
@@ -610,8 +610,8 @@ class SprintAISchedulerTests(APITestCase):
         self.sprint = Sprint.objects.create(
             project=self.project,
             milestone="Sprint 1",
-            start_date=datetime.date.today(),
-            end_date=datetime.date.today() + datetime.timedelta(days=14),
+            start_date=datetime.date(2026, 7, 20),
+            end_date=datetime.date(2026, 8, 7),
             status="ACTIVE"
         )
         self.task = SprintTask.objects.create(
