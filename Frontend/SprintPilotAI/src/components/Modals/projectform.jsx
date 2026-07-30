@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, Code, Check, Users, Loader2, X } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
+import { useValidationLimits } from '../../hooks/useValidationLimits';
 
 export default function ProjectForm({
   handleSubmit,
@@ -43,6 +44,7 @@ export default function ProjectForm({
 }) {
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const limits = useValidationLimits();
 
   const getTodayStr = () => {
     const d = new Date();
@@ -130,8 +132,8 @@ export default function ProjectForm({
             <input
               type="text"
               required
-              minLength={3}
-              maxLength={10}
+              minLength={limits.project.projectId.minLength}
+              maxLength={limits.project.projectId.maxLength}
               disabled={!!editingProjectId}
               placeholder="e.g. PRJ-001"
               value={projectId}
@@ -153,8 +155,8 @@ export default function ProjectForm({
             <input
               type="text"
               required
-              minLength={3}
-              maxLength={255}
+              minLength={limits.project.name.minLength}
+              maxLength={limits.project.name.maxLength}
               placeholder="Enter project name..."
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -171,8 +173,8 @@ export default function ProjectForm({
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description</label>
           <textarea
             rows="3"
-            minLength={10}
-            maxLength={100}
+            minLength={limits.project.description.minLength}
+            maxLength={limits.project.description.maxLength}
             placeholder="Brief description of the project scope and deliverables..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -247,7 +249,8 @@ export default function ProjectForm({
           <input
             type="number"
             required
-            min="0"
+            min={limits.project.teamSize.min}
+            max={limits.project.teamSize.max}
             placeholder="0"
             value={teamSize}
             onChange={(e) => setTeamSize(e.target.value)}
@@ -315,6 +318,8 @@ export default function ProjectForm({
               <input
                 type="number"
                 required
+                min={limits.project.numberOfDays.min}
+                max={limits.project.numberOfDays.max}
                 placeholder="10"
                 value={numberOfDays}
                 onChange={(e) => setNumberOfDays(e.target.value)}
@@ -510,6 +515,7 @@ export default function ProjectForm({
                       placeholder="Search candidates by name, email, or designation..."
                       value={memberSearchQuery}
                       onChange={(e) => setMemberSearchQuery(e.target.value)}
+                      maxLength={limits.general.search.maxLength}
                       onClick={(e) => e.stopPropagation()}
                       className={`w-full px-3 py-1.5 pl-8 rounded-xl border text-xs font-semibold outline-none focus:border-orange-500 transition-colors ${
                         darkMode

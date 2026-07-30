@@ -60,7 +60,7 @@ const Test = () => {
 
   // Filtering team members
   const filteredMembers = useMemo(() => {
-    return teamMembers.filter(member => 
+    return teamMembers.filter(member =>
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -97,11 +97,10 @@ const Test = () => {
 
       {/* METRICS ROW */}
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        
+
         {/* Card 1: Total Project */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Total Project</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -120,9 +119,8 @@ const Test = () => {
         </div>
 
         {/* Card 2: Total Tasks */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Total Tasks</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -145,9 +143,8 @@ const Test = () => {
         </div>
 
         {/* Card 3: Tasks Pending */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Tasks Pending</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -166,9 +163,8 @@ const Test = () => {
         </div>
 
         {/* Card 4: Project Overdue */}
-        <div className={`p-6 rounded-3xl border transition-all ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
-        }`}>
+        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Project Overdue</span>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
@@ -192,9 +188,8 @@ const Test = () => {
       </section>
 
       {/* CHARTS SECTION - Responsive Line Graph */}
-      <section className={`p-6 rounded-3xl border ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-      }`}>
+      <section className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+        }`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="text-left">
             <h3 className="font-bold text-lg">Sprint Progress & Performance</h3>
@@ -215,19 +210,17 @@ const Test = () => {
             </div>
 
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors cursor-pointer ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-50 border-slate-100 hover:bg-slate-100/70'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-50 border-slate-100 hover:bg-slate-100/70'
+                  }`}
               >
                 <span>Active Sprints</span>
                 <ChevronDown className="w-4 h-4 text-slate-500" />
               </button>
               {showTimeframeDropdown && (
-                <div className={`absolute right-0 mt-2 w-40 rounded-xl shadow-lg border py-1.5 z-10 ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white border-slate-100 text-slate-700'
-                }`}>
+                <div className={`absolute right-0 mt-2 w-40 rounded-xl shadow-lg border py-1.5 z-10 ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white border-slate-100 text-slate-700'
+                  }`}>
                   {['Sprint 1-6', 'All Sprints'].map((opt) => (
                     <button
                       key={opt}
@@ -335,9 +328,8 @@ const Test = () => {
       </section>
 
       {/* TEAM OVERVIEW SECTION */}
-      <section className={`p-6 rounded-3xl border ${
-        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-      }`}>
+      <section className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+        }`}>
         {/* Section Header Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h3 className="font-bold text-lg text-left">Team Overview</h3>
@@ -350,18 +342,17 @@ const Test = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search"
-                className={`py-2 pl-9 pr-4 text-xs rounded-xl outline-none border transition-all ${
-                  darkMode 
-                    ? 'bg-slate-800 text-slate-200 border-slate-700 placeholder-slate-500 focus:bg-slate-700/80 focus:ring-1 focus:ring-slate-600' 
+                maxLength={100}
+                className={`py-2 pl-9 pr-4 text-xs rounded-xl outline-none border transition-all ${darkMode
+                    ? 'bg-slate-800 text-slate-200 border-slate-700 placeholder-slate-500 focus:bg-slate-700/80 focus:ring-1 focus:ring-slate-600'
                     : 'bg-white text-slate-700 border-slate-200 placeholder-slate-400 focus:border-slate-300'
-                }`}
+                  }`}
               />
             </div>
 
             {/* Filter Button */}
-            <button className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-              darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}>
+            <button className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}>
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Filter</span>
             </button>
@@ -394,11 +385,10 @@ const Test = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {filteredMembers.map((member) => (
-                <tr 
-                  key={member.id} 
-                  className={`text-sm font-medium transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30 ${
-                    selectedMembers.has(member.id) ? 'bg-orange-500/[0.02]' : ''
-                  }`}
+                <tr
+                  key={member.id}
+                  className={`text-sm font-medium transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30 ${selectedMembers.has(member.id) ? 'bg-orange-500/[0.02]' : ''
+                    }`}
                 >
                   {/* Checkbox */}
                   <td className="py-4 px-4">
@@ -409,10 +399,10 @@ const Test = () => {
                       className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
                     />
                   </td>
-                  
+
                   {/* ID */}
                   <td className="py-4 px-4 text-slate-400 font-semibold text-left">{member.id}</td>
-                  
+
                   {/* Name + Avatar */}
                   <td className="py-4 px-4 text-left">
                     <div className="flex items-center gap-3">

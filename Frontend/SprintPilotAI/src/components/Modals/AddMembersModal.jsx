@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { useValidationLimits } from '../../hooks/useValidationLimits';
 
 export default function AddMembersModal({
   show,
@@ -14,6 +15,7 @@ export default function AddMembersModal({
 }) {
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const limits = useValidationLimits();
 
   // Get Initials for Avatar
   const getInitials = (fullName) => {
@@ -133,6 +135,7 @@ export default function AddMembersModal({
                 placeholder="Search by name or role..."
                 value={memberSearchQuery}
                 onChange={(e) => setMemberSearchQuery(e.target.value)}
+                maxLength={limits.general.search.maxLength}
                 className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-orange-500 transition-colors ${darkMode
                   ? 'bg-slate-950 border-slate-800 text-white'
                   : 'bg-white border-slate-200 text-slate-800'

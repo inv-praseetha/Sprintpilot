@@ -2,6 +2,7 @@ from django.db import transaction
 from accounts.models import Employee, EmployeeProfile
 from project.models import Project, ProjectMember, ProjectStack, Skill
 from django.utils import timezone
+from project.exceptions import ProjectValidationException
 
 class ProjectService:
     """
@@ -48,11 +49,11 @@ class ProjectService:
         today=timezone.localdate()
         if start_date and end_date:
             if end_date < start_date:
-                raise ValidationError("end_date must be greater than or equal to start_date")
+                raise ProjectValidationException("end_date must be greater than or equal to start_date")
             if start_date < today:
-                raise ValidationError("start_date must be greater than or equal to today")
+                raise ProjectValidationException("start_date must be greater than or equal to today")
             if end_date < today:
-                raise ValidationError("end_date must be greater than or equal to today")
+                raise ProjectValidationException("end_date must be greater than or equal to today")
         
 
 
