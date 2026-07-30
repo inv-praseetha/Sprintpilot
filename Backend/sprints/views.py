@@ -1,19 +1,14 @@
 import os
-import copy
-import datetime
-import openpyxl
 from django.http import FileResponse
-from django.conf import settings
-from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from project.models import Project
-from accounts.models import EmployeeProfile
-from sprints.models import Sprint, SprintTask, SprintHoliday
+from sprints.models import Sprint, SprintTask
 from sprints.serializers import SprintSerializer, SprintTaskSerializer
+from sprints.services import SprintService
+
 
 class SprintDownloadTemplateView(APIView):
     """
@@ -22,19 +17,20 @@ class SprintDownloadTemplateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        template_path = os.path.join(settings.BASE_DIR, 'templates', 'tasks_template.xlsx')
-        if not os.path.exists(template_path):
+        try:
+            template_path = SprintService.get_template_path()
+            response = FileResponse(
+                open(template_path, 'rb'), 
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="tasks_template.xlsx"'
+            return response
+        except FileNotFoundError as e:
             return Response(
-                {"detail": "Template file not found on server."}, 
+                {"detail": str(e)}, 
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-        response = FileResponse(
-            open(template_path, 'rb'), 
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="tasks_template.xlsx"'
-        return response
+
 
 class SprintDownloadScheduleView(APIView):
     """
@@ -45,382 +41,23 @@ class SprintDownloadScheduleView(APIView):
 
     def get(self, request, sprint_id, *args, **kwargs):
         try:
-            sprint = Sprint.objects.get(id=sprint_id)
-        except Sprint.DoesNotExist:
-            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        template_path = os.path.join(settings.BASE_DIR, 'templates', 'gantt_template.xlsx')
-        if not os.path.exists(template_path):
-            return Response(
-                {"detail": "Gantt template file not found on server."}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        try:
-            wb = openpyxl.load_workbook(template_path)
-            ws = wb.active
-            
-            # 1. Populate project header info
-            ws["B1"] = sprint.project.name
-            
-            start_date = sprint.start_date
-            if isinstance(start_date, str):
-                start_date = datetime.date.fromisoformat(start_date)
-            
-            # Write to E2 (Project Start) and E3 (Display Week) to align template formulas
-            ws["E2"] = start_date
-            ws["E3"] = 1 # Display Week is normally 1
-            
-            # 2. Gather tasks and group by category
-            tasks = sprint.tasks.filter(is_deleted=False).order_by('created_at')
-            
-            # Categories in required order
-            category_mapping = [
-                ('UI', 'UI Development'),
-                ('Backend', 'Backend Development'),
-                ('INFRA', 'Infra Development'),
-                ('QA', 'QA Development')
-            ]
-            
-            # Save original styles from the template rows (B through G)
-            styles = {}
-            for cat_key, cat_name in category_mapping:
-                # Determine template row based on original cell positions
-                if cat_name == 'UI Development':
-                    template_row = 10
-                elif cat_name == 'Backend Development':
-                    template_row = 20
-                elif cat_name == 'Infra Development':
-                    template_row = 30
-                else: # QA Development / QA
-                    template_row = 35
-                    
-                styles[cat_name] = []
-                for col in range(2, 8): # columns B to G (2 to 7)
-                    cell = ws.cell(row=template_row, column=col)
-                    styles[cat_name].append({
-                        'fill': copy.copy(cell.fill) if cell.fill else None,
-                        'font': copy.copy(cell.font) if cell.font else None,
-                        'border': copy.copy(cell.border) if cell.border else None,
-                        'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                        'number_format': cell.number_format
-                    })
-                    
-            # Save task styles per category
-            # UI task template: row 11
-            styles['task_UI'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=11, column=col)
-                styles['task_UI'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-
-            # Backend task template: row 21
-            styles['task_Backend'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=21, column=col)
-                styles['task_Backend'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-
-            # Infra task template: row 31
-            styles['task_INFRA'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=31, column=col)
-                styles['task_INFRA'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-
-            # QA task template: row 36
-            styles['task_QA'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=36, column=col)
-                styles['task_QA'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-                
-            # Save Releases row style (using Row 49)
-            styles['Releases'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=49, column=col)
-                styles['Releases'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-
-            # Save UAT Release row style (using Row 50)
-            styles['UAT_Release'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=50, column=col)
-                styles['UAT_Release'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-
-            # Save Production Release row style (using Row 51)
-            styles['Production_Release'] = []
-            for col in range(2, 8):
-                cell = ws.cell(row=51, column=col)
-                styles['Production_Release'].append({
-                    'fill': copy.copy(cell.fill) if cell.fill else None,
-                    'font': copy.copy(cell.font) if cell.font else None,
-                    'border': copy.copy(cell.border) if cell.border else None,
-                    'alignment': copy.copy(cell.alignment) if cell.alignment else None,
-                    'number_format': cell.number_format
-                })
-                
-            # 3. Clear schedule area columns B to G in rows 7 to 51
-            for r in range(7, 52):
-                for c in range(2, 8):
-                    cell = ws.cell(row=r, column=c)
-                    cell.value = None
-                    # Apply regular task style to clean up any old header formats in that row
-                    style_info = styles['task_UI'][c - 2]
-                    if style_info['fill']: cell.fill = style_info['fill']
-                    if style_info['font']: cell.font = style_info['font']
-                    if style_info['border']: cell.border = style_info['border']
-                    if style_info['alignment']: cell.alignment = style_info['alignment']
-                    cell.number_format = style_info['number_format']
-            
-            # 4. Write data sequentially starting at Row 10
-            current_row = 10
-            for cat_key, cat_name in category_mapping:
-                cat_tasks = [t for t in tasks if t.category == cat_key]
-                
-                # Write Phase Header
-                style_list = styles[cat_name]
-                for col_idx in range(2, 8):
-                    cell = ws.cell(row=current_row, column=col_idx)
-                    style_info = style_list[col_idx - 2]
-                    if style_info['fill']: cell.fill = style_info['fill']
-                    if style_info['font']: cell.font = style_info['font']
-                    if style_info['border']: cell.border = style_info['border']
-                    if style_info['alignment']: cell.alignment = style_info['alignment']
-                    cell.number_format = style_info['number_format']
-                
-                ws.cell(row=current_row, column=2, value=cat_name) # Column B
-                current_row += 1
-                
-                # Write tasks under this phase
-                for task in cat_tasks:
-                    # Apply task style for this category
-                    style_list = styles[f'task_{cat_key}']
-                    for col_idx in range(2, 8):
-                        cell = ws.cell(row=current_row, column=col_idx)
-                        style_info = style_list[col_idx - 2]
-                        if style_info['fill']: cell.fill = style_info['fill']
-                        if style_info['font']: cell.font = style_info['font']
-                        if style_info['border']: cell.border = style_info['border']
-                        if style_info['alignment']: cell.alignment = style_info['alignment']
-                        cell.number_format = style_info['number_format']
-
-                    # Write values
-                    cell_b = ws.cell(row=current_row, column=2)
-                    if task.jira_id:
-                        from decouple import config
-                        jira_base = config('JIRA_WORKSPACE_URL', default=config('JIRA_BASE_URL', default='https://jira.atlassian.com'))
-                        clean_base = jira_base.rstrip('/')
-                        jira_url = task.jira_id if task.jira_id.startswith('http') else f"{clean_base}/browse/{task.jira_id}"
-                        
-                        # Use Excel HYPERLINK formula with CHAR(10) to force newline in all sheet viewers
-                        clean_title = task.title.replace('"', '""')
-                        cell_b.value = f'=HYPERLINK("{jira_url}", "{clean_title}" & CHAR(10) & "{jira_url}")'
-                        
-                        # Style the font to look like a hyperlink
-                        cell_b.font = openpyxl.styles.Font(
-                            name=cell_b.font.name if cell_b.font else 'Segoe UI',
-                            size=cell_b.font.size if cell_b.font else 10,
-                            bold=cell_b.font.bold if cell_b.font else False,
-                            italic=cell_b.font.italic if cell_b.font else False,
-                            underline='single',
-                            color='0563C1'
-                        )
-                        
-                        # Enable wrap text
-                        orig_align = cell_b.alignment
-                        cell_b.alignment = openpyxl.styles.Alignment(
-                            horizontal=orig_align.horizontal if orig_align else None,
-                            vertical=orig_align.vertical if orig_align else None,
-                            text_rotation=orig_align.text_rotation if orig_align else 0,
-                            wrap_text=True,
-                            shrink_to_fit=orig_align.shrink_to_fit if orig_align else False,
-                            indent=orig_align.indent if orig_align else 0
-                        )
-                        # Set height to accommodate two lines
-                        ws.row_dimensions[current_row].height = 28
-                    else:
-                        cell_b.value = task.title
-                    
-                    # Column C: Assigned To
-                    assignee_name = ""
-                    if task.assigned_employee and task.assigned_employee.user:
-                        assignee_name = task.assigned_employee.user.full_name or ""
-                    ws.cell(row=current_row, column=3, value=assignee_name)
-                    
-                    # Column D: Progress
-                    progress_val = 0.0
-                    if task.status == 'DONE':
-                        progress_val = 1.0
-                    elif task.status == 'QA':
-                        progress_val = 0.90
-                    elif task.status == 'IN_REVIEW':
-                        progress_val = 0.80
-                    elif task.status == 'IN_PROGRESS':
-                        progress_val = 0.50
-                    ws.cell(row=current_row, column=4, value=progress_val)
-                    
-                    # Column E: Start Date
-                    t_start = task.planned_start_date
-                    if isinstance(t_start, str):
-                        t_start = datetime.date.fromisoformat(t_start)
-                    ws.cell(row=current_row, column=5, value=t_start)
-                    
-                    # Column F: End Date
-                    t_end = task.planned_end_date
-                    if isinstance(t_end, str):
-                        t_end = datetime.date.fromisoformat(t_end)
-                    ws.cell(row=current_row, column=6, value=t_end)
-                    
-                    # Column G: Remarks
-                    ws.cell(row=current_row, column=7, value=None)
-                    
-                    current_row += 1
-
-            # Write "Releases" header row (just color and name, no tasks, no remarks)
-            style_list = styles['Releases']
-            for col_idx in range(2, 8):
-                cell = ws.cell(row=current_row, column=col_idx)
-                style_info = style_list[col_idx - 2]
-                if style_info['fill']: cell.fill = style_info['fill']
-                if style_info['font']: cell.font = style_info['font']
-                if style_info['border']: cell.border = style_info['border']
-                if style_info['alignment']: cell.alignment = style_info['alignment']
-                cell.number_format = style_info['number_format']
-            
-            ws.cell(row=current_row, column=2, value='Releases') # Column B
-            # Ensure other columns in this row are empty (no remarks etc.)
-            for col_idx in range(3, 8):
-                ws.cell(row=current_row, column=col_idx, value=None)
-            
-            current_row += 1
-
-            # Write "UAT Release" task row
-            sprint_end_dt = sprint.end_date
-            if isinstance(sprint_end_dt, str):
-                sprint_end_dt = datetime.date.fromisoformat(sprint_end_dt)
-            second_last_day = sprint_end_dt - datetime.timedelta(days=1)
-            last_day = sprint_end_dt
-
-            style_list = styles['UAT_Release']
-            for col_idx in range(2, 8):
-                cell = ws.cell(row=current_row, column=col_idx)
-                style_info = style_list[col_idx - 2]
-                if style_info['fill']: cell.fill = style_info['fill']
-                if style_info['font']: cell.font = style_info['font']
-                if style_info['border']: cell.border = style_info['border']
-                if style_info['alignment']: cell.alignment = style_info['alignment']
-                cell.number_format = style_info['number_format']
-            
-            ws.cell(row=current_row, column=2, value='UAT Release')
-            ws.cell(row=current_row, column=3, value=None) # Assigned To: leave empty
-            ws.cell(row=current_row, column=4, value=0.0)  # Progress: 0%
-            ws.cell(row=current_row, column=5, value=second_last_day) # Start Date
-            ws.cell(row=current_row, column=6, value=second_last_day) # End Date
-            ws.cell(row=current_row, column=7, value=None) # Remarks
-            
-            current_row += 1
-
-            # Write "Production Release" task row
-            style_list = styles['Production_Release']
-            for col_idx in range(2, 8):
-                cell = ws.cell(row=current_row, column=col_idx)
-                style_info = style_list[col_idx - 2]
-                if style_info['fill']: cell.fill = style_info['fill']
-                if style_info['font']: cell.font = style_info['font']
-                if style_info['border']: cell.border = style_info['border']
-                if style_info['alignment']: cell.alignment = style_info['alignment']
-                cell.number_format = style_info['number_format']
-            
-            ws.cell(row=current_row, column=2, value='Production Release')
-            ws.cell(row=current_row, column=3, value=None) # Assigned To: leave empty
-            ws.cell(row=current_row, column=4, value=0.0)  # Progress: 0%
-            ws.cell(row=current_row, column=5, value=last_day) # Start Date
-            ws.cell(row=current_row, column=6, value=last_day) # End Date
-            ws.cell(row=current_row, column=7, value=None) # Remarks
-            
-            current_row += 1
-
-            # Remove the old conditional formatting rule for the Gantt chart area
-            keys_to_remove = []
-            for key in list(ws.conditional_formatting._cf_rules.keys()):
-                if "H7" in key.sqref or "BK51" in key.sqref:
-                    keys_to_remove.append(key)
-            for key in keys_to_remove:
-                del ws.conditional_formatting._cf_rules[key]
-
-            # Re-apply the weekend rule and the Gantt highlight rules to the active task rows (H10:BK{current_row - 1})
-            if current_row - 1 >= 10:
-                cf_range = f"H10:BK{current_row - 1}"
-                
-                from openpyxl.formatting.rule import FormulaRule
-                from openpyxl.styles import PatternFill
-                
-                weekend_fill = PatternFill(start_color="A5A5A5", end_color="A5A5A5", fill_type="solid")
-                gantt_fill = PatternFill(start_color="B4A7D6", end_color="B4A7D6", fill_type="solid")
-                
-                weekend_rule = FormulaRule(formula=['OR(TEXT(H$4,"ddd")="Sat", TEXT(H$4,"ddd")="Sun", COUNTIF($B$680:$B$696,H$4)>0)'], fill=weekend_fill)
-                gantt_rule_cd = FormulaRule(formula=['AND(H$4>=$C10,H$4<=$D10)'], fill=gantt_fill)
-                gantt_rule_ef = FormulaRule(formula=['AND(H$4>=$E10,H$4<=$F10)'], fill=gantt_fill)
-                
-                ws.conditional_formatting.add(cf_range, weekend_rule)
-                ws.conditional_formatting.add(cf_range, gantt_rule_cd)
-                ws.conditional_formatting.add(cf_range, gantt_rule_ef)
-            
-            # Set Column E (Start Date) width to match Column F (End Date) width
-            ws.column_dimensions['E'].width = ws.column_dimensions['F'].width
-
-            import io
-            buffer = io.BytesIO()
-            wb.save(buffer)
-            buffer.seek(0)
-            
-            clean_sprint_name = "".join([c if c.isalnum() else "_" for c in sprint.milestone])
-            filename = f"Schedule_{clean_sprint_name}.xlsx"
-            
+            buffer, filename = SprintService.generate_excel_schedule(sprint_id)
             response = FileResponse(
                 buffer, 
                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
             return response
-            
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+        except FileNotFoundError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response(
                 {"detail": f"Excel generation failed: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 class SprintListCreateView(APIView):
     """
@@ -429,123 +66,27 @@ class SprintListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, project_id, *args, **kwargs):
+        from project.models import Project
         try:
-            project = Project.objects.get(id=project_id)
+            sprints = SprintService.list_sprints(project_id)
+            serializer = SprintSerializer(sprints, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Project.DoesNotExist:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        from django.db.models import Prefetch
-        from sprints.models import SprintTask
-
-        sprints = Sprint.objects.filter(project=project).select_related('project').prefetch_related(
-            Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
-            'tasks__assigned_employee__user',
-            'tasks__assigned_employee__employee_skill_relations__skill',
-            'tasks__recommendations'
-        )
-        serializer = SprintSerializer(sprints, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, project_id, *args, **kwargs):
+        from project.models import Project
         try:
-            project = Project.objects.get(id=project_id)
-        except Project.DoesNotExist:
-            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if project.status == 'COMPLETED':
-            return Response(
-                {"detail": "Cannot create sprints in a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        data = request.data
-        milestone = data.get('milestone') or data.get('name')
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-
-        if not milestone or not start_date or not end_date:
-            return Response(
-                {"detail": "Sprint milestone, start_date, and end_date are required."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            with transaction.atomic():
-                sprint = Sprint.objects.create(
-                    project=project,
-                    milestone=milestone,
-                    start_date=start_date,
-                    end_date=end_date,
-                    status=data.get('status') or 'ACTIVE'
-                )
-
-                holidays_data = data.get('holidays') or []
-                for holiday_str in holidays_data:
-                    try:
-                        h_date = datetime.datetime.strptime(holiday_str, "%Y-%m-%d").date()
-                        SprintHoliday.objects.get_or_create(
-                            sprint=sprint,
-                            date=h_date,
-                            defaults={'description': 'Sprint Holiday'}
-                        )
-                    except Exception:
-                        pass
-
-                tasks_data = data.get('tasks') or []
-                for task_item in tasks_data:
-                    title = task_item.get('title')
-                    if not title:
-                        continue
-
-                    cat = task_item.get('category', 'UI')
-                    cat_upper = str(cat).upper().strip()
-                    if cat_upper == 'BACKEND':
-                        cat = 'Backend'
-                    elif cat_upper == 'INFRA':
-                        cat = 'INFRA'
-                    elif cat_upper == 'UI':
-                        cat = 'UI'
-                    elif cat_upper == 'QA':
-                        cat = 'QA'
-                    else:
-                        cat = 'UI'
-
-                    priority = task_item.get('priority', 'Normal')
-                    if priority not in ['Low', 'Normal', 'High', 'Critical']:
-                        priority = 'Normal'
-
-                    status_val = task_item.get('status', 'OPEN')
-                    status_val_clean = str(status_val).upper().replace(' ', '_').strip()
-                    if status_val_clean == 'IN_PROGRESS':
-                        status_val = 'IN_PROGRESS'
-                    elif status_val_clean in ('COMPLETED', 'DONE', 'CLOSED'):
-                        status_val = 'CLOSED'
-                    elif status_val_clean in ('TODO', 'OPEN'):
-                        status_val = 'OPEN'
-                    elif status_val_clean in ('IN_REVIEW', 'QA', 'RESOLVED'):
-                        status_val = 'RESOLVED'
-                    else:
-                        status_val = 'OPEN'
-
-                    SprintTask.objects.create(
-                        sprint=sprint,
-                        title=title,
-                        description=task_item.get('description') or task_item.get('desc') or '',
-                        category=cat,
-                        jira_id=task_item.get('jira_id') or task_item.get('jiraId') or '',
-                        priority=priority,
-                        status=status_val,
-                        story_points=task_item.get('story_points') or task_item.get('storyPoints') or None,
-                        estimated_hours=task_item.get('estimated_hours') or task_item.get('estimatedHours') or None,
-                        planned_start_date=task_item.get('planned_start_date') or None,
-                        planned_end_date=task_item.get('planned_end_date') or None,
-                        backlog_task_id=task_item.get('backlog_task_id') or ''
-                    )
-
+            sprint = SprintService.create_sprint(project_id, request.data)
             serializer = SprintSerializer(sprint)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SprintDetailView(APIView):
     """
@@ -555,29 +96,19 @@ class SprintDetailView(APIView):
 
     def get(self, request, pk, *args, **kwargs):
         try:
-            from django.db.models import Prefetch
-            from sprints.models import SprintTask
-            
-            sprint = Sprint.objects.select_related('project').prefetch_related(
-                Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
-                'tasks__assigned_employee__user',
-                'tasks__assigned_employee__employee_skill_relations__skill',
-                'tasks__recommendations'
-            ).get(id=pk)
+            sprint = SprintService.get_sprint_detail(pk)
+            serializer = SprintSerializer(sprint)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = SprintSerializer(sprint)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
         try:
-            sprint = Sprint.objects.get(id=pk)
+            SprintService.delete_sprint(pk)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        sprint.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class SprintTaskUpdateView(APIView):
     """
@@ -587,115 +118,29 @@ class SprintTaskUpdateView(APIView):
 
     def put(self, request, pk, *args, **kwargs):
         try:
-            task = SprintTask.objects.get(id=pk)
-        except SprintTask.DoesNotExist:
-            return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if task.sprint.project.status == 'COMPLETED':
-            return Response(
-                {"detail": "Cannot update tasks in a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        data = request.data
-
-        if 'status' in data:
-            status_val = data['status']
-            status_val_clean = str(status_val).upper().replace(' ', '_').strip()
-            if status_val_clean == 'IN_PROGRESS':
-                task.status = 'IN_PROGRESS'
-            elif status_val_clean in ('COMPLETED', 'DONE', 'CLOSED'):
-                task.status = 'CLOSED'
-            elif status_val_clean in ('TODO', 'OPEN'):
-                task.status = 'OPEN'
-            elif status_val_clean in ('IN_REVIEW', 'QA', 'RESOLVED'):
-                task.status = 'RESOLVED'
-            else:
-                task.status = status_val
-
-        if 'assigned_employee_id' in data or 'assignedTo' in data:
-            emp_id = data.get('assigned_employee_id') or data.get('assignedTo')
-            if emp_id:
-                if emp_id == 'unassigned' or emp_id == '':
-                    task.assigned_employee = None
-                else:
-                    try:
-                        task.assigned_employee = EmployeeProfile.objects.get(id=emp_id)
-                    except EmployeeProfile.DoesNotExist:
-                        return Response({"detail": "Employee profile not found."}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                task.assigned_employee = None
-
-        start_changed = 'planned_start_date' in data or 'startDate' in data
-        end_changed = 'planned_end_date' in data or 'endDate' in data
-        hours_changed = 'estimated_hours' in data or 'estimatedHours' in data
-        sp_changed = 'story_points' in data or 'storyPoints' in data
-        
-        if start_changed:
-            task.planned_start_date = data.get('planned_start_date') or data.get('startDate')
-
-        if end_changed:
-            task.planned_end_date = data.get('planned_end_date') or data.get('endDate')
-
-        if hours_changed:
-            task.estimated_hours = data.get('estimated_hours') if 'estimated_hours' in data else data.get('estimatedHours')
-        elif start_changed or end_changed:
-            if task.planned_start_date and task.planned_end_date:
-                from sprints.services.schedule_service import calculate_working_days
-                holidays = list(task.sprint.holidays.values_list('date', flat=True)) if task.sprint else None
-                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)
-                task.estimated_hours = wd * 8
-            
-        if sp_changed:
-            task.story_points = data.get('story_points') if 'story_points' in data else data.get('storyPoints')
-        elif start_changed or end_changed:
-            if task.planned_start_date and task.planned_end_date:
-                from sprints.services.schedule_service import calculate_working_days
-                holidays = list(task.sprint.holidays.values_list('date', flat=True)) if task.sprint else None
-                wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)
-                task.story_points = wd * 2
-            
-        if 'title' in data:
-            task.title = data.get('title')
-            
-        if 'description' in data:
-            task.description = data.get('description')
-            
-        if 'priority' in data:
-            task.priority = data.get('priority')
-
-        try:
-            task.save()
+            task = SprintService.update_task(pk, request.data)
             serializer = SprintTaskSerializer(task)
             return Response(serializer.data, status=status.HTTP_200_OK)
+        except SprintTask.DoesNotExist:
+            return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk, *args, **kwargs):
         try:
-            task = SprintTask.objects.get(id=pk)
+            SprintService.delete_task(pk)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except SprintTask.DoesNotExist:
             return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if task.sprint.project.status == 'COMPLETED':
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
             return Response(
-                {"detail": "Cannot delete tasks in a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": f"Failed to delete task from Backlog: {str(e)}"},
+                status=status.HTTP_502_BAD_GATEWAY
             )
-
-        if task.backlog_task_id:
-            from backlog.services.backlog_client import BacklogService
-            try:
-                BacklogService(project_key=task.sprint.project.project_id).delete_issue(task.backlog_task_id)
-            except Exception as e:
-                return Response(
-                    {"detail": f"Failed to delete task from Backlog: {str(e)}"},
-                    status=status.HTTP_502_BAD_GATEWAY
-                )
-
-        task.is_deleted = True
-        task.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SprintTaskBulkDeleteView(APIView):
@@ -706,60 +151,31 @@ class SprintTaskBulkDeleteView(APIView):
 
     def post(self, request, *args, **kwargs):
         task_ids = request.data.get('task_ids', [])
-        if not task_ids:
-            return Response({"detail": "No task IDs provided."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            count = SprintService.bulk_delete_tasks(task_ids)
+            return Response({"detail": f"Successfully deleted {count} tasks."}, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        tasks = SprintTask.objects.filter(id__in=task_ids)
-        if tasks.filter(sprint__project__status='COMPLETED').exists():
-            return Response(
-                {"detail": "Cannot delete tasks in a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
-        count = tasks.count()
-        tasks.update(is_deleted=True)
-        return Response({"detail": f"Successfully deleted {count} tasks."}, status=status.HTTP_200_OK)
-
-# View endpoints delegated to services
 class SprintAISuggestScheduleView(APIView):
+    """
+    API View to generate suggestions for task scheduling using AI.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, sprint_id, *args, **kwargs):
-        try:
-            sprint = Sprint.objects.get(id=sprint_id)
-        except Sprint.DoesNotExist:
-            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if sprint.project.status == 'COMPLETED':
-            return Response(
-                {"detail": "Cannot generate AI schedule for a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         from decouple import config
         api_key = config('GEMINI_API_KEY', default=None) or os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            return Response(
-                {"detail": "GEMINI_API_KEY is not configured. Please add GEMINI_API_KEY to your backend .env file."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         task_ids = request.data.get('task_ids', [])
-        if task_ids:
-            tasks = sprint.tasks.filter(id__in=task_ids, is_deleted=False)
-        else:
-            tasks = sprint.tasks.filter(is_deleted=False)
 
-        if not tasks.exists():
-            return Response(
-                {"detail": "No tasks found in this sprint to schedule."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        from sprints.services.schedule_service import generate_and_persist_recommendations
         try:
-            output_suggestions = generate_and_persist_recommendations(sprint, tasks, api_key)
+            output_suggestions = SprintService.generate_ai_suggestions(sprint_id, task_ids, api_key)
             return Response(output_suggestions, status=status.HTTP_200_OK)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except ImportError as e:
             return Response(
                 {"detail": str(e)},
@@ -771,25 +187,19 @@ class SprintAISuggestScheduleView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
+
 class SprintImportScheduleView(APIView):
+    """
+    API View to save imported schedule suggestions.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, sprint_id, *args, **kwargs):
         try:
-            sprint = Sprint.objects.get(id=sprint_id)
+            SprintService.import_schedule_data(sprint_id, request.data)
+            return Response({"detail": "Schedule successfully imported and saved."}, status=status.HTTP_200_OK)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if sprint.project.status == 'COMPLETED':
-            return Response(
-                {"detail": "Cannot import schedule for a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        from sprints.services.schedule_service import import_schedule
-        try:
-            import_schedule(sprint, request.data)
-            return Response({"detail": "Schedule successfully imported and saved."}, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -797,45 +207,22 @@ class SprintImportScheduleView(APIView):
 
 
 class SprintTaskCreateView(APIView):
+    """
+    API View to create a new task in a sprint.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, sprint_id, *args, **kwargs):
         try:
-            sprint = Sprint.objects.get(id=sprint_id)
+            task = SprintService.create_task(sprint_id, request.data)
+            return Response(SprintTaskSerializer(task).data, status=status.HTTP_201_CREATED)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if sprint.project.status == 'COMPLETED':
-            return Response(
-                {"detail": "Cannot add tasks to a completed project."}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = SprintTaskSerializer(data=request.data)
-        if serializer.is_valid():
-            task = serializer.save(sprint=sprint)
-            
-            # Recalculate story points and hours if planned start and end date are provided
-            start_date = serializer.validated_data.get('planned_start_date')
-            end_date = serializer.validated_data.get('planned_end_date')
-            if start_date and end_date:
-                from sprints.services.schedule_service import calculate_working_days
-                start_str = start_date.strftime("%Y-%m-%d")
-                end_str = end_date.strftime("%Y-%m-%d")
-                holidays = list(sprint.holidays.values_list('date', flat=True)) if sprint else None
-                wd = calculate_working_days(start_str, end_str, holidays=holidays)
-                if task.story_points is None:
-                    task.story_points = wd * 2
-                if task.estimated_hours is None:
-                    task.estimated_hours = wd * 8
-                task.save()
-            
-            # Update TaskRecommendation states if this task matches the assigned employee
-            if task.assigned_employee:
-                from sprints.models import TaskRecommendation
-                TaskRecommendation.objects.filter(task=task, recommended_employee=task.assigned_employee).update(accepted=True)
-                TaskRecommendation.objects.filter(task=task).exclude(recommended_employee=task.assigned_employee).update(accepted=False)
-                
-            return Response(SprintTaskSerializer(task).data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        except ValueError as e:
+            # Check if ValueError contains dictionary errors (from serializer)
+            err_msg = e.args[0] if e.args else str(e)
+            if isinstance(err_msg, dict):
+                return Response(err_msg, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
