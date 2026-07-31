@@ -40,6 +40,16 @@ export const SprintServices = {
   createSprintTask: async (sprintId, taskData) => {
     const response = await apiClient.post(`sprints/${sprintId}/tasks/`, taskData);
     return response.data;
+  },
+
+  getSprintNotes: async (sprintId) => {
+    const response = await apiClient.get(`sprints/${sprintId}/notes/`);
+    return response.data;
+  },
+
+  saveSprintNote: async (sprintId, noteData) => {
+    const response = await apiClient.post(`sprints/${sprintId}/notes/`, noteData);
+    return response.data;
   }
 };
 

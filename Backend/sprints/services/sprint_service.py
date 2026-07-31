@@ -9,7 +9,7 @@ from django.db.models import Prefetch
 
 from project.models import Project
 from accounts.models import EmployeeProfile
-from sprints.models import Sprint, SprintTask, SprintHoliday, TaskRecommendation
+from sprints.models import Sprint, SprintTask, SprintHoliday, TaskRecommendation, SprintNote
 from sprints.serializers import SprintSerializer, SprintTaskSerializer
 
 
@@ -694,3 +694,31 @@ class SprintService:
             TaskRecommendation.objects.filter(task=task).exclude(recommended_employee=task.assigned_employee).update(accepted=False)
 
         return task
+
+    @staticmethod
+    def list_sprint_notes(sprint_id: str):
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            raise Sprint.DoesNotExist("Sprint not found.")
+        return SprintNote.objects.filter(sprint=sprint)
+
+    @staticmethod
+    def save_sprint_note(sprint_id: str, date_str: str, content: str) -> SprintNote:
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            raise Sprint.DoesNotExist("Sprint not found.")
+
+        try:
+            note_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            note_date = datetime.date.today()
+
+        note, created = SprintNote.objects.update_or_create(
+            sprint=sprint,
+            date=note_date,
+            defaults={'content': content}
+        )
+        return note
+

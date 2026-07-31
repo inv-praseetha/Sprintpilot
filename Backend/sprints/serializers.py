@@ -1,7 +1,13 @@
 from rest_framework import serializers
 from accounts.serializers import EmployeeProfileSerializer
-from sprints.models import Sprint, SprintTask, SprintHoliday
+from sprints.models import Sprint, SprintTask, SprintHoliday, SprintNote
 from accounts.models import EmployeeProfile
+
+class SprintNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SprintNote
+        fields = ['id', 'sprint', 'date', 'content', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'sprint', 'created_at', 'updated_at']
 
 class SprintHolidaySerializer(serializers.ModelSerializer):
     class Meta:
