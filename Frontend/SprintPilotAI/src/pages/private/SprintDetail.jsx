@@ -1637,7 +1637,7 @@ export default function SprintDetail() {
                 <div>
                   <h3 className="font-extrabold text-base tracking-tight">
                     {selectedNoteDate === new Date().toLocaleDateString('en-CA') 
-                      ? "Daily Sprint Scratchpad" 
+                      ? "Daily Sprint MOM" 
                       : "Edit Historical Note"}
                   </h3>
                   <div className="flex items-center gap-2 mt-0.5">
