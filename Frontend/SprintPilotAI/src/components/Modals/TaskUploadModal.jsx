@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle } from 'lucide-react';
+import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database } from 'lucide-react';
 import ProjectService from '../../services/ProjectService';
 import CustomDatePicker from '../Common/CustomDatePicker';
+import apiClient from '../../api/apiClient';
 
 // Category color mappings matching parent
 const categoryConfig = {
@@ -44,7 +45,8 @@ export default function TaskUploadModal({
   activeProject,
   projects,
   onImportSuccess,
-  projectType
+  projectType,
+  projectJiraId
 }) {
   const [excelFile, setExcelFile] = useState(null);
   const [excelData, setExcelData] = useState([]);
@@ -54,6 +56,18 @@ export default function TaskUploadModal({
   const [sprintEndDate, setSprintEndDate] = useState('');
   const [parsedProjectInfo, setParsedProjectInfo] = useState({ id: '', name: '', matchedKey: '' });
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // Jira Specific States
+  const [importMode, setImportMode] = useState('EXCEL'); // 'EXCEL' or 'JIRA'
+  const [jiraProjectKey, setJiraProjectKey] = useState(projectJiraId || '');
+  const [isFetchingJira, setIsFetchingJira] = useState(false);
+  const [jiraAuthRequired, setJiraAuthRequired] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen && projectJiraId) {
+      setJiraProjectKey(projectJiraId);
+    }
+  }, [isOpen, projectJiraId]);
 
   if (!isOpen) return null;
 
@@ -66,6 +80,9 @@ export default function TaskUploadModal({
     setSprintEndDate('');
     setErrorMsg('');
     setParsedProjectInfo({ id: '', name: '', matchedKey: '' });
+    setJiraProjectKey(projectJiraId || '');
+    setIsFetchingJira(false);
+    setJiraAuthRequired(false);
     onClose();
   };
 
@@ -105,6 +122,54 @@ export default function TaskUploadModal({
       setErrorMsg('Failed to download Excel template. Please try again.');
     }
   };
+
+  const handleFetchJiraTasks = async () => {
+    if (!jiraProjectKey.trim()) {
+      setErrorMsg('Please enter a Jira Project Key.');
+      return;
+    }
+
+    setIsFetchingJira(true);
+    setErrorMsg('');
+    setExcelData([]);
+    setExcelHolidays([]);
+    setJiraAuthRequired(false);
+    try {
+      const res = await apiClient.post('jira/fetch/', {
+        project_key: jiraProjectKey.trim().toUpperCase()
+      });
+      if (res.data.tasks && res.data.tasks.length > 0) {
+        setExcelData(res.data.tasks);
+        setMilestoneName(`${jiraProjectKey.toUpperCase()} Sprint Import`);
+        setParsedProjectInfo({ id: jiraProjectKey, name: 'Jira Project', matchedKey: activeProject });
+      } else {
+        setErrorMsg('No tasks found for this project key in Jira.');
+      }
+    } catch (err) {
+      console.error('[Jira Import] Fetch error:', err);
+      if (err.response?.data?.auth_required) {
+        setJiraAuthRequired(true);
+        setErrorMsg(err.response?.data?.detail);
+      } else {
+        setErrorMsg(err.response?.data?.detail || 'Failed to fetch tasks from Jira.');
+      }
+    } finally {
+      setIsFetchingJira(false);
+    }
+  };
+
+  const handleConnectJira = async () => {
+    try {
+      const res = await apiClient.get('jira/auth-url/');
+      if (res.data.auth_url) {
+        sessionStorage.setItem('jira_redirect_back_url', window.location.pathname);
+        window.location.href = res.data.auth_url;
+      }
+    } catch (err) {
+      setErrorMsg('Failed to generate Jira login URL. Please check backend config.');
+    }
+  };
+
 
   const handleExcelUpload = (e) => {
     const file = e.target.files[0];
@@ -379,10 +444,39 @@ export default function TaskUploadModal({
           </div>
         )}
 
+        {/* Mode Toggle - Segmented Control */}
+        <div className="flex gap-4 mb-8">
+          <button
+            onClick={() => setImportMode('EXCEL')}
+            className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 border ${
+              importMode === 'EXCEL' 
+                ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/20 text-white scale-[1.02]' 
+                : 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 cursor-pointer'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Excel Upload
+          </button>
+          <button
+            onClick={() => setImportMode('JIRA')}
+            className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 border ${
+              importMode === 'JIRA' 
+                ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20 text-white scale-[1.02]' 
+                : 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 cursor-pointer'
+            }`}
+          >
+            <LayoutTemplate className="w-4 h-4" />
+            Jira Connect
+          </button>
+        </div>
+
         {/* Body Scrollable Area */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-6 scrollbar-thin">
-          {/* Step 1: Download Template */}
-          <div>
+          
+          {importMode === 'EXCEL' ? (
+            <>
+              {/* Step 1: Download Template */}
+              <div>
             <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">1. Get the Excel Template</h4>
             <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
               darkMode ? 'bg-slate-950/20 border-slate-800' : 'bg-slate-50/50 border-slate-200'
@@ -450,9 +544,71 @@ export default function TaskUploadModal({
               </div>
             )}
           </div>
+          </>
+          ) : (
+            /* Step 1 (JIRA): Fetch from Jira */
+            <div>
+              <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">1. Connect & Fetch Jira Tasks</h4>
+              
+              {jiraAuthRequired && (
+                <div className="mb-4 p-5 rounded-2xl border border-blue-500/20 bg-blue-500/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                      <AlertCircle className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-bold text-slate-800 dark:text-white mb-1">Jira Account Required</h5>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">You need to authorize SprintPilot to read your Jira tasks.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleConnectJira}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg"
+                  >
+                    Login with Jira
+                  </button>
+                </div>
+              )}
 
-          {/* Step 3: Milestone details (Visible only if file uploaded) */}
-          {excelFile && excelData.length > 0 && (
+              <div className={`p-4 rounded-2xl border flex items-center gap-4 ${
+                darkMode ? 'bg-slate-950/20 border-slate-800' : 'bg-slate-50/50 border-slate-200'
+              }`}>
+                <div className="flex-1 flex items-center gap-2">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Project Key:
+                  </span>
+                  {projectJiraId ? (
+                    <span className={`text-sm font-black tracking-widest px-3 py-1 rounded-lg ${
+                      darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'
+                    }`}>
+                      {projectJiraId}
+                    </span>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="e.g. SP"
+                      value={jiraProjectKey}
+                      onChange={(e) => setJiraProjectKey(e.target.value.toUpperCase())}
+                      className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        darkMode ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  )}
+                </div>
+                <button
+                  onClick={handleFetchJiraTasks}
+                  disabled={isFetchingJira}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold px-5 py-3 rounded-2xl shadow-lg transition-colors cursor-pointer flex items-center gap-2"
+                >
+                  {isFetchingJira ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                  Fetch
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Milestone details (Visible only if file uploaded or fetched) */}
+          {(excelFile || (importMode === 'JIRA' && excelData.length > 0)) && excelData.length > 0 && (
             <div className="space-y-4 animate-fade-in">
               <div>
                 <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">3. Define Milestone Details</h4>
@@ -559,6 +715,7 @@ export default function TaskUploadModal({
                         darkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
                       }`}>
                         <th className="py-2.5 px-3">Title</th>
+                        <th className="py-2.5 px-3">Description</th>
                         <th className="py-2.5 px-3">Category</th>
                         <th className="py-2.5 px-3">Jira ID</th>
                       </tr>
@@ -566,7 +723,8 @@ export default function TaskUploadModal({
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
                       {excelData.map((row, idx) => (
                         <tr key={idx} className={darkMode ? 'bg-slate-900/40 text-slate-300' : 'bg-white text-slate-700'}>
-                          <td className="py-2 px-3 font-semibold truncate max-w-[200px]">{row.title}</td>
+                          <td className="py-2 px-3 font-semibold truncate max-w-[150px]">{row.title}</td>
+                          <td className="py-2 px-3 text-slate-500 truncate max-w-[180px]" title={row.desc}>{row.desc}</td>
                           <td className="py-2 px-3">
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${categoryConfig[row.category]?.bg}`}>
                               {row.category}
@@ -596,7 +754,7 @@ export default function TaskUploadModal({
 
           <button
             onClick={handleConfirmUpload}
-            disabled={!excelFile || excelData.length === 0}
+            disabled={(importMode === 'EXCEL' && !excelFile) || excelData.length === 0}
             className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-5 py-2.5 rounded-2xl shadow-lg shadow-orange-500/10 transition-colors cursor-pointer"
           >
             Confirm Import

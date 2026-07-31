@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'accounts',
     'project',
     'sprints',
+    'jira_integration',
 ]
 
 MIDDLEWARE = [

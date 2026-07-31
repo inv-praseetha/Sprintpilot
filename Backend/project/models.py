@@ -48,6 +48,7 @@ class Project(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project_id = models.CharField(max_length=10, validators=[MinLengthValidator(3)], unique=True)
+    jira_id = models.CharField(max_length=10, null=True, blank=True)
     name = models.CharField(max_length=255, validators=[MinLengthValidator(3)])
     description = models.TextField(null=True, blank=True, validators=[MinLengthValidator(10), MaxLengthValidator(100)])
     created_by = models.ForeignKey(
@@ -145,5 +146,3 @@ class ProjectStack(models.Model):
 
     def __str__(self):
         return f"{self.project.name} - {self.skill.name}"
-
-

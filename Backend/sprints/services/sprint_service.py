@@ -218,8 +218,15 @@ class SprintService:
                     from decouple import config
                     jira_base = config('JIRA_WORKSPACE_URL', default=config('JIRA_BASE_URL', default='https://jira.atlassian.com'))
                     clean_base = jira_base.rstrip('/')
-                    jira_url = task.jira_id if task.jira_id.startswith('http') else f"{clean_base}/browse/{task.jira_id}"
                     
+                    if task.jira_id.startswith('http'):
+                        jira_url = task.jira_id
+                    else:
+                        # Extract project key (e.g. SCRUM from SCRUM-123)
+                        project_key = task.jira_id.split('-')[0] if '-' in task.jira_id else 'PROJECT'
+                        # Use the Jira Software Cloud specific URL format
+                        jira_url = f"{clean_base}/jira/software/projects/{project_key}/issues/{task.jira_id}"
+                        
                     # Use Excel HYPERLINK formula with CHAR(10) to force newline in all sheet viewers
                     clean_title = task.title.replace('"', '""')
                     cell_b.value = f'=HYPERLINK("{jira_url}", "{clean_title}" & CHAR(10) & "{jira_url}")'

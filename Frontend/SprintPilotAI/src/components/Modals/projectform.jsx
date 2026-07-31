@@ -10,6 +10,8 @@ export default function ProjectForm({
   darkMode,
   projectId,
   setProjectId,
+  jiraId,
+  setJiraId,
   name,
   setName,
   description,
@@ -126,7 +128,7 @@ export default function ProjectForm({
 
       {/* ID, Name & Description */}
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="space-y-2 text-left sm:col-span-1">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Project ID <span className="text-rose-500">*</span></label>
             <input
@@ -146,6 +148,21 @@ export default function ProjectForm({
                   : darkMode
                     ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
                     : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
+              }`}
+            />
+          </div>
+
+          <div className="space-y-2 text-left sm:col-span-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Jira ID <span className="text-[10px] lowercase text-slate-500">(optional)</span></label>
+            <input
+              type="text"
+              placeholder="e.g. SP"
+              value={jiraId || ''}
+              onChange={(e) => setJiraId && setJiraId(e.target.value.toUpperCase())}
+              className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
+                darkMode
+                  ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
+                  : 'bg-slate-50 border-slate-100 text-slate-800 focus:border-orange-500 focus:bg-white'
               }`}
             />
           </div>
