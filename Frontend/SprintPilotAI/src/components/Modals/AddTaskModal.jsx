@@ -278,7 +278,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                   handleChange({ target: { name: 'planned_start_date', value: val } });
                 }}
                 minDate={sprintStartDate}
-                maxDate={schedulingEndDate}
+                maxDate={sprintEndDate}
                 darkMode={darkMode}
               />
             </div>
@@ -292,7 +292,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                   handleChange({ target: { name: 'planned_end_date', value: val } });
                 }}
                 minDate={formData.planned_start_date || sprintStartDate}
-                maxDate={schedulingEndDate}
+                maxDate={sprintEndDate}
                 darkMode={darkMode}
               />
             </div>
