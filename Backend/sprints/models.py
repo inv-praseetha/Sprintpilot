@@ -206,3 +206,20 @@ class SprintHoliday(models.Model):
     def __str__(self):
         return f"{self.sprint.milestone} - {self.date}"
 
+class SprintNote(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sprint = models.ForeignKey(Sprint, on_delete=models.CASCADE, related_name='notes')
+    date = models.DateField(default=timezone.now)
+    content = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'sprint_notes'
+        unique_together = ('sprint', 'date')
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.sprint.milestone} Note - {self.date}"
+
+

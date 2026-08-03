@@ -649,3 +649,60 @@ class SprintGeminiClientTests(APITestCase):
         mock_get_client.side_effect = Exception("Client error")
         with self.assertRaises(Exception):
             generate_schedule_content("prompt", None, "dummy_key")
+
+
+class SprintNoteAPITests(APITestCase):
+    def setUp(self):
+        self.creator = Employee.objects.create(
+            email="manager@example.com",
+            full_name="Manager Name",
+            role="PROJECT_MANAGER",
+            is_active=True
+        )
+        self.profile, _ = EmployeeProfile.objects.get_or_create(
+            user=self.creator,
+            defaults={"designation": "UI Developer", "experience_years": 5.0}
+        )
+        self.project = Project.objects.create(
+            name="Project Alpha",
+            status="ACTIVE",
+            type="AGILE",
+            created_by=self.creator
+        )
+        self.sprint = Sprint.objects.create(
+            project=self.project,
+            milestone="Sprint 1",
+            start_date=datetime.date(2026, 7, 20),
+            end_date=datetime.date(2026, 8, 7),
+            status="ACTIVE"
+        )
+        ProjectMember.objects.create(project=self.project, employee_profile=self.profile)
+        self.client.force_authenticate(user=self.creator)
+
+    def test_save_and_list_note_success(self):
+        url = reverse('sprint_note_list', kwargs={'sprint_id': self.sprint.id})
+        
+        # 1. Create a note for today
+        data = {
+            "date": "2026-07-30",
+            "content": "Today we refactored the models."
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['content'], "Today we refactored the models.")
+        
+        # 2. Update the same note (upsert check)
+        data_update = {
+            "date": "2026-07-30",
+            "content": "Today we refactored the models and views."
+        }
+        response_update = self.client.post(url, data_update, format='json')
+        self.assertEqual(response_update.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_update.data['content'], "Today we refactored the models and views.")
+        
+        # 3. Retrieve list of notes
+        list_response = self.client.get(url)
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(list_response.data[0]['content'], "Today we refactored the models and views.")
+

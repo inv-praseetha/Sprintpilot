@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from sprints.models import Sprint, SprintTask
-from sprints.serializers import SprintSerializer, SprintTaskSerializer
+from sprints.serializers import SprintSerializer, SprintTaskSerializer, SprintNoteSerializer
 from sprints.services import SprintService
 
 
@@ -224,6 +224,37 @@ class SprintTaskCreateView(APIView):
             if isinstance(err_msg, dict):
                 return Response(err_msg, status=status.HTTP_400_BAD_REQUEST)
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class SprintNoteListView(APIView):
+    """
+    API View to list and upsert daily notes for a sprint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, sprint_id, *args, **kwargs):
+        try:
+            notes = SprintService.list_sprint_notes(sprint_id)
+            return Response(SprintNoteSerializer(notes, many=True).data, status=status.HTTP_200_OK)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        date_str = request.data.get('date')
+        content = request.data.get('content', '')
+        if not date_str:
+            return Response({"detail": "date is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            note = SprintService.save_sprint_note(sprint_id, date_str, content)
+            return Response(SprintNoteSerializer(note).data, status=status.HTTP_200_OK)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

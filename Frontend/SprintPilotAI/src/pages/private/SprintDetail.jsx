@@ -20,10 +20,15 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Download,
   Plus,
   ExternalLink,
-  Trash2
+  Trash2,
+  FileText,
+  ClipboardList,
+  History
 } from 'lucide-react';
 
 
@@ -158,6 +163,15 @@ export default function SprintDetail() {
   const [modifiedTaskIds, setModifiedTaskIds] = useState(new Set());
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+  const [chartExpanded, setChartExpanded] = useState(true);
+
+  // Daily Scratchpad states
+  const [notes, setNotes] = useState([]);
+  const [todayNote, setTodayNote] = useState('');
+  const [selectedNoteDate, setSelectedNoteDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [lastSavedNoteTime, setLastSavedNoteTime] = useState(null);
+  const lastSavedContentRef = useRef('');
 
   const getSchedulingEndDate = (endDateStr) => {
     if (!endDateStr) return '';
@@ -239,6 +253,7 @@ export default function SprintDetail() {
         setIsEditing(false);
         setModifiedTaskIds(new Set());
         setSelectedTaskIds(new Set());
+        setSelectedNoteDate(new Date().toLocaleDateString('en-CA'));
 
         // 1. Fetch Sprint Details (with nested tasks)
         const sprintData = await SprintServices.getSprintDetails(sprintId);
@@ -263,6 +278,16 @@ export default function SprintDetail() {
         const holidaysMap = new Map((sprintData.holidays || []).map(h => [h.date, h.description || '']));
         const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, holidaysMap);
         setTimelineDaysList(days);
+
+        // 3. Fetch Sprint Notes
+        const notesData = await SprintServices.getSprintNotes(sprintId);
+        setNotes(notesData);
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const todayNoteObj = notesData.find(n => n.date === todayStr);
+        const initialContent = todayNoteObj ? todayNoteObj.content : '';
+        setTodayNote(initialContent);
+        lastSavedContentRef.current = initialContent;
+        setLastSavedNoteTime(todayNoteObj ? new Date(todayNoteObj.updated_at).toLocaleTimeString() : null);
       } catch (err) {
         console.error('[SprintDetail] Error loading data:', err);
       } finally {
@@ -271,6 +296,41 @@ export default function SprintDetail() {
     };
     fetchData();
   }, [sprintId]);
+
+  // Debounce save for today's note
+  useEffect(() => {
+    if (pageLoading) return;
+    if (todayNote === lastSavedContentRef.current) return;
+
+    setIsSavingNote(true);
+    const timer = setTimeout(async () => {
+      try {
+        const savedNote = await SprintServices.saveSprintNote(sprintId, {
+          date: selectedNoteDate,
+          content: todayNote
+        });
+        lastSavedContentRef.current = todayNote;
+        setLastSavedNoteTime(new Date().toLocaleTimeString());
+
+        setNotes(prev => {
+          const index = prev.findIndex(n => n.date === selectedNoteDate);
+          if (index !== -1) {
+            const next = [...prev];
+            next[index] = savedNote;
+            return next;
+          } else {
+            return [savedNote, ...prev];
+          }
+        });
+      } catch (err) {
+        console.error('[SprintDetail] Error autosaving daily note:', err);
+      } finally {
+        setIsSavingNote(false);
+      }
+    }, 2000); // 2-second debounce
+
+    return () => clearTimeout(timer);
+  }, [todayNote, selectedNoteDate, sprintId, pageLoading]);
 
 
 
@@ -787,13 +847,29 @@ export default function SprintDetail() {
             {/* Unified Card Container */}
             <div className={`rounded-3xl border overflow-hidden shadow-xl ${darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-200'
               }`}>
-              {/* Header with Title, Actions & Legend */}
-              <div className={`p-5 border-b flex flex-col lg:flex-row gap-4 justify-between lg:items-center ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
-                }`}>
+              {/* Header with Title & Collapse Toggle */}
+              <button
+                onClick={() => setChartExpanded(!chartExpanded)}
+                className={`w-full p-5 flex justify-between items-center transition-colors cursor-pointer text-left focus:outline-none ${
+                  chartExpanded ? 'border-b' : ''
+                } ${
+                  darkMode 
+                    ? 'border-slate-800 bg-slate-900 hover:bg-slate-850/30' 
+                    : 'border-slate-200 bg-white hover:bg-slate-50/50'
+                }`}
+              >
                 <div>
                   <h3 className="font-extrabold text-base tracking-tight">AI Optimised Gantt Schedule</h3>
                   <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider mt-0.5">Sprint Duration: {sprint.start_date} to {sprint.end_date}</p>
                 </div>
+                {chartExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+              </button>
+
+              {chartExpanded && (
+                <div>
+                  {/* Actions & Legend Row */}
+                  <div className={`p-5 border-b flex flex-col lg:flex-row gap-4 justify-between lg:items-center ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+                    }`}>
 
                 {/* Action Buttons: Update / Save & Sync */}
                 <div className="flex items-center gap-2">
@@ -1544,8 +1620,182 @@ export default function SprintDetail() {
                 </table>
               </div>
             </div>
-          </>
-        )}
+          )}
+        </div>
+
+        {/* 2. DAILY JOURNAL & HISTORICAL TIMELINE */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+          {/* Left Column: Selected Scratchpad */}
+          <div className={`p-6 rounded-3xl border shadow-xl flex flex-col transition-all duration-300 text-left ${
+            darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-orange-500/10 text-orange-500">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base tracking-tight">
+                    {selectedNoteDate === new Date().toLocaleDateString('en-CA') 
+                      ? "Daily Sprint MOM" 
+                      : "Edit Historical Note"}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      Selected: {new Date(selectedNoteDate + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    {selectedNoteDate !== new Date().toLocaleDateString('en-CA') && (
+                      <button
+                        onClick={() => {
+                          const todayStr = new Date().toLocaleDateString('en-CA');
+                          setSelectedNoteDate(todayStr);
+                          const todayNoteObj = notes.find(n => n.date === todayStr);
+                          const content = todayNoteObj ? todayNoteObj.content : '';
+                          setTodayNote(content);
+                          lastSavedContentRef.current = content;
+                          setLastSavedNoteTime(todayNoteObj ? new Date(todayNoteObj.updated_at || todayNoteObj.created_at).toLocaleTimeString() : null);
+                        }}
+                        className="px-2 py-0.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                      >
+                        Switch to Today
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Autosave status indicator */}
+              <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                {isSavingNote ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-500" />
+                    <span className="text-orange-500 uppercase tracking-wider">Saving...</span>
+                  </>
+                ) : lastSavedNoteTime ? (
+                  <>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-slate-400 font-medium">Saved at {lastSavedNoteTime}</span>
+                  </>
+                ) : (
+                  <span className="text-slate-400 font-medium">Ready</span>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              value={todayNote}
+              onChange={(e) => setTodayNote(e.target.value)}
+              placeholder="Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)"
+              className={`w-full flex-grow min-h-[300px] p-5 rounded-2xl border text-sm font-medium leading-relaxed resize-none focus:outline-none transition-all ${
+                darkMode 
+                  ? 'bg-slate-950/40 border-slate-800 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-250 placeholder-slate-600'
+                  : 'bg-slate-50/50 border-slate-200 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-800 placeholder-slate-400'
+              }`}
+            />
+          </div>
+
+          {/* Right Column: Historical Logs Timeline */}
+          <div className={`p-6 rounded-3xl border shadow-xl flex flex-col transition-all duration-300 text-left ${
+            darkMode ? 'bg-slate-900 border-slate-850' : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
+                <History className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base tracking-tight">Chronological History</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Previous Sprint logs</p>
+              </div>
+            </div>
+
+            <div className="flex-grow overflow-y-auto max-h-[300px] pr-2 custom-scrollbar space-y-4">
+              {notes.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center py-12 text-center">
+                  <ClipboardList className="w-10 h-10 text-slate-400 dark:text-slate-600 mb-2 opacity-50" />
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">No logs recorded yet</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-600 mt-1 max-w-[200px]">Notes you add will be chronologized here.</p>
+                </div>
+              ) : (
+                [...notes]
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .map((note) => {
+                    const noteDate = new Date(note.date + 'T00:00:00');
+                    const formattedDateStr = noteDate.toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    });
+                    const isSelected = note.date === selectedNoteDate;
+                    const isToday = note.date === new Date().toLocaleDateString('en-CA');
+
+                    // Check if updated on another day
+                    const updatedDateTime = new Date(note.updated_at || note.created_at || new Date());
+                    const updatedLocalDateStr = updatedDateTime.toLocaleDateString('en-CA');
+                    const wasUpdatedAnotherDay = updatedLocalDateStr !== note.date;
+                    const updatedTimeStr = updatedDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const updatedDisplay = wasUpdatedAnotherDay
+                      ? `Updated: ${updatedDateTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ${updatedTimeStr}`
+                      : `Updated: ${updatedTimeStr}`;
+
+                    return (
+                      <button 
+                        key={note.id || note.date}
+                        onClick={() => {
+                          setSelectedNoteDate(note.date);
+                          setTodayNote(note.content);
+                          lastSavedContentRef.current = note.content;
+                          setLastSavedNoteTime(updatedDateTime.toLocaleTimeString());
+                        }}
+                        className={`w-full p-4 rounded-2xl border text-left flex flex-col gap-2 transition-all cursor-pointer outline-none ${
+                          isSelected
+                            ? darkMode 
+                              ? 'bg-orange-500/10 border-orange-500' 
+                              : 'bg-orange-50/50 border-orange-400'
+                            : darkMode 
+                              ? 'bg-slate-950/20 border-slate-850/80 hover:bg-slate-950/40 hover:border-slate-700' 
+                              : 'bg-slate-50/30 border-slate-100 hover:bg-slate-50/80 hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                              isSelected
+                                ? 'bg-orange-500 text-white'
+                                : darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {formattedDateStr}
+                            </span>
+                            {isToday && (
+                              <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded-md">
+                                Today
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {updatedDisplay}
+                          </span>
+                        </div>
+                        <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
+                          isSelected 
+                            ? darkMode ? 'text-slate-100' : 'text-slate-950' 
+                            : darkMode ? 'text-slate-300' : 'text-slate-800'
+                        }`}>
+                          {note.content || <em className="opacity-60">No content entered.</em>}
+                        </p>
+                      </button>
+                    );
+                  })
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    )}
 
         <AddTaskModal
           show={isAddTaskModalOpen}
