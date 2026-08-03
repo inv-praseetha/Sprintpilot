@@ -233,12 +233,14 @@ class SprintNoteListView(APIView):
     """
     API View to list and upsert daily notes for a sprint.
     """
+    from rest_framework.parsers import MultiPartParser, JSONParser, FormParser
+    parser_classes = (MultiPartParser, JSONParser, FormParser)
     permission_classes = [IsAuthenticated]
 
     def get(self, request, sprint_id, *args, **kwargs):
         try:
             notes = SprintService.list_sprint_notes(sprint_id)
-            return Response(SprintNoteSerializer(notes, many=True).data, status=status.HTTP_200_OK)
+            return Response(SprintNoteSerializer(notes, many=True, context={'request': request}).data, status=status.HTTP_200_OK)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -246,13 +248,22 @@ class SprintNoteListView(APIView):
 
     def post(self, request, sprint_id, *args, **kwargs):
         date_str = request.data.get('date')
-        content = request.data.get('content', '')
+        content = request.data.get('content')
+        attachment = request.FILES.get('attachment')
+        delete_attachment = request.data.get('delete_attachment') == 'true'
+
         if not date_str:
             return Response({"detail": "date is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            note = SprintService.save_sprint_note(sprint_id, date_str, content)
-            return Response(SprintNoteSerializer(note).data, status=status.HTTP_200_OK)
+            note = SprintService.save_sprint_note(
+                sprint_id,
+                date_str,
+                content=content,
+                attachment=attachment,
+                delete_attachment=delete_attachment
+            )
+            return Response(SprintNoteSerializer(note, context={'request': request}).data, status=status.HTTP_200_OK)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:

@@ -6,7 +6,7 @@ from accounts.models import EmployeeProfile
 class SprintNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = SprintNote
-        fields = ['id', 'sprint', 'date', 'content', 'created_at', 'updated_at']
+        fields = ['id', 'sprint', 'date', 'content', 'attachment', 'created_at', 'updated_at']
         read_only_fields = ['id', 'sprint', 'created_at', 'updated_at']
 
 class SprintHolidaySerializer(serializers.ModelSerializer):
