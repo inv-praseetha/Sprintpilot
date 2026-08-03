@@ -341,12 +341,12 @@ export default function ProjectCreation() {
       setSubmitting(false);
       return;
     }
-    if (selectedMembers.length === 0) {
+    if (!editingProjectId && selectedMembers.length === 0) {
       setFormError("At least one team member must be selected.");
       setSubmitting(false);
       return;
     }
-    if (selectedSkills.length === 0) {
+    if (!editingProjectId && selectedSkills.length === 0) {
       setFormError("At least one skill must be selected.");
       setSubmitting(false);
       return;
@@ -363,10 +363,13 @@ export default function ProjectCreation() {
       end_date: computedEndDate,
       number_of_days: computedDays,
       team_lead: teamLead,
-      members: selectedMembers,
-      skills: selectedSkills,
       team_size: teamSize ? parseInt(teamSize, 10) : 0
     };
+
+    if (!editingProjectId) {
+      requestData.members = selectedMembers;
+      requestData.skills = selectedSkills;
+    }
 
     try {
       const response = editingProjectId

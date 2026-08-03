@@ -7,7 +7,7 @@ from project.validators import (
     validate_members,
     validate_skills
 )
-
+from rest_framework.validators import UniqueValidator
 class SkillSerializer(serializers.ModelSerializer):
     """
     Serializer for Skill model.
@@ -16,7 +16,7 @@ class SkillSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Skill
-        fields = ["id", "name", "category", "parent", "sub_skills"]
+        fields = ["id", "name", "category", "parent", "sub_skills"] 
         read_only_fields = fields
 
     def get_sub_skills(self, obj):
@@ -29,15 +29,27 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     """
     Serializer to validate Project creation input.
     """
-    from rest_framework.validators import UniqueValidator
+    from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
     project_id = serializers.CharField(
         required=True,
-        validators=[UniqueValidator(queryset=Project.objects.all(), message="A project with this Project ID already exists.")]
+        validators=[
+            UniqueValidator(queryset=Project.objects.all(), message="A project with this Project ID already exists."),
+            RegexValidator(regex=r'^[A-Z0-9\-]+$', message="Project ID must be alphanumeric and uppercase.")
+        ]
     )
-    jira_id = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=10)
+    jira_id = serializers.CharField(
+        required=False, 
+        allow_null=True, 
+        allow_blank=True, 
+        max_length=10,
+        validators=[
+            RegexValidator(regex=r'^[A-Z][A-Z0-9]+$', message="Jira ID must start with an uppercase letter and be uppercase alphanumeric.")
+        ]
+    )
+    description = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=5000)
     team_lead = serializers.UUIDField(required=True)
-    number_of_days = serializers.IntegerField(required=False, allow_null=True)
-    team_size = serializers.IntegerField(required=False, default=0)
+    number_of_days = serializers.IntegerField(required=False, allow_null=True, validators=[MinValueValidator(1), MaxValueValidator(3650)])
+    team_size = serializers.IntegerField(required=False, default=1, validators=[MinValueValidator(1)])
     members = serializers.ListField(
         child=serializers.UUIDField(), 
         required=False, 
@@ -87,19 +99,35 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             if not number_of_days or number_of_days <= 0:
                 raise ProjectValidationException("Number of days must be a positive integer for Agile projects.")
         
-        # Validating values and returning the actual objects (or verifying existence)
-        validate_team_lead(attrs.get("team_lead"))
-        validate_members(attrs.get("members", []))
-        validate_skills(attrs.get("skills", []))
-        
-        # Validate that assigned members count does not exceed team size
-        team_size = attrs.get("team_size", 0)
-        if team_size <= 0:
-            raise ProjectValidationException("Team size must be a positive integer.")
+        # Description Trim Validation
+        description = attrs.get("description", "")
+        if description and not description.strip():
+            raise ProjectValidationException("Description cannot be purely whitespace.")
+        if description:
+            attrs["description"] = description.strip()
             
-        members_count = len(attrs.get("members", []))
-        if members_count > team_size:
-            raise ProjectValidationException(f"Cannot assign more members ({members_count}) than the project team size ({team_size}).")
+        team_size = attrs.get("team_size", 1)
+        members = attrs.get("members", [])
+        if team_size < len(members):
+            raise ProjectValidationException(f"Team size ({team_size}) cannot be less than the number of provided members ({len(members)}).")
+
+        # Validate Team Lead UUID directly via validator (which returns Model)
+        team_lead_id = attrs.get("team_lead")
+        if team_lead_id:
+            lead = validate_team_lead(team_lead_id)
+            attrs["team_lead_obj"] = lead
+
+        member_ids = attrs.get("members", [])
+        if member_ids:
+            profiles = validate_members(member_ids)
+            attrs["members_obj"] = profiles
+
+        skill_ids = attrs.get("skills", [])
+        if skill_ids:
+            skills = validate_skills(skill_ids)
+            attrs["skills_obj"] = skills
+        
+
         
         return attrs
 

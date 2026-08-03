@@ -46,11 +46,26 @@ class Project(models.Model):
         WATERFALL = "WATERFALL", "Waterfall"
         AGILE = "AGILE", "Agile"
 
+    from django.core.validators import RegexValidator
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project_id = models.CharField(max_length=10, validators=[MinLengthValidator(3)], unique=True)
-    jira_id = models.CharField(max_length=10, null=True, blank=True)
+    project_id = models.CharField(
+        max_length=10, 
+        validators=[
+            MinLengthValidator(3),
+            RegexValidator(regex=r'^[A-Z0-9\-]+$', message="Project ID must be alphanumeric and uppercase.")
+        ], 
+        unique=True
+    )
+    jira_id = models.CharField(
+        max_length=10, 
+        validators=[
+            RegexValidator(regex=r'^[A-Z][A-Z0-9]+$', message="Jira ID must start with an uppercase letter and be uppercase alphanumeric.")
+        ],
+        null=True, 
+        blank=True
+    )
     name = models.CharField(max_length=255, validators=[MinLengthValidator(3)])
-    description = models.TextField(null=True, blank=True, validators=[MinLengthValidator(10), MaxLengthValidator(100)])
+    description = models.TextField(null=True, blank=True, validators=[MinLengthValidator(10), MaxLengthValidator(5000)])
     created_by = models.ForeignKey(
         Employee, 
         on_delete=models.CASCADE, 
@@ -69,15 +84,15 @@ class Project(models.Model):
     )
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
-    number_of_days=models.IntegerField(blank=True,null=True)
+    number_of_days = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
     team_lead = models.ForeignKey(
         Employee, 
-        on_delete=models.CASCADE, 
+        on_delete=models.SET_NULL, 
         related_name="led_projects", 
         null=True, 
         blank=True
     )
-    team_size = models.IntegerField(default=0)
+    team_size = models.PositiveIntegerField(default=0, validators=[MinValueValidator(1)])
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
