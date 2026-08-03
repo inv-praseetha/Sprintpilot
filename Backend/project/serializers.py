@@ -34,6 +34,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         required=True,
         validators=[UniqueValidator(queryset=Project.objects.all(), message="A project with this Project ID already exists.")]
     )
+    jira_id = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=10)
     team_lead = serializers.UUIDField(required=True)
     number_of_days = serializers.IntegerField(required=False, allow_null=True)
     team_size = serializers.IntegerField(required=False, default=0)
@@ -52,6 +53,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "project_id",
+            "jira_id",
             "name",
             "description",
             "status",
@@ -114,6 +116,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project_id",
+            "jira_id",
             "name",
             "description",
             "created_by",
@@ -144,6 +147,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project_id",
+            "jira_id",
             "name",
             "description",
             "created_by",

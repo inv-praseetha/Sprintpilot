@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/', include('project.urls')),
     path('api/', include('sprints.urls')),
     path('api/', include('backlog.urls')),
+    path('api/jira/', include('jira_integration.urls')),
 ]

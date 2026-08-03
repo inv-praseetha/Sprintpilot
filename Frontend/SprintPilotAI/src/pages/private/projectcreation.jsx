@@ -97,6 +97,7 @@ export default function ProjectCreation() {
 
   // Form Field States
   const [projectId, setProjectId] = useState('');
+  const [jiraId, setJiraId] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('ACTIVE');
@@ -352,6 +353,7 @@ export default function ProjectCreation() {
 
     const requestData = {
       project_id: projectId.trim() || null,
+      jira_id: jiraId?.trim() || null,
       name,
       description: description.trim() || null,
       status,
@@ -384,6 +386,7 @@ export default function ProjectCreation() {
 
   const resetForm = () => {
     setProjectId('');
+    setJiraId('');
     setName('');
     setDescription('');
     setStatus('ACTIVE');
@@ -404,6 +407,7 @@ export default function ProjectCreation() {
   const handleEditProject = (project) => {
     setEditingProjectId(project.id);
     setProjectId(project.project_id || '');
+    setJiraId(project.jira_id || '');
     setName(project.name || '');
     setDescription(project.description || '');
     setStatus(project.status || 'ACTIVE');
@@ -852,6 +856,8 @@ export default function ProjectCreation() {
           darkMode={darkMode}
           projectId={projectId}
           setProjectId={setProjectId}
+          jiraId={jiraId}
+          setJiraId={setJiraId}
           name={name}
           setName={setName}
           description={description}

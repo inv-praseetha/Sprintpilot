@@ -228,6 +228,7 @@ class SprintTaskCreateView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 class SprintNoteListView(APIView):
     """
     API View to list and upsert daily notes for a sprint.

@@ -215,14 +215,34 @@ class SprintService:
                 # Write values
                 cell_b = ws.cell(row=current_row, column=2)
                 if task.jira_id:
-                    from decouple import config
-                    jira_base = config('JIRA_WORKSPACE_URL', default=config('JIRA_BASE_URL', default='https://jira.atlassian.com'))
-                    clean_base = jira_base.rstrip('/')
-                    jira_url = task.jira_id if task.jira_id.startswith('http') else f"{clean_base}/browse/{task.jira_id}"
+                    # Dynamically get the workspace URL from the authenticated Jira session
+                    from jira_integration.models import JiraOAuthToken
+                    jira_token = JiraOAuthToken.objects.first()
+                    jira_base = jira_token.workspace_url if (jira_token and jira_token.workspace_url) else "https://jira.atlassian.com"
                     
-                    # Use Excel HYPERLINK formula with CHAR(10) to force newline in all sheet viewers
-                    clean_title = task.title.replace('"', '""')
-                    cell_b.value = f'=HYPERLINK("{jira_url}", "{clean_title}" & CHAR(10) & "{jira_url}")'
+                    clean_base = jira_base.rstrip('/')
+                    
+                    if task.jira_id.startswith('http'):
+                        jira_url = task.jira_id
+                    else:
+                        # Use the canonical Jira Cloud URL format which automatically handles redirects
+                        jira_url = f"{clean_base}/browse/{task.jira_id}"
+                        
+                    # Use a very safe Excel formula. 
+                    # We append the URL to the title so the user sees both, separated by a space.
+                    jira_url = jira_url.strip()
+                    safe_title = task.title.replace('"', "''").replace('\n', ' ')
+                    
+                    # Calculate safe display length to keep the ENTIRE formula under 255 characters
+                    # Formula: =HYPERLINK("url", "display")
+                    # Formula overhead: 16 chars + len(jira_url) + len(display_text)
+                    max_display_len = 250 - 16 - len(jira_url)
+                    
+                    display_text = f"{safe_title} ({jira_url})"
+                    if len(display_text) > max_display_len:
+                        display_text = display_text[:max_display_len-3] + "..."
+                        
+                    cell_b.value = f'=HYPERLINK("{jira_url}", "{display_text}")'
                     
                     # Style the font to look like a hyperlink
                     cell_b.font = openpyxl.styles.Font(

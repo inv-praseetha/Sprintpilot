@@ -1279,6 +1279,7 @@ export default function ProjectDetail() {
           onClose={() => setShowUploadSprintModal(false)}
           darkMode={darkMode}
           activeProject={project.name}
+          projectJiraId={project.jira_id}
           projects={{
             [project.name]: {
               id: project.id || '',
@@ -1351,7 +1352,6 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

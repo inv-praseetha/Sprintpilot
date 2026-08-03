@@ -11,6 +11,7 @@ import Login from './pages/auth/login';
 import ProjectCreation from './pages/private/projectcreation';
 import ProjectDetail from './pages/private/projectdetail';
 import SprintDetail from './pages/private/SprintDetail';
+import JiraCallback from './pages/public/JiraCallback';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
               <Route path="/projects" element={<ProjectCreation/>} />
               <Route path="/projects/:projectId" element={<ProjectDetail />} />
               <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
+              <Route path="/jira/callback" element={<JiraCallback />} />
               <Route path="/test" element={<Test />} />
               {/* Fallback to 404 page */}
               <Route path="*" element={<NotFound />} />
