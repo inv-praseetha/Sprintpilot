@@ -95,6 +95,17 @@ class SprintTask(models.Model):
         from django.core.exceptions import ValidationError
         from datetime import datetime, date, timedelta
 
+        # 0. Disable updates to schedule/deletion for CLOSED tasks
+        if self.pk:
+            original = SprintTask.objects.get(pk=self.pk)
+            if original.status == 'CLOSED':
+                if self.is_deleted and not original.is_deleted:
+                    raise ValidationError("Cannot delete this task as it is already closed/completed.")
+                if (self.planned_start_date != original.planned_start_date or
+                    self.planned_end_date != original.planned_end_date or
+                    self.assigned_employee_id != original.assigned_employee_id):
+                    raise ValidationError("Updates to start date, end date, or assignee are disabled for CLOSED tasks.")
+
         def to_date(d):
             if isinstance(d, str):
                 try:
@@ -116,13 +127,12 @@ class SprintTask(models.Model):
         if self.sprint and not skip_validation:
             sprint_start = to_date(self.sprint.start_date)
             sprint_end = to_date(self.sprint.end_date)
-            effective_end = sprint_end - timedelta(days=2)
             if start:
-                if start < sprint_start or start > effective_end:
-                    raise ValidationError({"planned_start_date": f"Task planned start date ({start}) must be within the valid scheduling duration ({sprint_start} to {effective_end})."})
+                if start < sprint_start or start > sprint_end:
+                    raise ValidationError({"planned_start_date": f"Task planned start date ({start}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
             if end:
-                if end < sprint_start or end > effective_end:
-                    raise ValidationError({"planned_end_date": f"Task planned end date ({end}) must be within the valid scheduling duration ({sprint_start} to {effective_end})."})
+                if end < sprint_start or end > sprint_end:
+                    raise ValidationError({"planned_end_date": f"Task planned end date ({end}) must be within the sprint duration ({sprint_start} to {sprint_end})."})
             
             # 2.5 Validate dates are not on weekends
             if self.sprint.project and (start or end):
@@ -163,6 +173,12 @@ class SprintTask(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.status == 'CLOSED':
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Cannot delete this task as it is already closed/completed.")
+        super().delete(*args, **kwargs)
 
     def __str__(self):
         return self.title

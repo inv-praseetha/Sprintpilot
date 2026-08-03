@@ -620,6 +620,9 @@ class SprintService:
         if task.sprint.project.status == 'COMPLETED':
             raise ValueError("Cannot delete tasks in a completed project.")
 
+        if task.status == 'CLOSED':
+            raise ValueError("Cannot delete this task as it is already closed/completed.")
+
         if task.backlog_task_id:
             from backlog.services.backlog_client import BacklogService
             BacklogService(project_key=task.sprint.project.project_id).delete_issue(task.backlog_task_id)
@@ -635,6 +638,9 @@ class SprintService:
         tasks = SprintTask.objects.filter(id__in=task_ids)
         if tasks.filter(sprint__project__status='COMPLETED').exists():
             raise ValueError("Cannot delete tasks in a completed project.")
+
+        if tasks.filter(status='CLOSED').exists():
+            raise ValueError("Cannot delete this task as it is already closed/completed.")
 
         count = tasks.count()
         tasks.update(is_deleted=True)
