@@ -8,6 +8,7 @@ class JiraOAuthToken(models.Model):
     access_token = models.TextField()
     refresh_token = models.TextField()
     cloud_id = models.CharField(max_length=255)
+    workspace_url = models.URLField(null=True, blank=True)
     expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

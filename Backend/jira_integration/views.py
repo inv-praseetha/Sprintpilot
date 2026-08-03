@@ -113,6 +113,7 @@ class JiraTokenExchangeView(APIView):
 
             # Get the first available cloud_id
             cloud_id = resources[0].get("id")
+            workspace_url = resources[0].get("url")
 
             # Save to Database (Singleton)
             JiraOAuthToken.objects.all().delete() # Clear existing tokens
@@ -120,6 +121,7 @@ class JiraTokenExchangeView(APIView):
                 access_token=access_token,
                 refresh_token=refresh_token,
                 cloud_id=cloud_id,
+                workspace_url=workspace_url,
                 expires_at=expires_at
             )
 
