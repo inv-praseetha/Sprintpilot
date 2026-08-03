@@ -724,7 +724,7 @@ class SprintService:
         return SprintNote.objects.filter(sprint=sprint)
 
     @staticmethod
-    def save_sprint_note(sprint_id: str, date_str: str, content: str) -> SprintNote:
+    def save_sprint_note(sprint_id: str, date_str: str, content: str = None, attachment=None, delete_attachment: bool = False) -> SprintNote:
         try:
             sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
@@ -735,10 +735,18 @@ class SprintService:
         except ValueError:
             note_date = datetime.date.today()
 
+        defaults = {}
+        if content is not None:
+            defaults['content'] = content
+        if attachment is not None:
+            defaults['attachment'] = attachment
+        elif delete_attachment:
+            defaults['attachment'] = None
+
         note, created = SprintNote.objects.update_or_create(
             sprint=sprint,
             date=note_date,
-            defaults={'content': content}
+            defaults=defaults
         )
         return note
 

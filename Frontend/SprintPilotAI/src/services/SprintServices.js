@@ -48,7 +48,13 @@ export const SprintServices = {
   },
 
   saveSprintNote: async (sprintId, noteData) => {
-    const response = await apiClient.post(`sprints/${sprintId}/notes/`, noteData);
+    const config = {};
+    if (noteData instanceof FormData) {
+      config.headers = {
+        'Content-Type': 'multipart/form-data'
+      };
+    }
+    const response = await apiClient.post(`sprints/${sprintId}/notes/`, noteData, config);
     return response.data;
   }
 };

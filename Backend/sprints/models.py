@@ -211,6 +211,7 @@ class SprintNote(models.Model):
     sprint = models.ForeignKey(Sprint, on_delete=models.CASCADE, related_name='notes')
     date = models.DateField(default=timezone.now)
     content = models.TextField(blank=True, default='')
+    attachment = models.FileField(upload_to='notes_attachments/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

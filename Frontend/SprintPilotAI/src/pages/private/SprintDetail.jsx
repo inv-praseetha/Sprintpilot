@@ -28,7 +28,8 @@ import {
   Trash2,
   FileText,
   ClipboardList,
-  History
+  History,
+  Paperclip
 } from 'lucide-react';
 
 
@@ -331,6 +332,90 @@ export default function SprintDetail() {
 
     return () => clearTimeout(timer);
   }, [todayNote, selectedNoteDate, sprintId, pageLoading]);
+
+  const getAttachmentUrl = (path) => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    const baseUrl = apiClient.defaults.baseURL || 'http://localhost:8000/api/';
+    const host = baseUrl.replace(/\/api\/?$/, '');
+    return `${host}${path}`;
+  };
+
+  const handleAttachmentChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a PDF file only.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('date', selectedNoteDate);
+    formData.append('attachment', file);
+    if (todayNote !== undefined && todayNote !== null) {
+      formData.append('content', todayNote);
+    }
+
+    setIsSavingNote(true);
+    try {
+      const savedNote = await SprintServices.saveSprintNote(sprintId, formData);
+      
+      // Update notes state
+      setNotes(prev => {
+        const index = prev.findIndex(n => n.date === selectedNoteDate);
+        if (index !== -1) {
+          const next = [...prev];
+          next[index] = savedNote;
+          return next;
+        } else {
+          return [savedNote, ...prev];
+        }
+      });
+      setLastSavedNoteTime(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error('[SprintDetail] Error uploading attachment:', err);
+      alert('Failed to upload PDF attachment. Please try again.');
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleRemoveAttachment = async () => {
+    if (!window.confirm('Are you sure you want to delete this PDF attachment?')) return;
+
+    const formData = new FormData();
+    formData.append('date', selectedNoteDate);
+    formData.append('delete_attachment', 'true');
+    if (todayNote !== undefined && todayNote !== null) {
+      formData.append('content', todayNote);
+    }
+
+    setIsSavingNote(true);
+    try {
+      const savedNote = await SprintServices.saveSprintNote(sprintId, formData);
+      
+      // Update notes state
+      setNotes(prev => {
+        const index = prev.findIndex(n => n.date === selectedNoteDate);
+        if (index !== -1) {
+          const next = [...prev];
+          next[index] = savedNote;
+          return next;
+        } else {
+          return [savedNote, ...prev];
+        }
+      });
+      setLastSavedNoteTime(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error('[SprintDetail] Error removing attachment:', err);
+      alert('Failed to remove PDF attachment. Please try again.');
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
 
 
 
@@ -729,6 +814,8 @@ export default function SprintDetail() {
   const isSyncNeeded = selectedTaskIds.size > 0 
     ? tasks.filter(t => selectedTaskIds.has(t.id)).some(checkSyncNeeded)
     : tasks.length > 0 && tasks.some(checkSyncNeeded);
+
+  const currentNoteObj = notes.find(n => n.date === selectedNoteDate);
 
   return (
     <div className={`p-6 sm:p-8 mx-auto min-h-screen ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-800'}`}>
@@ -1696,6 +1783,62 @@ export default function SprintDetail() {
                   : 'bg-slate-50/50 border-slate-200 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-800 placeholder-slate-400'
               }`}
             />
+
+            {/* Attachment Section */}
+            <div className={`mt-3 flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all ${
+              darkMode 
+                ? 'border-slate-800 bg-slate-950/20 text-slate-300' 
+                : 'border-slate-200 bg-slate-50/50 text-slate-700'
+            }`}>
+              <div className="flex items-center gap-2 overflow-hidden">
+                <Paperclip className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                {currentNoteObj?.attachment ? (
+                  <span className="truncate max-w-[200px]" title={currentNoteObj.attachment.split('/').pop()}>
+                    {currentNoteObj.attachment.split('/').pop()}
+                  </span>
+                ) : (
+                  <span className="opacity-50">No PDF attached</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {currentNoteObj?.attachment && (
+                  <>
+                    <a
+                      href={getAttachmentUrl(currentNoteObj.attachment)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Download className="w-3 h-3" /> Download
+                    </a>
+                    <button
+                      onClick={handleRemoveAttachment}
+                      className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
+                        darkMode 
+                          ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-rose-500' 
+                          : 'border-slate-250 bg-white hover:bg-slate-50 text-rose-600'
+                      }`}
+                      title="Delete attachment"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+                <label className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
+                  darkMode 
+                    ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' 
+                    : 'border-slate-250 bg-white hover:bg-slate-50 text-slate-700'
+                }`}>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleAttachmentChange}
+                    className="hidden"
+                  />
+                  {currentNoteObj?.attachment ? 'Replace' : 'Attach PDF'}
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Historical Logs Timeline */}
@@ -1780,13 +1923,77 @@ export default function SprintDetail() {
                             {updatedDisplay}
                           </span>
                         </div>
-                        <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
-                          isSelected 
-                            ? darkMode ? 'text-slate-100' : 'text-slate-950' 
-                            : darkMode ? 'text-slate-300' : 'text-slate-800'
-                        }`}>
-                          {note.content || <em className="opacity-60">No content entered.</em>}
-                        </p>
+                        {/* Note content / attachment status */}
+                        {!note.attachment && (
+                          <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
+                            isSelected 
+                              ? darkMode ? 'text-slate-100' : 'text-slate-950' 
+                              : darkMode ? 'text-slate-300' : 'text-slate-800'
+                          }`}>
+                            {note.content || <em className="opacity-60">No content entered.</em>}
+                          </p>
+                        )}
+
+                        {note.content && note.attachment && (
+                          <div className="flex flex-col gap-1.5 w-full">
+                            <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
+                              isSelected 
+                                ? darkMode ? 'text-slate-100' : 'text-slate-950' 
+                                : darkMode ? 'text-slate-300' : 'text-slate-800'
+                            }`}>
+                              {note.content}
+                            </p>
+                            <div className="flex justify-between items-center w-full gap-2">
+                              <span className="text-[11px] font-bold text-orange-500 flex items-center gap-1.5 truncate">
+                                <Paperclip className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate" title={note.attachment.split('/').pop()}>
+                                  {note.attachment.split('/').pop()}
+                                </span>
+                              </span>
+                              <a
+                                href={getAttachmentUrl(note.attachment)}
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className={`p-1 px-1.5 rounded-lg border transition-all flex-shrink-0 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider ${
+                                  darkMode 
+                                    ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-orange-500' 
+                                    : 'border-slate-200 bg-white hover:bg-slate-50 text-orange-650'
+                                }`}
+                                title="Download PDF attachment"
+                              >
+                                <Download className="w-3 h-3" /> PDF
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        {!note.content && note.attachment && (
+                          <div className="flex justify-between items-center w-full gap-2">
+                            <span className="text-xs font-bold text-orange-500 flex items-center gap-1.5 truncate">
+                              <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span className="truncate" title={note.attachment.split('/').pop()}>
+                                {note.attachment.split('/').pop()}
+                              </span>
+                            </span>
+                            <a
+                              href={getAttachmentUrl(note.attachment)}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`p-1 px-1.5 rounded-lg border transition-all flex-shrink-0 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider ${
+                                darkMode 
+                                  ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-orange-500' 
+                                  : 'border-slate-200 bg-white hover:bg-slate-50 text-orange-650'
+                              }`}
+                              title="Download PDF attachment"
+                            >
+                              <Download className="w-3.5 h-3.5" /> PDF
+                            </a>
+                          </div>
+                        )}
                       </button>
                     );
                   })
