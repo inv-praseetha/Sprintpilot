@@ -612,10 +612,21 @@ export default function SprintDetail() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedTaskIds.size === tasks.length) {
-      setSelectedTaskIds(new Set());
+    const activeTasks = tasks.filter(t => t.status !== 'CLOSED');
+    if (activeTasks.length === 0) return;
+    const allSelected = activeTasks.every(t => selectedTaskIds.has(t.id));
+    if (allSelected) {
+      setSelectedTaskIds(prev => {
+        const next = new Set(prev);
+        activeTasks.forEach(t => next.delete(t.id));
+        return next;
+      });
     } else {
-      setSelectedTaskIds(new Set(tasks.map(t => t.id)));
+      setSelectedTaskIds(prev => {
+        const next = new Set(prev);
+        activeTasks.forEach(t => next.add(t.id));
+        return next;
+      });
     }
   };
 
@@ -1169,7 +1180,7 @@ export default function SprintDetail() {
                       >
                         <input
                           type="checkbox"
-                          checked={tasks.length > 0 && selectedTaskIds.size === tasks.length}
+                          checked={tasks.filter(t => t.status !== 'CLOSED').length > 0 && tasks.filter(t => t.status !== 'CLOSED').every(t => selectedTaskIds.has(t.id))}
                           onChange={toggleSelectAll}
                           disabled={isSyncing}
                           className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-3.5 h-3.5"
@@ -1480,8 +1491,9 @@ export default function SprintDetail() {
                                     type="checkbox"
                                     checked={selectedTaskIds.has(task.id)}
                                     onChange={() => toggleSelectTask(task.id)}
-                                    disabled={isSyncing}
+                                    disabled={isSyncing || task.status === 'CLOSED'}
                                     className="rounded border-slate-350 text-orange-500 focus:ring-orange-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-3.5 h-3.5"
+                                    title={task.status === 'CLOSED' ? "Closed tasks cannot be selected" : ""}
                                   />
                                 </td>
 
@@ -1513,7 +1525,7 @@ export default function SprintDetail() {
                                   className={`py-4 px-4 sticky left-[260px] ${rowZIndexClass} border-r align-middle text-left focus-within:z-50 ${stickyNormalBgClass}`}
                                   style={{ minWidth: '150px', maxWidth: '150px', width: '150px' }}
                                 >
-                                  {isEditing ? (
+                                  {isEditing && task.status !== 'CLOSED' ? (
                                     <select
                                       value={task.assigned_employee?.id || ""}
                                       onChange={(e) => handleAssigneeChange(task.id, e.target.value)}
@@ -1566,11 +1578,11 @@ export default function SprintDetail() {
                                     } ${stickyNormalBgClass}`}
                                   style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                                 >
-                                  {isEditing ? (
+                                  {isEditing && task.status !== 'CLOSED' ? (
                                     <CustomDatePicker
                                       value={task.planned_start_date}
                                       minDate={sprint?.start_date}
-                                      maxDate={task.planned_end_date || schedulingEndDate}
+                                      maxDate={task.planned_end_date || sprint?.end_date}
                                       onChange={(newDate) => handleStartDateChange(task.id, newDate)}
                                       darkMode={darkMode}
                                       onOpen={() => setActiveDatePickerId(`${task.id}-start`)}
@@ -1589,11 +1601,11 @@ export default function SprintDetail() {
                                     } ${stickyNormalBgClass}`}
                                   style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                                 >
-                                  {isEditing ? (
+                                  {isEditing && task.status !== 'CLOSED' ? (
                                     <CustomDatePicker
                                       value={task.planned_end_date}
                                       minDate={task.planned_start_date || sprint?.start_date}
-                                      maxDate={schedulingEndDate}
+                                      maxDate={sprint?.end_date}
                                       onChange={(newDate) => handleEndDateChange(task.id, newDate)}
                                       darkMode={darkMode}
                                       onOpen={() => setActiveDatePickerId(`${task.id}-end`)}
@@ -1630,13 +1642,13 @@ export default function SprintDetail() {
                                 >
                                   <button
                                     onClick={() => handleIndividualDelete(task.id)}
-                                    disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                                    disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || task.status === 'CLOSED'}
                                     className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                       darkMode 
                                         ? 'hover:bg-slate-800 text-red-400 hover:text-red-300' 
                                         : 'hover:bg-red-50 text-red-600 hover:text-red-700'
                                     }`}
-                                    title="Delete task"
+                                    title={task.status === 'CLOSED' ? "Cannot delete this task as it is already closed/completed" : "Delete task"}
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
