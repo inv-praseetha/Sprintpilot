@@ -71,25 +71,31 @@ class ProjectCreateView(APIView):
         serializer = ProjectCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Call service layer to perform business logic & DB creation inside a transaction
-        created_project = ProjectService.create_project(
-            creator=request.user,
-            validated_data=serializer.validated_data
-        )
+        try:
+            # Call service layer to perform business logic & DB creation inside a transaction
+            created_project = ProjectService.create_project(
+                creator=request.user,
+                validated_data=serializer.validated_data
+            )
 
-        # Query optimization for response object representation
-        project = Project.objects.filter(is_deleted=False).select_related(
-            "created_by", 
-            "team_lead"
-        ).prefetch_related(
-            "members__employee_profile__user", 
-            "members__employee_profile__employee_skill_relations__skill", 
-            "project_stack__skill"
-        ).get(id=created_project.id)
+            # Query optimization for response object representation
+            project = Project.objects.filter(is_deleted=False).select_related(
+                "created_by", 
+                "team_lead"
+            ).prefetch_related(
+                "members__employee_profile__user", 
+                "members__employee_profile__employee_skill_relations__skill", 
+                "project_stack__skill"
+            ).get(id=created_project.id)
 
-        # Serialize and return detail response
-        detail_serializer = ProjectDetailSerializer(project)
-        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
+            # Serialize and return detail response
+            detail_serializer = ProjectDetailSerializer(project)
+            return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to create project: %s", str(e))
+            return Response({"detail": f"Failed to create project: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 from project.models import Skill
@@ -125,6 +131,7 @@ class EmployeeProfileListView(APIView):
         if skill:
             skill = skill[:100]
             profiles = profiles.filter(skills__name__icontains=skill)
+            
         serializer = EmployeeProfileSerializer(profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -167,88 +174,113 @@ class ProjectDetailView(APIView):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to modify this project."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Prevent adding new members if the project is already COMPLETED
+        # Prevent updating if the project is already COMPLETED
         if project.status == 'COMPLETED':
-            new_members = request.data.get("members", [])
-            current_members = [str(pm.employee_profile_id) for pm in project.members.all()]
-            added_members = set([str(m) for m in new_members]) - set(current_members)
-            if added_members:
-                return Response(
-                    {"detail": "Cannot add members to a completed project."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            return Response(
+                {"detail": "Cannot update a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = ProjectCreateSerializer(instance=project, data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        updated_project = ProjectService.update_project(
-            project=project,
-            validated_data=serializer.validated_data
-        )
+        try:
+            updated_project = ProjectService.update_project(
+                project=project,
+                validated_data=serializer.validated_data
+            )
 
-        refreshed_project = Project.objects.filter(is_deleted=False).select_related(
-            "created_by", 
-            "team_lead"
-        ).prefetch_related(
-            "members__employee_profile__user", 
-            "members__employee_profile__employee_skill_relations__skill", 
-            "project_stack__skill"
-        ).get(id=updated_project.id)
+            refreshed_project = Project.objects.filter(is_deleted=False).select_related(
+                "created_by", 
+                "team_lead"
+            ).prefetch_related(
+                "members__employee_profile__user", 
+                "members__employee_profile__employee_skill_relations__skill", 
+                "project_stack__skill"
+            ).get(id=updated_project.id)
 
-        detail_serializer = ProjectDetailSerializer(refreshed_project)
-        return Response(detail_serializer.data, status=status.HTTP_200_OK)
+            detail_serializer = ProjectDetailSerializer(refreshed_project)
+            return Response(detail_serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to update project: %s", str(e))
+            return Response({"detail": f"Failed to update project: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, pk, *args, **kwargs):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to modify this project."}, status=status.HTTP_403_FORBIDDEN)
+
         status_value = request.data.get("status")
-        if status_value:
-            if status_value not in Project.Status.values:
-                return Response({"detail": f"Invalid status: {status_value}"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Collect profiles to sync before saving
-            member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))
-            profile_ids = [p.id for p in member_profiles]
-            if project.team_lead:
-                try:
-                    lead_profile = EmployeeProfile.objects.get(user=project.team_lead)
-                    profile_ids.append(lead_profile.id)
-                except EmployeeProfile.DoesNotExist:
-                    pass
+        if project.status == 'COMPLETED':
+            if not status_value or status_value == 'COMPLETED':
+                return Response(
+                    {"detail": "Cannot modify a completed project, except to reopen it."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        try:
+            if status_value:
+                if status_value not in Project.Status.values:
+                    return Response({"detail": f"Invalid status: {status_value}"}, status=status.HTTP_400_BAD_REQUEST)
 
-            project.status = status_value
-            project.save()
+                # Collect profiles to sync before saving
+                member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))
+                profile_ids = [p.id for p in member_profiles]
+                if project.team_lead:
+                    try:
+                        lead_profile = EmployeeProfile.objects.get(user=project.team_lead)
+                        profile_ids.append(lead_profile.id)
+                    except EmployeeProfile.DoesNotExist:
+                        pass
 
-            # Sync profiles to update status (e.g. active to inactive or vice versa)
-            ProjectService.sync_employee_statuses(profile_ids)
+                project.status = status_value
+                project.save()
 
-        refreshed_project = self.get_object(pk)
-        detail_serializer = ProjectDetailSerializer(refreshed_project)
-        return Response(detail_serializer.data, status=status.HTTP_200_OK)
+                # Sync profiles to update status (e.g. active to inactive or vice versa)
+                ProjectService.sync_employee_statuses(profile_ids)
+
+            refreshed_project = self.get_object(pk)
+            detail_serializer = ProjectDetailSerializer(refreshed_project)
+            return Response(detail_serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to patch project: %s", str(e))
+            return Response({"detail": f"Failed to modify project: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk, *args, **kwargs):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to delete this project."}, status=status.HTTP_403_FORBIDDEN)
+
+        if project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot delete a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        # Get member profiles associated with this project to sync later
-        member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))
-        profiles_to_sync = [p.id for p in member_profiles]
-        if project.team_lead:
-            lead_profile = EmployeeProfile.objects.filter(user=project.team_lead).first()
-            if lead_profile:
-                profiles_to_sync.append(lead_profile.id)
-        
-        project.is_deleted = True
-        project.save(update_fields=["is_deleted", "updated_at"])
-        
-        # Synchronize statuses of all involved profiles
-        ProjectService.sync_employee_statuses(profiles_to_sync)
-                
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            # Deletion logic moved to Service layer for Transactional Safety
+            ProjectService.delete_project(project)
+                    
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to delete project: %s", str(e))
+            return Response({"detail": f"Failed to delete project: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 

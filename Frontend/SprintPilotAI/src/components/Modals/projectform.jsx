@@ -136,10 +136,12 @@ export default function ProjectForm({
               required
               minLength={limits.project.projectId.minLength}
               maxLength={limits.project.projectId.maxLength}
+              pattern={limits.project.projectId.pattern}
+              title="Project ID must be alphanumeric and uppercase (hyphens allowed)"
               disabled={!!editingProjectId}
               placeholder="e.g. PRJ-001"
               value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
+              onChange={(e) => setProjectId(e.target.value.toUpperCase())}
               className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
                 editingProjectId
                   ? darkMode
@@ -156,6 +158,9 @@ export default function ProjectForm({
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Jira ID <span className="text-[10px] lowercase text-slate-500">(optional)</span></label>
             <input
               type="text"
+              maxLength={limits.project.jiraId.maxLength}
+              pattern={limits.project.jiraId.pattern}
+              title="Jira ID must start with an uppercase letter and be uppercase alphanumeric"
               placeholder="e.g. SP"
               value={jiraId || ''}
               onChange={(e) => setJiraId && setJiraId(e.target.value.toUpperCase())}
@@ -379,7 +384,9 @@ export default function ProjectForm({
       </div>
 
       {/* Tech Stack / Skills Category Selector & Multi-Select */}
-      <div className="space-y-3.5 text-left">
+      {!editingProjectId && (
+        <>
+          <div className="space-y-3.5 text-left">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <Code className="w-4.5 h-4.5 text-slate-400" /> Technical Stack Required
@@ -656,6 +663,8 @@ export default function ProjectForm({
           </span>
         )}
       </div>
+      </>
+      )}
 
       {/* Form Actions */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">

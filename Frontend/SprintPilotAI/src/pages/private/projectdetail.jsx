@@ -105,7 +105,7 @@ export default function ProjectDetail() {
   const fetchEmployees = async () => {
     try {
       const employeesRes = await apiClient.get('projects/employees/');
-      setEmployees(employeesRes.data);
+      setEmployees(employeesRes.data.results !== undefined ? employeesRes.data.results : employeesRes.data);
     } catch (err) {
       console.error('[ProjectDetail] Error fetching employees:', err);
     }
@@ -346,9 +346,10 @@ export default function ProjectDetail() {
   const availableEmployees = useMemo(() => {
     if (!employees || !project) return [];
     const currentMemberUserIds = project.members.map(m => m.user.id);
-    // Filter out users who are already members OR the team lead
+    // Filter out users who are already members OR the team lead OR have TEAM_LEAD role
     return employees.filter(emp => {
       const isLead = project.team_lead?.id === emp.user.id;
+      const isTeamLeadRole = emp.user?.role === 'TEAM_LEAD';
       const isMember = currentMemberUserIds.includes(emp.user.id);
       const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
         emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
@@ -364,7 +365,7 @@ export default function ProjectDetail() {
         )
       ));
 
-      return !isLead && !isMember && matchesSearch && matchesSkills;
+      return !isLead && !isTeamLeadRole && !isMember && matchesSearch && matchesSkills;
     });
   }, [employees, project, memberSearchQuery]);
 

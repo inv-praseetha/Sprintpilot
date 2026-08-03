@@ -3,7 +3,12 @@ export const useValidationLimits = () => {
     project: {
       projectId: {
         minLength: 3,
-        maxLength: 10
+        maxLength: 10,
+        pattern: '^[A-Z0-9\\-]+$'
+      },
+      jiraId: {
+        maxLength: 10,
+        pattern: '^[A-Z][A-Z0-9]+$'
       },
       name: {
         minLength: 3,
@@ -11,7 +16,7 @@ export const useValidationLimits = () => {
       },
       description: {
         minLength: 10,
-        maxLength: 100
+        maxLength: 5000
       },
       teamSize: {
         min: 1,
@@ -19,7 +24,7 @@ export const useValidationLimits = () => {
       },
       numberOfDays: {
         min: 1,
-        max: 9999
+        max: 365
       }
     },
     sprint: {
