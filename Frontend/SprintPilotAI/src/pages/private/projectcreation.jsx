@@ -129,11 +129,11 @@ export default function ProjectCreation() {
     try {
       // 1. Fetch Skills
       const skillsRes = await apiClient.get('projects/skills/');
-      setSkills(skillsRes.data);
+      setSkills(skillsRes.data.results !== undefined ? skillsRes.data.results : skillsRes.data);
 
       // 2. Fetch Employee Profiles
       const employeesRes = await apiClient.get('projects/employees/');
-      setEmployees(employeesRes.data);
+      setEmployees(employeesRes.data.results !== undefined ? employeesRes.data.results : employeesRes.data);
     } catch (err) {
       console.error('[fetchMetadata] Error fetching metadata:', err);
       setMetaError(`Network connection error: ${err.message || 'Error fetching metadata'}`);
@@ -241,7 +241,8 @@ export default function ProjectCreation() {
   // If no skills are selected, show all active employees.
   const filteredEmployeesForSelection = useMemo(() => {
     const activeEmployees = employees.filter(emp =>
-      emp.status === 'ACTIVE' || emp.status === 'WFM' || selectedMembers.includes(emp.id)
+      (emp.status === 'ACTIVE' || emp.status === 'WFM' || selectedMembers.includes(emp.id)) &&
+      emp.user?.role !== 'TEAM_LEAD'
     );
     if (selectedSkills.length === 0) return activeEmployees;
     return activeEmployees.filter(emp =>

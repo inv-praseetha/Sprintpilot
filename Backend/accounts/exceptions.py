@@ -76,15 +76,15 @@ def custom_exception_handler(exc, context):
         # Standardize other DRF exceptions (like ValidationError, PermissionDenied, NotAuthenticated)
         detail = response.data.get("detail", response.data)
         
-        # If response.data is a dict or list (e.g. validation errors), extract or keep
         if isinstance(detail, dict):
-            # Try to grab the first error detail message
-            first_key = next(iter(detail))
-            first_val = detail[first_key]
-            if isinstance(first_val, list) and len(first_val) > 0:
-                detail_msg = f"{first_key}: {first_val[0]}"
-            else:
-                detail_msg = f"{first_key}: {first_val}"
+            # Grab all error detail messages
+            error_msgs = []
+            for key, val in detail.items():
+                if isinstance(val, list) and len(val) > 0:
+                    error_msgs.append(f"{key}: {val[0]}")
+                else:
+                    error_msgs.append(f"{key}: {val}")
+            detail_msg = ", ".join(error_msgs)
         elif isinstance(detail, list) and len(detail) > 0:
             detail_msg = str(detail[0])
         else:

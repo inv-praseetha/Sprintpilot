@@ -105,6 +105,14 @@ class SkillListView(APIView):
 
     def get(self, request, *args, **kwargs):
         skills = Skill.objects.all()
+        
+        # Paginate results if requested
+        paginator = ProjectPagination()
+        page = paginator.paginate_queryset(skills, request, view=self)
+        if page is not None:
+            serializer = SkillSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            
         serializer = SkillSerializer(skills, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -125,6 +133,13 @@ class EmployeeProfileListView(APIView):
         if skill:
             skill = skill[:100]
             profiles = profiles.filter(skills__name__icontains=skill)
+            
+        paginator = ProjectPagination()
+        page = paginator.paginate_queryset(profiles, request, view=self)
+        if page is not None:
+            serializer = EmployeeProfileSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            
         serializer = EmployeeProfileSerializer(profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -167,17 +182,16 @@ class ProjectDetailView(APIView):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to modify this project."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Prevent adding new members if the project is already COMPLETED
+        # Prevent updating if the project is already COMPLETED
         if project.status == 'COMPLETED':
-            new_members = request.data.get("members", [])
-            current_members = [str(pm.employee_profile_id) for pm in project.members.all()]
-            added_members = set([str(m) for m in new_members]) - set(current_members)
-            if added_members:
-                return Response(
-                    {"detail": "Cannot add members to a completed project."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            return Response(
+                {"detail": "Cannot update a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = ProjectCreateSerializer(instance=project, data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -204,7 +218,17 @@ class ProjectDetailView(APIView):
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to modify this project."}, status=status.HTTP_403_FORBIDDEN)
+
         status_value = request.data.get("status")
+
+        if project.status == 'COMPLETED':
+            if not status_value or status_value == 'COMPLETED':
+                return Response(
+                    {"detail": "Cannot modify a completed project, except to reopen it."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         if status_value:
             if status_value not in Project.Status.values:
                 return Response({"detail": f"Invalid status: {status_value}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -233,6 +257,15 @@ class ProjectDetailView(APIView):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to delete this project."}, status=status.HTTP_403_FORBIDDEN)
+
+        if project.status == 'COMPLETED':
+            return Response(
+                {"detail": "Cannot delete a completed project."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Get member profiles associated with this project to sync later
         member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))

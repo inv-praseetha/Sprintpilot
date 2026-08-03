@@ -91,16 +91,22 @@ class ProjectService:
         """
         Updates a Project, ProjectMembers, and ProjectStack entries in a single atomic transaction.
         """
-        member_ids = validated_data.pop("members", [])
-        skill_ids = validated_data.pop("skills", [])
-        team_lead_id = validated_data.pop("team_lead")
+        has_members = "members" in validated_data
+        member_ids = validated_data.pop("members", []) if has_members else []
+        has_skills = "skills" in validated_data
+        skill_ids = validated_data.pop("skills", []) if has_skills else []
+        has_team_lead = "team_lead" in validated_data
+        team_lead_id = validated_data.pop("team_lead", None) if has_team_lead else None
 
-        # Retrieve verified Team Lead
-        team_lead = Employee.objects.get(id=team_lead_id)
+        # Retrieve verified Team Lead if provided
+        team_lead = None
+        if has_team_lead and team_lead_id:
+            team_lead = Employee.objects.get(id=team_lead_id)
         
         # Retrieve team size
-        team_size = validated_data.pop("team_size", 0)
-        if not team_size:
+        has_team_size = "team_size" in validated_data
+        team_size = validated_data.pop("team_size", 0) if has_team_size else 0
+        if has_team_size and not team_size and has_members:
             team_size = len(member_ids)
 
         # Default number_of_days to 10 for AGILE type if not provided
@@ -116,43 +122,48 @@ class ProjectService:
         previous_member_ids = list(project.members.values_list('employee_profile_id', flat=True))
 
         # Update Project fields
-        project.team_lead = team_lead
-        project.team_size = team_size
+        if has_team_lead and team_lead:
+            project.team_lead = team_lead
+        if has_team_size:
+            project.team_size = team_size
         for key, value in validated_data.items():
             setattr(project, key, value)
         project.save()
 
-        # Update Members: delete old and create new
-
-        ProjectMember.objects.filter(project=project).delete()
-        if member_ids:
-            profiles = EmployeeProfile.objects.filter(id__in=member_ids)
-            member_instances = [
-                ProjectMember(project=project, employee_profile=prof)
-                for prof in profiles
-            ]
-            ProjectMember.objects.bulk_create(member_instances)
+        # Update Members: delete old and create new only if provided
+        if has_members:
+            ProjectMember.objects.filter(project=project).delete()
+            if member_ids:
+                profiles = EmployeeProfile.objects.filter(id__in=member_ids)
+                member_instances = [
+                    ProjectMember(project=project, employee_profile=prof)
+                    for prof in profiles
+                ]
+                ProjectMember.objects.bulk_create(member_instances)
 
         # Gather all profiles to sync (previous members, current members, previous team lead, new team lead)
-        profiles_to_sync = set(previous_member_ids) | set(member_ids)
+        profiles_to_sync = set(previous_member_ids)
+        if has_members:
+            profiles_to_sync |= set(member_ids)
         if previous_team_lead:
             prev_lead_profile = EmployeeProfile.objects.filter(user=previous_team_lead).first()
             if prev_lead_profile:
                 profiles_to_sync.add(prev_lead_profile.id)
-        if team_lead:
+        if has_team_lead and team_lead:
             new_lead_profile = EmployeeProfile.objects.filter(user=team_lead).first()
             if new_lead_profile:
                 profiles_to_sync.add(new_lead_profile.id)
 
-        # Update Skills: delete old and create new
-        ProjectStack.objects.filter(project=project).delete()
-        if skill_ids:
-            skills = Skill.objects.filter(id__in=skill_ids)
-            stack_instances = [
-                ProjectStack(project=project, skill=sk)
-                for sk in skills
-            ]
-            ProjectStack.objects.bulk_create(stack_instances)
+        # Update Skills: delete old and create new only if provided
+        if has_skills:
+            ProjectStack.objects.filter(project=project).delete()
+            if skill_ids:
+                skills = Skill.objects.filter(id__in=skill_ids)
+                stack_instances = [
+                    ProjectStack(project=project, skill=sk)
+                    for sk in skills
+                ]
+                ProjectStack.objects.bulk_create(stack_instances)
 
         ProjectService.sync_employee_statuses(list(profiles_to_sync))
 

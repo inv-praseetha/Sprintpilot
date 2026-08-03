@@ -1,6 +1,7 @@
 from accounts.models import Employee, EmployeeProfile
 from project.models import Skill
 from project.exceptions import ProjectValidationException
+from django.core.exceptions import ValidationError
 
 def validate_project_dates(project_type: str, start_date, end_date) -> None:
     """
@@ -21,8 +22,8 @@ def validate_team_lead(team_lead_id) -> Employee:
         
     try:
         lead = Employee.objects.get(id=team_lead_id)
-    except (Employee.DoesNotExist, ValueError, TypeError):
-        raise ProjectValidationException("Selected Team Lead does not exist.")
+    except (Employee.DoesNotExist, ValueError, TypeError, ValidationError):
+        raise ProjectValidationException("Selected Team Lead does not exist or invalid ID.")
 
     if not lead.is_active:
         raise ProjectValidationException("Selected Team Lead is not active.")
@@ -45,13 +46,19 @@ def validate_members(member_ids: list) -> list[EmployeeProfile]:
         raise ProjectValidationException("Duplicate members are not allowed.")
 
     # Bulk query to avoid N+1 query issue
-    profiles = list(EmployeeProfile.objects.select_related("user").filter(id__in=member_ids))
+    try:
+        profiles = list(EmployeeProfile.objects.select_related("user").filter(id__in=member_ids))
+    except (ValueError, TypeError, ValidationError):
+        raise ProjectValidationException("One or more selected member profiles have invalid IDs.")
+        
     if len(profiles) != len(member_ids):
         raise ProjectValidationException("One or more selected member profiles do not exist.")
 
     for profile in profiles:
         if not profile.user.is_active:
             raise ProjectValidationException(f"Employee '{profile.user.full_name}' is not active.")
+        if profile.user.role == Employee.Role.TEAM_LEAD:
+            raise ProjectValidationException(f"Employee '{profile.user.full_name}' has the TEAM_LEAD role and cannot be added as a regular team member.")
 
     return profiles
 
@@ -68,7 +75,11 @@ def validate_skills(skill_ids: list) -> list[Skill]:
         raise ProjectValidationException("Duplicate skills are not allowed.")
 
     # Bulk query
-    skills = list(Skill.objects.filter(id__in=skill_ids))
+    try:
+        skills = list(Skill.objects.filter(id__in=skill_ids))
+    except (ValueError, TypeError, ValidationError):
+        raise ProjectValidationException("One or more selected skills have invalid IDs.")
+        
     if len(skills) != len(skill_ids):
         raise ProjectValidationException("One or more selected skills do not exist.")
 
