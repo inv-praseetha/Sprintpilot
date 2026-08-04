@@ -115,6 +115,26 @@ class BacklogSyncService:
                         emp = EmployeeProfile.objects.filter(user__email=email).first()
                         if emp:
                             task.assigned_employee = emp
+                            
+                    issue_category = issue.get("category")
+                    if issue_category and len(issue_category) > 0:
+                        cat_obj = issue_category[0]
+                        cat_id = str(cat_obj.get("id"))
+                        cat_name = cat_obj.get("name")
+                        if cat_name:
+                            task.category = cat_name
+                            try:
+                                from backlog.models import BacklogCategory
+                                b_cat, created = BacklogCategory.objects.get_or_create(
+                                    project=project,
+                                    name=cat_name,
+                                    defaults={'backlog_category_id': cat_id}
+                                )
+                                if not b_cat.backlog_category_id and cat_id:
+                                    b_cat.backlog_category_id = cat_id
+                                    b_cat.save()
+                            except Exception as cat_err:
+                                logger.error(f"Failed to sync category {cat_name}: {cat_err}")
 
                     task.synced_at = timezone.now()
                     task._skip_sync_validation = True
@@ -126,6 +146,17 @@ class BacklogSyncService:
                 except Exception as e:
                     logger.error(f"Database/Validation failure for SprintTask {issue_key}: {e}")
                     failed_count += 1
+
+        # Auto-close sprints if all tasks are CLOSED
+        from sprints.models import Sprint, SprintTask
+        for project in projects:
+            sprints = project.sprints.filter(status__in=[Sprint.Status.ACTIVE, Sprint.Status.PLANNED])
+            for sprint in sprints:
+                tasks = sprint.tasks.filter(is_deleted=False)
+                if tasks.exists() and not tasks.exclude(status__in=[SprintTask.Status.CLOSED, SprintTask.Status.RESOLVED]).exists():
+                    sprint.status = Sprint.Status.COMPLETED
+                    sprint.save()
+                    logger.info(f"Auto-closed Sprint #{sprint.id} as all tasks are CLOSED/RESOLVED")
 
         duration = (timezone.now() - start_time).total_seconds()
         

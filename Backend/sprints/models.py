@@ -97,14 +97,17 @@ class SprintTask(models.Model):
 
         # 0. Disable updates to schedule/deletion for CLOSED tasks
         if self.pk:
-            original = SprintTask.objects.get(pk=self.pk)
-            if original.status == 'CLOSED':
-                if self.is_deleted and not original.is_deleted:
-                    raise ValidationError("Cannot delete this task as it is already closed/completed.")
-                if (self.planned_start_date != original.planned_start_date or
-                    self.planned_end_date != original.planned_end_date or
-                    self.assigned_employee_id != original.assigned_employee_id):
-                    raise ValidationError("Updates to start date, end date, or assignee are disabled for CLOSED tasks.")
+            try:
+                original = SprintTask.objects.get(pk=self.pk)
+                if original.status == 'CLOSED':
+                    if self.is_deleted and not original.is_deleted:
+                        raise ValidationError("Cannot delete this task as it is already closed/completed.")
+                    if (self.planned_start_date != original.planned_start_date or
+                        self.planned_end_date != original.planned_end_date or
+                        self.assigned_employee_id != original.assigned_employee_id):
+                        raise ValidationError("Updates to start date, end date, or assignee are disabled for CLOSED tasks.")
+            except SprintTask.DoesNotExist:
+                pass
 
         def to_date(d):
             if isinstance(d, str):

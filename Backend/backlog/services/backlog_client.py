@@ -158,6 +158,15 @@ class BacklogService:
         task_priority = getattr(task, 'priority', 'NORMAL').upper()
         priority_id = priority_map.get(task_priority, 3)
         
+        # Map status
+        status_map = {
+            'OPEN': 1,
+            'IN_PROGRESS': 2,
+            'RESOLVED': 3,
+            'CLOSED': 4
+        }
+        task_status = getattr(task, 'status', 'OPEN').upper()
+        
         payload = {
             "projectId": backlog_project_id or project_id,
             "summary": task.title,
@@ -166,7 +175,8 @@ class BacklogService:
             "startDate": task.planned_start_date.isoformat() if task.planned_start_date else None,
             "dueDate": task.planned_end_date.isoformat() if task.planned_end_date else None,
             "estimatedHours": float(task.estimated_hours) if task.estimated_hours else None,
-            "priorityId": priority_id 
+            "priorityId": priority_id,
+            "statusId": status_map.get(task_status, 1)
         }
 
         # Add milestone if sprint is available
@@ -245,13 +255,23 @@ class BacklogService:
         task_priority = getattr(task, 'priority', 'NORMAL').upper()
         priority_id = priority_map.get(task_priority, 3)
         
+        # Map status
+        status_map = {
+            'OPEN': 1,
+            'IN_PROGRESS': 2,
+            'RESOLVED': 3,
+            'CLOSED': 4
+        }
+        task_status = getattr(task, 'status', 'OPEN').upper()
+        
         payload = {
             "summary": task.title,
             "description": description,
             "startDate": task.planned_start_date.isoformat() if task.planned_start_date else "",
             "dueDate": task.planned_end_date.isoformat() if task.planned_end_date else "",
             "estimatedHours": float(task.estimated_hours) if task.estimated_hours else "",
-            "priorityId": priority_id 
+            "priorityId": priority_id,
+            "statusId": status_map.get(task_status, 1)
         }
 
         # Add milestone if sprint is available
