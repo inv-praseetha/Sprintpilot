@@ -533,6 +533,65 @@ class SprintService:
             raise Sprint.DoesNotExist("Sprint not found.")
 
     @staticmethod
+    def get_sprint_closure_summary(sprint_id: str) -> dict:
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            raise Sprint.DoesNotExist("Sprint not found.")
+
+        if sprint.status == 'COMPLETED':
+            raise ValueError("Sprint is already closed.")
+
+        tasks = sprint.tasks.filter(is_deleted=False)
+        total_tasks = tasks.count()
+        if total_tasks == 0:
+            raise ValueError("Sprint does not contain any tasks.")
+
+        summary = {
+            "total_tasks": total_tasks,
+            "open_tasks": tasks.filter(status='OPEN').count(),
+            "in_progress_tasks": tasks.filter(status='IN_PROGRESS').count(),
+            "resolved_tasks": tasks.filter(status='RESOLVED').count(),
+            "closed_tasks": tasks.filter(status='CLOSED').count()
+        }
+        return summary
+
+    @staticmethod
+    def close_sprint(sprint_id: str) -> None:
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            raise Sprint.DoesNotExist("Sprint not found.")
+
+        if sprint.status == 'COMPLETED':
+            raise ValueError("Sprint is already closed.")
+
+        with transaction.atomic():
+            tasks = sprint.tasks.filter(is_deleted=False)
+            if not tasks.exists():
+                raise ValueError("Sprint does not contain any tasks.")
+                
+            for task in tasks:
+                if task.status != 'CLOSED':
+                    task.status = 'CLOSED'
+                    task._skip_sync_validation = True
+                    task.save()
+                    
+                    if task.backlog_task_id and sprint.project.project_id:
+                        try:
+                            from backlog.services.backlog_client import BacklogService
+                            backlog_client = BacklogService(project_key=sprint.project.project_id)
+                            backlog_client.update_task(task)
+                        except Exception as e:
+                            if "NO_CHANGES_DETECTED" not in str(e):
+                                import logging
+                                logging.getLogger(__name__).error(f"Failed to close task {task.id} in backlog: {e}")
+                                raise Exception(f"Failed to sync task {task.id} to Backlog. Operation aborted.")
+
+            sprint.status = 'COMPLETED'
+            sprint.save()
+
+    @staticmethod
     def update_task(task_id: str, data: dict) -> SprintTask:
         try:
             task = SprintTask.objects.get(id=task_id)

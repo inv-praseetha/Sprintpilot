@@ -706,3 +706,103 @@ class SprintNoteAPITests(APITestCase):
         self.assertEqual(len(list_response.data), 1)
         self.assertEqual(list_response.data[0]['content'], "Today we refactored the models and views.")
 
+class SprintClosureTests(APITestCase):
+    def setUp(self):
+        self.creator = Employee.objects.create(
+            email="manager_closure@example.com",
+            full_name="Manager Closure",
+            role="PROJECT_MANAGER",
+            is_active=True
+        )
+        self.profile, _ = EmployeeProfile.objects.get_or_create(
+            user=self.creator,
+            defaults={"designation": "Manager", "experience_years": 5.0}
+        )
+        self.project = Project.objects.create(
+            project_id="PRJ-CLOSE",
+            name="Project Closure",
+            status="ACTIVE",
+            type="AGILE",
+            created_by=self.creator
+        )
+        self.sprint = Sprint.objects.create(
+            project=self.project,
+            milestone="Sprint to Close",
+            start_date=datetime.date(2026, 7, 20),
+            end_date=datetime.date(2026, 8, 7),
+            status="ACTIVE"
+        )
+        ProjectMember.objects.create(project=self.project, employee_profile=self.profile)
+        self.client.force_authenticate(user=self.creator)
+
+    def test_sprint_closure_summary_success(self):
+        # Create tasks
+        SprintTask.objects.create(sprint=self.sprint, title="T1", status="OPEN", category="UI", description="d")
+        SprintTask.objects.create(sprint=self.sprint, title="T2", status="IN_PROGRESS", category="UI", description="d")
+        SprintTask.objects.create(sprint=self.sprint, title="T3", status="RESOLVED", category="UI", description="d")
+        SprintTask.objects.create(sprint=self.sprint, title="T4", status="CLOSED", category="UI", description="d")
+        SprintTask.objects.create(sprint=self.sprint, title="T5", status="OPEN", category="UI", description="d", is_deleted=True) # Ignored
+
+        url = reverse('sprint_closure_summary', kwargs={'pk': self.sprint.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data['total_tasks'], 4)
+        self.assertEqual(data['open_tasks'], 1)
+        self.assertEqual(data['in_progress_tasks'], 1)
+        self.assertEqual(data['resolved_tasks'], 1)
+        self.assertEqual(data['closed_tasks'], 1)
+
+    def test_sprint_closure_summary_empty_sprint(self):
+        url = reverse('sprint_closure_summary', kwargs={'pk': self.sprint.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Sprint does not contain any tasks", response.data['detail'])
+
+    def test_sprint_closure_summary_already_closed(self):
+        self.sprint.status = "COMPLETED"
+        self.sprint.save()
+        url = reverse('sprint_closure_summary', kwargs={'pk': self.sprint.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Sprint is already closed", response.data['detail'])
+
+    @patch('backlog.services.backlog_client.BacklogService.update_task')
+    def test_sprint_close_success(self, mock_update_task):
+        task1 = SprintTask.objects.create(sprint=self.sprint, title="T1", status="OPEN", category="UI", description="d", backlog_task_id="B-1")
+        task2 = SprintTask.objects.create(sprint=self.sprint, title="T2", status="IN_PROGRESS", category="UI", description="d", backlog_task_id="B-2")
+        
+        url = reverse('sprint_close', kwargs={'pk': self.sprint.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        self.sprint.refresh_from_db()
+        self.assertEqual(self.sprint.status, "COMPLETED")
+        task1.refresh_from_db()
+        task2.refresh_from_db()
+        self.assertEqual(task1.status, "CLOSED")
+        self.assertEqual(task2.status, "CLOSED")
+        self.assertEqual(mock_update_task.call_count, 2)
+
+    @patch('backlog.services.backlog_client.BacklogService.update_task')
+    def test_sprint_close_rollback_on_backlog_failure(self, mock_update_task):
+        task1 = SprintTask.objects.create(sprint=self.sprint, title="T1", status="OPEN", category="UI", description="d", backlog_task_id="B-1")
+        mock_update_task.side_effect = Exception("Backlog API Error")
+        
+        url = reverse('sprint_close', kwargs={'pk': self.sprint.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unable to close sprint because Backlog synchronization failed", response.data['detail'])
+        
+        self.sprint.refresh_from_db()
+        self.assertEqual(self.sprint.status, "ACTIVE")
+        task1.refresh_from_db()
+        self.assertEqual(task1.status, "OPEN") # Transaction rolled back
+
+    def test_sprint_close_unauthorized(self):
+        self.client.logout()
+        url = reverse('sprint_close', kwargs={'pk': self.sprint.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
