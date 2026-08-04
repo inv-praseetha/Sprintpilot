@@ -6,6 +6,8 @@ import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
 import AddTaskModal from '../../components/Modals/AddTaskModal';
 import CustomDatePicker from '../../components/Common/CustomDatePicker';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 
 import {
   ArrowLeft,
@@ -79,6 +81,26 @@ const getProgressPercentage = (status) => {
   if (s === 'OPEN') return '0%';
   return '0%';
 };
+
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+};
+
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+    ['clean']
+  ],
+};
+
+const quillFormats = [
+  'header',
+  'bold', 'italic', 'underline', 'strike',
+  'list', 'bullet'
+];
 
 // Generates calendar columns starting from the Monday of the start date week to the Friday of the end date week
 const generateTimelineDays = (startStr, endStr, holidaysMap = new Map()) => {
@@ -1785,16 +1807,16 @@ export default function SprintDetail() {
               </div>
             </div>
 
-            <textarea
-              value={todayNote}
-              onChange={(e) => setTodayNote(e.target.value)}
-              placeholder="Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)"
-              className={`w-full flex-grow min-h-[300px] p-5 rounded-2xl border text-sm font-medium leading-relaxed resize-none focus:outline-none transition-all ${
-                darkMode 
-                  ? 'bg-slate-950/40 border-slate-800 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-250 placeholder-slate-600'
-                  : 'bg-slate-50/50 border-slate-200 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-800 placeholder-slate-400'
-              }`}
-            />
+            <div className={`rich-text-editor-container ${darkMode ? 'dark' : ''}`}>
+              <ReactQuill
+                theme="snow"
+                value={todayNote}
+                onChange={setTodayNote}
+                placeholder="Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)"
+                modules={quillModules}
+                formats={quillFormats}
+              />
+            </div>
 
             {/* Attachment Section */}
             <div className={`mt-3 flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all ${
@@ -1935,25 +1957,24 @@ export default function SprintDetail() {
                             {updatedDisplay}
                           </span>
                         </div>
-                        {/* Note content / attachment status */}
                         {!note.attachment && (
                           <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
                             isSelected 
                               ? darkMode ? 'text-slate-100' : 'text-slate-950' 
                               : darkMode ? 'text-slate-300' : 'text-slate-800'
                           }`}>
-                            {note.content || <em className="opacity-60">No content entered.</em>}
+                            {stripHtml(note.content) || <em className="opacity-60">No content entered.</em>}
                           </p>
                         )}
 
-                        {note.content && note.attachment && (
+                        {stripHtml(note.content) && note.attachment && (
                           <div className="flex flex-col gap-1.5 w-full">
                             <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
                               isSelected 
                                 ? darkMode ? 'text-slate-100' : 'text-slate-950' 
                                 : darkMode ? 'text-slate-300' : 'text-slate-800'
                             }`}>
-                              {note.content}
+                              {stripHtml(note.content)}
                             </p>
                             <div className="flex justify-between items-center w-full gap-2">
                               <span className="text-[11px] font-bold text-orange-500 flex items-center gap-1.5 truncate">
@@ -1981,7 +2002,7 @@ export default function SprintDetail() {
                           </div>
                         )}
 
-                        {!note.content && note.attachment && (
+                        {!stripHtml(note.content) && note.attachment && (
                           <div className="flex justify-between items-center w-full gap-2">
                             <span className="text-xs font-bold text-orange-500 flex items-center gap-1.5 truncate">
                               <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
