@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database } from 'lucide-react';
+import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity } from 'lucide-react';
 import ProjectService from '../../services/ProjectService';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import apiClient from '../../api/apiClient';
@@ -551,22 +551,79 @@ export default function TaskUploadModal({
               <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">1. Connect & Fetch Jira Tasks</h4>
               
               {jiraAuthRequired && (
-                <div className="mb-4 p-5 rounded-2xl border border-blue-500/20 bg-blue-500/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                      <AlertCircle className="w-5 h-5 text-blue-500" />
+                <div className="mb-6 relative overflow-hidden rounded-3xl border border-blue-500/20 bg-gradient-to-br from-blue-600/5 to-indigo-600/10 p-1">
+                  <style>{`
+                    @keyframes slideFlow {
+                      0% { transform: translateX(-100%); }
+                      100% { transform: translateX(200%); }
+                    }
+                    @keyframes shimmerBtn {
+                      0% { transform: skew(-12deg) translateX(-150%); }
+                      100% { transform: skew(-12deg) translateX(250%); }
+                    }
+                    .animate-slide-flow {
+                      animation: slideFlow 1.5s linear infinite;
+                    }
+                    .animate-shimmer-btn {
+                      animation: shimmerBtn 2.5s ease-in-out infinite;
+                    }
+                  `}</style>
+                  {/* Glassmorphic inner container */}
+                  <div className="relative bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-[1.4rem] p-6 sm:p-8 flex flex-col items-center text-center">
+                    
+                    {/* Animated Connection Graphic */}
+                    <div className="flex items-center justify-center w-full max-w-[280px] mb-6 relative">
+                      {/* SprintPilot Side */}
+                      <div className="relative z-10 w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 p-[2px] shadow-[0_0_20px_-5px_rgba(249,115,22,0.5)] shrink-0">
+                        <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[14px] flex items-center justify-center">
+                          <Activity className="w-6 h-6 text-orange-500" />
+                        </div>
+                        {/* Ping effect */}
+                        <div className="absolute inset-0 rounded-2xl border-2 border-orange-500/30 animate-ping" style={{ animationDuration: '3s' }}></div>
+                      </div>
+
+                      {/* Connection Line with Flowing Animation */}
+                      <div className="relative flex-1 h-[2px] mx-2">
+                        {/* Background dashed line */}
+                        <div className="absolute inset-0 border-t-[3px] border-dotted border-slate-300 dark:border-slate-700"></div>
+                        {/* Animated flowing stream */}
+                        <div className="absolute inset-0 overflow-hidden">
+                          <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-80 animate-slide-flow"></div>
+                        </div>
+                      </div>
+
+                      {/* Jira Side */}
+                      <div className="relative z-10 w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 p-[2px] shadow-[0_0_20px_-5px_rgba(59,130,246,0.5)] shrink-0">
+                        <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[14px] flex items-center justify-center">
+                          <LayoutTemplate className="w-6 h-6 text-blue-500" />
+                        </div>
+                        {/* Ping effect */}
+                        <div className="absolute inset-0 rounded-2xl border-2 border-blue-500/30 animate-ping" style={{ animationDuration: '3s', animationDelay: '1.5s' }}></div>
+                      </div>
                     </div>
-                    <div>
-                      <h5 className="text-sm font-bold text-slate-800 dark:text-white mb-1">Jira Account Required</h5>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">You need to authorize SprintPilot to read your Jira tasks.</p>
-                    </div>
+
+                    <h5 className="text-base sm:text-lg font-black tracking-tight text-slate-800 dark:text-white mb-2">Connect SprintPilot AI to Jira</h5>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[320px] leading-relaxed mb-6 font-medium">
+                      Securely authorize SprintPilot AI to automatically fetch and synchronize your Jira tasks, issues, and milestones.
+                    </p>
+
+                    <button
+                      onClick={handleConnectJira}
+                      className="group relative w-full sm:w-auto overflow-hidden rounded-xl bg-blue-600 px-8 py-3 text-white transition-all hover:scale-105 hover:bg-blue-500 hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.8)] shadow-[0_0_20px_-5px_rgba(59,130,246,0.5)] active:scale-95"
+                    >
+                      <div className="absolute inset-0 flex h-full w-full justify-center">
+                        <div className="w-12 h-full bg-white/20 animate-shimmer-btn" />
+                      </div>
+                      <span className="relative text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2">
+                        <Database className="w-4 h-4" />
+                        Authorize with Jira
+                      </span>
+                    </button>
                   </div>
-                  <button
-                    onClick={handleConnectJira}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg"
-                  >
-                    Login with Jira
-                  </button>
+                  
+                  {/* Decorative background glows */}
+                  <div className="absolute top-0 left-0 w-40 h-40 bg-orange-500/20 blur-[60px] rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+                  <div className="absolute bottom-0 right-0 w-40 h-40 bg-blue-500/20 blur-[60px] rounded-full pointer-events-none translate-x-1/2 translate-y-1/2" />
                 </div>
               )}
 
