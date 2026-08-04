@@ -6,6 +6,8 @@ import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
 import AddTaskModal from '../../components/Modals/AddTaskModal';
 import CustomDatePicker from '../../components/Common/CustomDatePicker';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 
 import {
   ArrowLeft,
@@ -108,6 +110,26 @@ const getProgressPercentage = (status) => {
   return '0%';
 };
 
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+};
+
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+    ['clean']
+  ],
+};
+
+const quillFormats = [
+  'header',
+  'bold', 'italic', 'underline', 'strike',
+  'list', 'bullet'
+];
+
 // Generates calendar columns starting from the Monday of the start date week to the Friday of the end date week
 const generateTimelineDays = (startStr, endStr, holidaysMap = new Map()) => {
   const sStr = startStr || '2026-07-15';
@@ -200,6 +222,11 @@ export default function SprintDetail() {
   const [selectedNoteDate, setSelectedNoteDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [lastSavedNoteTime, setLastSavedNoteTime] = useState(null);
+  const [pdfPreviewToggle, setPdfPreviewToggle] = useState(null);
+  const [notesOffset, setNotesOffset] = useState(0);
+  const [hasMoreNotes, setHasMoreNotes] = useState(true);
+  const [loadingMoreNotes, setLoadingMoreNotes] = useState(false);
+  const historyListRef = useRef(null);
   const lastSavedContentRef = useRef('');
 
   const getSchedulingEndDate = (endDateStr) => {
@@ -283,6 +310,7 @@ export default function SprintDetail() {
         setModifiedTaskIds(new Set());
         setSelectedTaskIds(new Set());
         setSelectedNoteDate(new Date().toLocaleDateString('en-CA'));
+        setPdfPreviewToggle(null);
 
         // 1. Fetch Sprint Details (with nested tasks)
         const sprintData = await SprintServices.getSprintDetails(sprintId);
@@ -308,9 +336,15 @@ export default function SprintDetail() {
         const days = generateTimelineDays(sprintData.start_date, sprintData.end_date, holidaysMap);
         setTimelineDaysList(days);
 
-        // 3. Fetch Sprint Notes
-        const notesData = await SprintServices.getSprintNotes(sprintId);
+        // 3. Fetch Sprint Notes (Page 1: limit=5, offset=0)
+        setNotesOffset(5);
+        setHasMoreNotes(true);
+        setLoadingMoreNotes(false);
+        const notesData = await SprintServices.getSprintNotes(sprintId, 5, 0);
         setNotes(notesData);
+        if (notesData.length < 5) {
+          setHasMoreNotes(false);
+        }
         const todayStr = new Date().toLocaleDateString('en-CA');
         const todayNoteObj = notesData.find(n => n.date === todayStr);
         const initialContent = todayNoteObj ? todayNoteObj.content : '';
@@ -361,14 +395,62 @@ export default function SprintDetail() {
     return () => clearTimeout(timer);
   }, [todayNote, selectedNoteDate, sprintId, pageLoading]);
 
+  const loadMoreNotes = async () => {
+    if (loadingMoreNotes || !hasMoreNotes || !sprintId) return;
+    setLoadingMoreNotes(true);
+    try {
+      const moreNotes = await SprintServices.getSprintNotes(sprintId, 5, notesOffset);
+      if (moreNotes.length < 5) {
+        setHasMoreNotes(false);
+      }
+      if (moreNotes.length > 0) {
+        setNotes(prev => {
+          const merged = [...prev];
+          moreNotes.forEach(newNote => {
+            if (!merged.some(existing => existing.id === newNote.id || existing.date === newNote.date)) {
+              merged.push(newNote);
+            }
+          });
+          return merged;
+        });
+        setNotesOffset(prev => prev + 5);
+      }
+    } catch (err) {
+      console.error('[SprintDetail] Error loading more notes:', err);
+    } finally {
+      setLoadingMoreNotes(false);
+    }
+  };
+
+  useEffect(() => {
+    const listElement = historyListRef.current;
+    if (!listElement) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = listElement;
+      if (scrollHeight - scrollTop - clientHeight < 15) {
+        if (hasMoreNotes && !loadingMoreNotes && !pageLoading) {
+          loadMoreNotes();
+        }
+      }
+    };
+
+    listElement.addEventListener('scroll', handleScroll);
+    return () => {
+      listElement.removeEventListener('scroll', handleScroll);
+    };
+  }, [hasMoreNotes, loadingMoreNotes, pageLoading, sprintId, notesOffset]);
+
   const getAttachmentUrl = (path) => {
     if (!path) return '';
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
+    let finalPath = path;
+    if (finalPath.startsWith('http://') || finalPath.startsWith('https://')) {
+      return finalPath.replace('://localhost:', '://127.0.0.1:');
     }
-    const baseUrl = apiClient.defaults.baseURL || 'http://localhost:8000/api/';
-    const host = baseUrl.replace(/\/api\/?$/, '');
-    return `${host}${path}`;
+    const baseUrl = apiClient.defaults.baseURL || 'http://127.0.0.1:8000/api/';
+    let host = baseUrl.replace(/\/api\/?$/, '');
+    host = host.replace('://localhost:', '://127.0.0.1:');
+    return `${host}${finalPath}`;
   };
 
   const handleAttachmentChange = async (e) => {
@@ -1786,6 +1868,7 @@ export default function SprintDetail() {
                           setTodayNote(content);
                           lastSavedContentRef.current = content;
                           setLastSavedNoteTime(todayNoteObj ? new Date(todayNoteObj.updated_at || todayNoteObj.created_at).toLocaleTimeString() : null);
+                          setPdfPreviewToggle(null);
                         }}
                         className="px-2 py-0.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
                       >
@@ -1813,16 +1896,53 @@ export default function SprintDetail() {
               </div>
             </div>
 
-            <textarea
-              value={todayNote}
-              onChange={(e) => setTodayNote(e.target.value)}
-              placeholder="Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)"
-              className={`w-full flex-grow min-h-[300px] p-5 rounded-2xl border text-sm font-medium leading-relaxed resize-none focus:outline-none transition-all ${
-                darkMode 
-                  ? 'bg-slate-950/40 border-slate-800 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-250 placeholder-slate-600'
-                  : 'bg-slate-50/50 border-slate-200 focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-slate-800 placeholder-slate-400'
-              }`}
-            />
+            {(() => {
+              const hasAttachment = !!currentNoteObj?.attachment;
+              const hasTextContent = !!stripHtml(todayNote);
+              const shouldShowPdfPreview = hasAttachment && (
+                pdfPreviewToggle === 'preview' ||
+                (pdfPreviewToggle === null && !hasTextContent)
+              );
+
+              return shouldShowPdfPreview ? (
+                <div className={`rich-text-editor-container flex flex-col ${darkMode ? 'dark' : ''} border rounded-2xl overflow-hidden border-slate-200 dark:border-slate-800`}>
+                  <div className="flex justify-between items-center px-4 py-2 border-b border-slate-200 bg-slate-100 flex-shrink-0">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-900">PDF Attachment Preview</span>
+                    <button
+                      onClick={() => setPdfPreviewToggle('editor')}
+                      className="px-2.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border-none outline-none"
+                    >
+                      Edit Text Note
+                    </button>
+                  </div>
+                  <div className="w-full flex-grow overflow-hidden relative" style={{ height: 'calc(100% - 37px)' }}>
+                    <iframe
+                      src={`${getAttachmentUrl(currentNoteObj.attachment)}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                      className="absolute border-none"
+                      style={{
+                        top: '-4px',
+                        left: '-8px',
+                        width: 'calc(100% + 32px)',
+                        height: 'calc(100% + 12px)'
+                      }}
+                      scrolling="no"
+                      title="PDF Attachment Preview"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className={`rich-text-editor-container ${darkMode ? 'dark' : ''}`}>
+                  <ReactQuill
+                    theme="snow"
+                    value={todayNote}
+                    onChange={setTodayNote}
+                    placeholder="Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)"
+                    modules={quillModules}
+                    formats={quillFormats}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Attachment Section */}
             <div className={`mt-3 flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all ${
@@ -1833,9 +1953,13 @@ export default function SprintDetail() {
               <div className="flex items-center gap-2 overflow-hidden">
                 <Paperclip className="w-4 h-4 text-orange-500 flex-shrink-0" />
                 {currentNoteObj?.attachment ? (
-                  <span className="truncate max-w-[200px]" title={currentNoteObj.attachment.split('/').pop()}>
+                  <button
+                    onClick={() => setPdfPreviewToggle('preview')}
+                    className="truncate max-w-[200px] text-orange-500 hover:text-orange-600 hover:underline cursor-pointer font-bold text-left bg-transparent border-none p-0 outline-none"
+                    title="Click to preview PDF"
+                  >
                     {currentNoteObj.attachment.split('/').pop()}
-                  </span>
+                  </button>
                 ) : (
                   <span className="opacity-50">No PDF attached</span>
                 )}
@@ -1895,7 +2019,10 @@ export default function SprintDetail() {
               </div>
             </div>
 
-            <div className="flex-grow overflow-y-auto max-h-[300px] pr-2 custom-scrollbar space-y-4">
+            <div 
+              ref={historyListRef}
+              className="flex-grow overflow-y-auto max-h-[370px] min-h-0 pr-2 custom-scrollbar space-y-4"
+            >
               {notes.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center py-12 text-center">
                   <ClipboardList className="w-10 h-10 text-slate-400 dark:text-slate-600 mb-2 opacity-50" />
@@ -1903,7 +2030,8 @@ export default function SprintDetail() {
                   <p className="text-[11px] text-slate-400 dark:text-slate-600 mt-1 max-w-[200px]">Notes you add will be chronologized here.</p>
                 </div>
               ) : (
-                [...notes]
+                <>
+                  {[...notes]
                   .sort((a, b) => new Date(b.date) - new Date(a.date))
                   .map((note) => {
                     const noteDate = new Date(note.date + 'T00:00:00');
@@ -1933,6 +2061,7 @@ export default function SprintDetail() {
                           setTodayNote(note.content);
                           lastSavedContentRef.current = note.content;
                           setLastSavedNoteTime(updatedDateTime.toLocaleTimeString());
+                          setPdfPreviewToggle(null);
                         }}
                         className={`w-full p-4 rounded-2xl border text-left flex flex-col gap-2 transition-all cursor-pointer outline-none ${
                           isSelected
@@ -1963,25 +2092,24 @@ export default function SprintDetail() {
                             {updatedDisplay}
                           </span>
                         </div>
-                        {/* Note content / attachment status */}
                         {!note.attachment && (
-                          <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
+                          <p className={`text-xs font-medium leading-relaxed line-clamp-4 w-full text-left ${
                             isSelected 
                               ? darkMode ? 'text-slate-100' : 'text-slate-950' 
                               : darkMode ? 'text-slate-300' : 'text-slate-800'
                           }`}>
-                            {note.content || <em className="opacity-60">No content entered.</em>}
+                            {stripHtml(note.content) || <em className="opacity-60">No content entered.</em>}
                           </p>
                         )}
 
-                        {note.content && note.attachment && (
+                        {stripHtml(note.content) && note.attachment && (
                           <div className="flex flex-col gap-1.5 w-full">
-                            <p className={`text-xs font-medium leading-relaxed truncate w-full text-left ${
+                            <p className={`text-xs font-medium leading-relaxed line-clamp-4 w-full text-left ${
                               isSelected 
                                 ? darkMode ? 'text-slate-100' : 'text-slate-950' 
                                 : darkMode ? 'text-slate-300' : 'text-slate-800'
                             }`}>
-                              {note.content}
+                              {stripHtml(note.content)}
                             </p>
                             <div className="flex justify-between items-center w-full gap-2">
                               <span className="text-[11px] font-bold text-orange-500 flex items-center gap-1.5 truncate">
@@ -2009,7 +2137,7 @@ export default function SprintDetail() {
                           </div>
                         )}
 
-                        {!note.content && note.attachment && (
+                        {!stripHtml(note.content) && note.attachment && (
                           <div className="flex justify-between items-center w-full gap-2">
                             <span className="text-xs font-bold text-orange-500 flex items-center gap-1.5 truncate">
                               <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
@@ -2036,7 +2164,15 @@ export default function SprintDetail() {
                         )}
                       </button>
                     );
-                  })
+                  })}
+                  {loadingMoreNotes && (
+                    <div className="flex justify-center items-center py-3">
+                      <span className="text-[10px] font-bold text-orange-500 animate-pulse uppercase tracking-wider">
+                        Loading more notes...
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

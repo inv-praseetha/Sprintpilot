@@ -279,7 +279,22 @@ class SprintNoteListView(APIView):
 
     def get(self, request, sprint_id, *args, **kwargs):
         try:
-            notes = SprintService.list_sprint_notes(sprint_id)
+            notes = SprintService.list_sprint_notes(sprint_id).order_by('-date')
+            
+            limit = request.query_params.get('limit')
+            offset = request.query_params.get('offset')
+            
+            if limit is not None:
+                try:
+                    limit = int(limit)
+                    if offset is not None:
+                        offset = int(offset)
+                        notes = notes[offset:offset+limit]
+                    else:
+                        notes = notes[:limit]
+                except ValueError:
+                    pass
+            
             return Response(SprintNoteSerializer(notes, many=True, context={'request': request}).data, status=status.HTTP_200_OK)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
