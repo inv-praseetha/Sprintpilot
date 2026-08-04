@@ -446,13 +446,13 @@ export default function ProjectDetail() {
         <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
         <h3 className="text-lg font-bold">Failed to load Project</h3>
         <p className="text-sm text-slate-400 mt-1 mb-6">{error || 'Project not found.'}</p>
-        <Link
-          to="/projects"
+        <button
+          onClick={() => navigate(-1)}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-orange-500/20"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Projects List
-        </Link>
+        </button>
       </div>
     );
   }
@@ -462,14 +462,14 @@ export default function ProjectDetail() {
 
       {/* Back navigation */}
       <div className="mb-6 flex justify-between items-center">
-        <Link
-          to="/projects"
+        <button
+          onClick={() => navigate(-1)}
           className={`inline-flex items-center gap-2 text-xs font-black tracking-wider uppercase transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
             }`}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Projects List
-        </Link>
+        </button>
       </div>
 
       {/* Main header banner */}
