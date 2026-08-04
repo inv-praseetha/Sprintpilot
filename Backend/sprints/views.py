@@ -110,6 +110,46 @@ class SprintDetailView(APIView):
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
+class SprintClosureSummaryView(APIView):
+    """
+    API View to get a summary of a sprint's tasks before closing.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        try:
+            summary = SprintService.get_sprint_closure_summary(pk)
+            return Response(summary, status=status.HTTP_200_OK)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception(f"Error fetching sprint closure summary: {e}")
+            return Response({"detail": "An unexpected error occurred while fetching the summary."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class SprintCloseView(APIView):
+    """
+    API View to manually close a sprint and update Backlog.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        try:
+            SprintService.close_sprint(pk)
+            return Response({"detail": "Sprint closed successfully and Backlog updated."}, status=status.HTTP_200_OK)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception(f"Error closing sprint: {e}")
+            # As per requirement: "400 Unable to close sprint because Backlog synchronization failed."
+            return Response({"detail": "Unable to close sprint because Backlog synchronization failed."}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class SprintTaskUpdateView(APIView):
     """
     API View to update single fields of a sprint task.

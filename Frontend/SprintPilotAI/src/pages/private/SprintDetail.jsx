@@ -68,7 +68,35 @@ const getCleanCategory = (cat) => {
   if (c === 'BACKEND') return 'Backend';
   if (c === 'INFRA' || c === 'SYSTEM DESIGN & INFRA') return 'INFRA';
   if (c === 'QA') return 'QA';
-  return 'UI'; // default fallback
+  return c; // If it's a dynamic category, return as is
+};
+
+const getCategoryConfig = (category) => {
+  const c = String(category).toUpperCase().trim();
+  if (c === 'UI') return categoryConfig.UI;
+  if (c === 'BACKEND') return categoryConfig.Backend;
+  if (c === 'INFRA' || c === 'SYSTEM DESIGN & INFRA') return categoryConfig.INFRA;
+  if (c === 'QA') return categoryConfig.QA;
+  
+  return {
+    label: category,
+    bgLight: 'bg-slate-50 text-slate-600 border-slate-200/50',
+    bgDark: 'bg-slate-900/40 text-slate-400 border-slate-800/50',
+    bar: 'bg-slate-500'
+  };
+};
+
+const getUniqueCategories = (tasks) => {
+  const categories = new Set(tasks.map(t => t.category || 'UI'));
+  const defaultCats = ['UI', 'Backend', 'INFRA', 'QA'];
+  const result = [...defaultCats];
+  categories.forEach(c => {
+    const clean = String(c).toUpperCase().trim();
+    if (!['UI', 'BACKEND', 'INFRA', 'SYSTEM DESIGN & INFRA', 'QA'].includes(clean)) {
+      result.push(c);
+    }
+  });
+  return result;
 };
 
 const getProgressPercentage = (status) => {
@@ -1434,9 +1462,9 @@ export default function SprintDetail() {
 
                   <tbody className={`divide-y text-xs font-semibold ${darkMode ? 'divide-slate-800/80 text-slate-300 border-b border-slate-800' : 'divide-slate-200 text-slate-700 border-b border-slate-200'
                     }`}>
-                    {['UI', 'Backend', 'INFRA', 'QA'].map((category) => {
+                    {getUniqueCategories(tasks).map((category) => {
                       const catTasks = tasks.filter(t => getCleanCategory(t.category) === getCleanCategory(category));
-                      const config = categoryConfig[category];
+                      const config = getCategoryConfig(category);
 
                       if (catTasks.length === 0) return null;
 

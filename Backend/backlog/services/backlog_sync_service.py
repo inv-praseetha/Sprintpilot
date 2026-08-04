@@ -38,7 +38,7 @@ class BacklogSyncService:
         logger.info("Synchronization Started")
         start_time = timezone.now()
         
-        # Calculate updatedSince: 24 hours ago
+        # Calculate updatedSince: 24 hours ago (Safest window for irregular daily schedules)
         updated_since = start_time - timedelta(hours=24)
         
         from project.models import Project
@@ -66,6 +66,28 @@ class BacklogSyncService:
                 
             backlog_client = BacklogService(project_key=project.project_id)
             
+            # Fetch categories from Project Settings and ONLY insert the newly created ones
+            try:
+                project_categories = backlog_client.fetch_project_categories()
+                from backlog.models import BacklogCategory
+                new_categories_count = 0
+                for cat in project_categories:
+                    cat_id = str(cat.get('id'))
+                    cat_name = cat.get('name')
+                    if cat_id and cat_name:
+                        # Use get_or_create by ID: ignores existing ones, only creates new ones
+                        b_cat, created = BacklogCategory.objects.get_or_create(
+                            project=project,
+                            backlog_category_id=cat_id,
+                            defaults={'name': cat_name}
+                        )
+                        if created:
+                            new_categories_count += 1
+                if new_categories_count > 0:
+                    logger.info(f"Added {new_categories_count} newly created categories from Backlog for project {project.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to sync categories directly from Backlog for project {project.project_id}: {e}")
+                
             try:
                 issues = list(backlog_client.fetch_updated_issues(updated_since=updated_since))
             except Exception as e:
@@ -75,57 +97,95 @@ class BacklogSyncService:
             total_fetched += len(issues)
             logger.info(f"Fetched {len(issues)} updated issues from Backlog for project {project.project_id}")
 
-            for issue in issues:
-                issue_key = issue.get("issueKey")
-                
-                # Find matching SprintTask, restricting to the current project
-                task = SprintTask.objects.filter(backlog_task_id=issue_key, sprint__project=project).first()
-                if not task:
-                    logger.info(f"Skipped Backlog Issue {issue_key} (Task not found in Sprintpilot under project {project.project_id})")
-                    skipped_count += 1
-                    continue
-
-                try:
-                    # Update task fields from Backlog
-                    task.title = issue.get("summary", task.title)
-                    
-                    if "description" in issue:
-                        raw_desc = issue.get("description") or ""
-                        task.description = raw_desc.split("\n\n---")[0] if "\n\n---" in raw_desc else raw_desc
-
-                    status_obj = issue.get("status")
-                    if status_obj and "id" in status_obj:
-                        task.status = self._map_status(status_obj["id"])
-
-                    priority_obj = issue.get("priority")
-                    if priority_obj and "id" in priority_obj:
-                        task.priority = self._map_priority(priority_obj["id"])
-
-                    start_date_str = issue.get("startDate")
-                    if start_date_str:
-                        task.planned_start_date = start_date_str[:10]
+            from django.db import transaction
+            try:
+                with transaction.atomic():
+                    for issue in issues:
+                        issue_key = issue.get("issueKey")
                         
-                    due_date_str = issue.get("dueDate")
-                    if due_date_str:
-                        task.planned_end_date = due_date_str[:10]
+                        # Find matching SprintTask, restricting to the current project
+                        task = SprintTask.objects.filter(backlog_task_id=issue_key, sprint__project=project).first()
+                        if not task:
+                            logger.info(f"Skipped Backlog Issue {issue_key} (Task not found in Sprintpilot under project {project.project_id})")
+                            skipped_count += 1
+                            continue
 
-                    assignee_obj = issue.get("assignee")
-                    if assignee_obj and "mailAddress" in assignee_obj:
-                        email = assignee_obj["mailAddress"]
-                        emp = EmployeeProfile.objects.filter(user__email=email).first()
-                        if emp:
-                            task.assigned_employee = emp
+                        # Update task fields from Backlog
+                        task.title = issue.get("summary", task.title)
+                        
+                        if "description" in issue:
+                            raw_desc = issue.get("description") or ""
+                            task.description = raw_desc.split("\n\n---")[0] if "\n\n---" in raw_desc else raw_desc
 
-                    task.synced_at = timezone.now()
-                    task._skip_sync_validation = True
-                    task.save()
+                        status_obj = issue.get("status")
+                        if status_obj and "id" in status_obj:
+                            task.status = self._map_status(status_obj["id"])
+
+                        priority_obj = issue.get("priority")
+                        if priority_obj and "id" in priority_obj:
+                            task.priority = self._map_priority(priority_obj["id"])
+
+                        start_date_str = issue.get("startDate")
+                        if start_date_str:
+                            task.planned_start_date = start_date_str[:10]
+                            
+                        due_date_str = issue.get("dueDate")
+                        if due_date_str:
+                            task.planned_end_date = due_date_str[:10]
+
+                        assignee_obj = issue.get("assignee")
+                        if assignee_obj and "mailAddress" in assignee_obj:
+                            email = assignee_obj["mailAddress"]
+                            emp = EmployeeProfile.objects.filter(user__email=email).first()
+                            if emp:
+                                task.assigned_employee = emp
+                                
+                        issue_category = issue.get("category")
+                        if issue_category and len(issue_category) > 0:
+                            cat_obj = issue_category[0]
+                            cat_id = str(cat_obj.get("id"))
+                            cat_name = cat_obj.get("name")
+                            if cat_name:
+                                task.category = cat_name
+                                try:
+                                    from backlog.models import BacklogCategory
+                                    if cat_id:
+                                        b_cat, created = BacklogCategory.objects.get_or_create(
+                                            project=project,
+                                            backlog_category_id=cat_id,
+                                            defaults={'name': cat_name}
+                                        )
+                                    else:
+                                        # Fallback if no ID is present
+                                        b_cat, created = BacklogCategory.objects.get_or_create(
+                                            project=project,
+                                            name=cat_name
+                                        )
+                                except Exception as cat_err:
+                                    logger.error(f"Failed to sync category {cat_name}: {cat_err}")
+
+                        task.synced_at = timezone.now()
+                        task._skip_sync_validation = True
+                        task.save()
+                        
+                        logger.info(f"Updated SprintTask #{task.id} (Backlog Key: {issue_key})")
+                        updated_count += 1
                     
-                    logger.info(f"Updated SprintTask #{task.id} (Backlog Key: {issue_key})")
-                    updated_count += 1
-                    
-                except Exception as e:
-                    logger.error(f"Database/Validation failure for SprintTask {issue_key}: {e}")
-                    failed_count += 1
+            except Exception as e:
+                logger.error(f"Database/Validation failure for project {project.project_id}. Rolling back updates. Error: {e}")
+                # The transaction.atomic() block will automatically roll back all DB saves for this project
+                failed_count += len(issues) # Consider all issues for this project failed due to rollback
+
+        # Auto-close sprints if all tasks are CLOSED
+        from sprints.models import Sprint
+        for project in projects:
+            sprints = project.sprints.filter(status__in=[Sprint.Status.ACTIVE, Sprint.Status.PLANNED])
+            for sprint in sprints:
+                tasks = sprint.tasks.filter(is_deleted=False)
+                if tasks.exists() and not tasks.exclude(status__in=[SprintTask.Status.CLOSED, SprintTask.Status.RESOLVED]).exists():
+                    sprint.status = Sprint.Status.COMPLETED
+                    sprint.save()
+                    logger.info(f"Auto-closed Sprint #{sprint.id} as all tasks are CLOSED/RESOLVED")
 
         duration = (timezone.now() - start_time).total_seconds()
         
