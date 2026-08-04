@@ -9,7 +9,8 @@ from sprints.views import (
     SprintAISuggestScheduleView,
     SprintImportScheduleView,
     SprintTaskCreateView,
-    SprintNoteListView
+    SprintNoteListView,
+    SprintTaskStatusView
 )
 
 
@@ -19,6 +20,7 @@ urlpatterns = [
     path('projects/<uuid:project_id>/sprints/', SprintListCreateView.as_view(), name='sprint_list_create'),
     path('sprints/<uuid:pk>/', SprintDetailView.as_view(), name='sprint_detail'),
     path('sprints/tasks/bulk-delete/', SprintTaskBulkDeleteView.as_view(), name='sprint_task_bulk_delete'),
+    path('sprints/tasks/status/', SprintTaskStatusView.as_view(), name='sprint_tasks_status'),
     path('sprints/tasks/<uuid:pk>/', SprintTaskUpdateView.as_view(), name='sprint_task_update'),
     path('sprints/<uuid:sprint_id>/tasks/', SprintTaskCreateView.as_view(), name='sprint_task_create'),
     path('sprints/<uuid:sprint_id>/ai-schedule/', SprintAISuggestScheduleView.as_view(), name='sprint_ai_schedule'),

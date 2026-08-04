@@ -926,14 +926,14 @@ export default function SprintDetail() {
 
       {/* Navigation Breadcrumb */}
       <div className="mb-6 flex justify-between items-center">
-        <Link
-          to={`/projects/${projectId}`}
+        <button
+          onClick={() => navigate(-1)}
           className={`inline-flex items-center gap-2 text-xs font-black tracking-wider uppercase transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
             }`}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Project Details
-        </Link>
+        </button>
       </div>
 
       {/* Main header banner */}

@@ -756,3 +756,114 @@ class SprintService:
         )
         return note
 
+    @staticmethod
+    def get_tasks_by_due_status(
+        column: str = None,
+        overdue_offset: int = 0,
+        overdue_limit: int = 5,
+        today_offset: int = 0,
+        today_limit: int = 5,
+        tomorrow_offset: int = 0,
+        tomorrow_limit: int = 5,
+        search: str = None,
+        project_id: str = None
+    ) -> dict:
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.db.models import Q
+        from project.models import Project
+
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+
+        # Fetch active projects
+        active_projects = Project.objects.exclude(status='COMPLETED')
+
+        # Filter active tasks in active sprints/projects
+        tasks = SprintTask.objects.filter(
+            sprint__project__in=active_projects,
+            is_deleted=False
+        ).exclude(status__in=['CLOSED', 'RESOLVED']).select_related(
+            'sprint', 'sprint__project', 'assigned_employee', 'assigned_employee__user'
+        )
+
+        if project_id:
+            tasks = tasks.filter(sprint__project_id=project_id)
+
+        if search:
+            tasks = tasks.filter(
+                Q(title__icontains=search) |
+                Q(assigned_employee__user__full_name__icontains=search) |
+                Q(sprint__project__name__icontains=search) |
+                Q(sprint__milestone__icontains=search)
+            )
+
+        overdue_list = []
+        today_list = []
+        tomorrow_list = []
+
+        for t in tasks:
+            assigned_employee_data = None
+            if t.assigned_employee:
+                assigned_employee_data = {
+                    'id': str(t.assigned_employee.id),
+                    'user': {
+                        'id': str(t.assigned_employee.user.id),
+                        'email': t.assigned_employee.user.email,
+                        'full_name': t.assigned_employee.user.full_name,
+                        'role': t.assigned_employee.user.role
+                    } if t.assigned_employee.user else None,
+                    'designation': t.assigned_employee.designation
+                }
+
+            task_data = {
+                'id': str(t.id),
+                'title': t.title,
+                'category': t.category,
+                'priority': t.priority,
+                'planned_end_date': str(t.planned_end_date) if t.planned_end_date else None,
+                'status': t.status,
+                'assigned_employee': assigned_employee_data,
+                'projectId': str(t.sprint.project.id) if t.sprint and t.sprint.project else None,
+                'projectName': t.sprint.project.name if t.sprint and t.sprint.project else None,
+                'sprintId': str(t.sprint.id) if t.sprint else None,
+                'sprintName': t.sprint.milestone if t.sprint else None,
+            }
+
+            if not t.planned_end_date:
+                overdue_list.append(task_data)
+            else:
+                if t.planned_end_date < today:
+                    overdue_list.append(task_data)
+                elif t.planned_end_date == today:
+                    today_list.append(task_data)
+                elif t.planned_end_date == tomorrow:
+                    tomorrow_list.append(task_data)
+
+        # Build response dict
+        response_data = {}
+
+        if not column or column.upper() == 'OVERDUE':
+            overdue_slice = overdue_list[overdue_offset:overdue_offset + overdue_limit]
+            response_data['overdue'] = {
+                'tasks': overdue_slice,
+                'has_more': len(overdue_list) > (overdue_offset + overdue_limit)
+            }
+
+        if not column or column.upper() == 'TODAY':
+            today_slice = today_list[today_offset:today_offset + today_limit]
+            response_data['today'] = {
+                'tasks': today_slice,
+                'has_more': len(today_list) > (today_offset + today_limit)
+            }
+
+        if not column or column.upper() == 'TOMORROW':
+            tomorrow_slice = tomorrow_list[tomorrow_offset:tomorrow_offset + tomorrow_limit]
+            response_data['tomorrow'] = {
+                'tasks': tomorrow_slice,
+                'has_more': len(tomorrow_list) > (tomorrow_offset + tomorrow_limit)
+            }
+
+        return response_data
+
+

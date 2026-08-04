@@ -60,7 +60,7 @@ export default function SideBar() {
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
     { name: 'Projects', icon: FolderKanban, to: '/projects' },
-    // { name: 'Sprints', icon: Bot, to: '/sprints' }
+    { name: 'Status', icon: Bot, to: '/status' }
   ];
 
   return (
