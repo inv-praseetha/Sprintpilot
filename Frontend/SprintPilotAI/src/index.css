@@ -101,6 +101,47 @@ h1, h2, h3, h4, h5, h6 {
   overflow-y: auto; /* Enable scroll if text overflows */
   font-size: 0.875rem; /* text-sm */
   line-height: 1.625; /* leading-relaxed */
+
+  /* Custom scrollbar for Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Custom scrollbar for Chrome, Safari, and Edge */
+.rich-text-editor-container .ql-editor::-webkit-scrollbar {
+  width: 6px;
+}
+.rich-text-editor-container .ql-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rich-text-editor-container .ql-editor::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+.rich-text-editor-container .ql-editor::-webkit-scrollbar-thumb:hover {
+  background: #f97316; /* Brand orange hover highlight */
+}
+
+/* Dark mode scrollbar overrides */
+.rich-text-editor-container.dark .ql-editor {
+  scrollbar-color: #475569 transparent;
+}
+.rich-text-editor-container.dark .ql-editor::-webkit-scrollbar-thumb {
+  background: #475569; /* slate-600 */
+}
+.rich-text-editor-container.dark .ql-editor::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}
+
+/* Hide scrollbars for the PDF preview iframe */
+.rich-text-editor-container iframe {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  overflow: hidden;
+}
+.rich-text-editor-container iframe::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 .rich-text-editor-container .ql-editor.ql-blank::before {
   color: #94a3b8; /* text-slate-400 */

@@ -42,8 +42,15 @@ export const SprintServices = {
     return response.data;
   },
 
-  getSprintNotes: async (sprintId) => {
-    const response = await apiClient.get(`sprints/${sprintId}/notes/`);
+  getSprintNotes: async (sprintId, limit = null, offset = null) => {
+    let url = `sprints/${sprintId}/notes/`;
+    const params = [];
+    if (limit !== null) params.push(`limit=${limit}`);
+    if (offset !== null) params.push(`offset=${offset}`);
+    if (params.length > 0) {
+      url += `?${params.join('&')}`;
+    }
+    const response = await apiClient.get(url);
     return response.data;
   },
 
