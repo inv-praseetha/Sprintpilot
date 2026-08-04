@@ -117,6 +117,22 @@ class BacklogService:
             logger.error(f"Failed to get or create Backlog category '{category_name}': {e}")
             return None
 
+    def fetch_project_categories(self):
+        """Fetch all categories for the project from Backlog API."""
+        if not self.workspace_url or not self.api_key:
+            raise ValueError("Backlog configuration missing.")
+
+        url = f"{self.workspace_url}/api/v2/projects/{self.project_key}/categories"
+        params = {"apiKey": self.api_key}
+        
+        try:
+            res = requests.get(url, params=params)
+            res.raise_for_status()
+            return res.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch categories from Backlog for project {self.project_key}: {e}")
+            return []
+
     def sync_task(self, task, backlog_project_id=None):
         if not self.workspace_url or not self.api_key:
             raise ValueError("Backlog configuration missing.")

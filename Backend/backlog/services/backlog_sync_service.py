@@ -38,7 +38,7 @@ class BacklogSyncService:
         logger.info("Synchronization Started")
         start_time = timezone.now()
         
-        # Calculate updatedSince: 24 hours ago
+        # Calculate updatedSince: 24 hours ago (Safest window for irregular daily schedules)
         updated_since = start_time - timedelta(hours=24)
         
         from project.models import Project
@@ -66,6 +66,28 @@ class BacklogSyncService:
                 
             backlog_client = BacklogService(project_key=project.project_id)
             
+            # Fetch categories from Project Settings and ONLY insert the newly created ones
+            try:
+                project_categories = backlog_client.fetch_project_categories()
+                from backlog.models import BacklogCategory
+                new_categories_count = 0
+                for cat in project_categories:
+                    cat_id = str(cat.get('id'))
+                    cat_name = cat.get('name')
+                    if cat_id and cat_name:
+                        # Use get_or_create by ID: ignores existing ones, only creates new ones
+                        b_cat, created = BacklogCategory.objects.get_or_create(
+                            project=project,
+                            backlog_category_id=cat_id,
+                            defaults={'name': cat_name}
+                        )
+                        if created:
+                            new_categories_count += 1
+                if new_categories_count > 0:
+                    logger.info(f"Added {new_categories_count} newly created categories from Backlog for project {project.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to sync categories directly from Backlog for project {project.project_id}: {e}")
+                
             try:
                 issues = list(backlog_client.fetch_updated_issues(updated_since=updated_since))
             except Exception as e:
@@ -127,14 +149,18 @@ class BacklogSyncService:
                                 task.category = cat_name
                                 try:
                                     from backlog.models import BacklogCategory
-                                    b_cat, created = BacklogCategory.objects.get_or_create(
-                                        project=project,
-                                        name=cat_name,
-                                        defaults={'backlog_category_id': cat_id}
-                                    )
-                                    if not b_cat.backlog_category_id and cat_id:
-                                        b_cat.backlog_category_id = cat_id
-                                        b_cat.save()
+                                    if cat_id:
+                                        b_cat, created = BacklogCategory.objects.get_or_create(
+                                            project=project,
+                                            backlog_category_id=cat_id,
+                                            defaults={'name': cat_name}
+                                        )
+                                    else:
+                                        # Fallback if no ID is present
+                                        b_cat, created = BacklogCategory.objects.get_or_create(
+                                            project=project,
+                                            name=cat_name
+                                        )
                                 except Exception as cat_err:
                                     logger.error(f"Failed to sync category {cat_name}: {cat_err}")
 
@@ -151,7 +177,7 @@ class BacklogSyncService:
                 failed_count += len(issues) # Consider all issues for this project failed due to rollback
 
         # Auto-close sprints if all tasks are CLOSED
-        from sprints.models import Sprint, SprintTask
+        from sprints.models import Sprint
         for project in projects:
             sprints = project.sprints.filter(status__in=[Sprint.Status.ACTIVE, Sprint.Status.PLANNED])
             for sprint in sprints:
