@@ -530,7 +530,9 @@ const Dashboard = () => {
         </div>
 
         {/* Card 2: Tasks End Today */}
-        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+        <div 
+          onClick={() => navigate('/status')}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer hover:scale-[1.01] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
           }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Due Today</span>
@@ -554,7 +556,9 @@ const Dashboard = () => {
         </div>
 
         {/* Card 3: Tasks End Tomorrow */}
-        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+        <div 
+          onClick={() => navigate('/status')}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer hover:scale-[1.01] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
           }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Due Tomorrow</span>
@@ -574,7 +578,9 @@ const Dashboard = () => {
         </div>
 
         {/* Card 4: Tasks Overdue */}
-        <div className={`p-6 rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
+        <div 
+          onClick={() => navigate('/status')}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer hover:scale-[1.01] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-slate-100/50'
           }`}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium text-slate-400">Tasks Overdue</span>
