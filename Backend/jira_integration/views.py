@@ -139,9 +139,12 @@ class JiraFetchTasksView(APIView):
 
     def post(self, request, *args, **kwargs):
         project_key = request.data.get('project_key')
+        sprint_name = request.data.get('sprint_name')
+        
         if not project_key:
             return Response({"detail": "Jira Project Key is required."}, status=status.HTTP_400_BAD_REQUEST)
-
+        if not sprint_name:
+            return Response({"detail": "Jira Sprint Name is required."}, status=status.HTTP_400_BAD_REQUEST)
         # Retrieve token from DB
         token_obj = JiraOAuthToken.objects.first()
         if not token_obj:
@@ -156,8 +159,13 @@ class JiraFetchTasksView(APIView):
             "Accept": "application/json",
             "Content-Type": "application/json"
         }
+        jql = f"project={project_key}"
+        if sprint_name:
+            jql += f' AND sprint="{sprint_name}"'
+        jql += " ORDER BY created DESC"
+            
         payload = {
-            "jql": f"project={project_key} ORDER BY created DESC",
+            "jql": jql,
             "maxResults": 100,
             "fields": ["summary", "description", "issuetype"]
         }
@@ -165,9 +173,7 @@ class JiraFetchTasksView(APIView):
         try:
             res = requests.post(search_url, json=payload, headers=headers)
             
-            # Basic refresh token logic could go here if res.status_code == 401
             if res.status_code == 401:
-                # Token might be expired, need user to re-authenticate for now
                 JiraOAuthToken.objects.all().delete()
                 return Response(
                     {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
@@ -182,11 +188,30 @@ class JiraFetchTasksView(APIView):
             data = res.json()
             issues = data.get("issues", [])
             
+            if not issues:
+                return Response({"tasks": [], "message": "No tasks found in Jira matching the specified Project Key and Sprint Name."}, status=status.HTTP_200_OK)
+                
+            # Filter out tasks that already exist in the database (by jira_id)
+            from sprints.models import SprintTask
+            fetched_jira_ids = [issue.get("key") for issue in issues if issue.get("key")]
+            existing_jira_ids = set(SprintTask.objects.filter(jira_id__in=fetched_jira_ids, is_deleted=False).values_list('jira_id', flat=True))
+            
             tasks = []
             for issue in issues:
+                jira_id = issue.get("key")
+                if jira_id in existing_jira_ids:
+                    continue # Skip tasks that are already imported
+                    
                 fields = issue.get("fields", {})
                 issue_type = fields.get("issuetype", {}).get("name", "").upper()
                 
+                desc = fields.get("description")
+                if not desc:
+                    desc = "No description provided."
+                elif isinstance(desc, dict):
+                    extracted = extract_text_from_adf(desc)
+                    desc = extracted if extracted else "No description provided."
+
                 category = "UI"
                 if "BACKEND" in issue_type or "SERVER" in issue_type:
                     category = "BACKEND"
@@ -194,23 +219,18 @@ class JiraFetchTasksView(APIView):
                     category = "QA"
                 elif "INFRA" in issue_type or "OPS" in issue_type or "TASK" in issue_type:
                     category = "INFRA"
-                    
-                desc = fields.get("description")
-                if not desc:
-                    desc = "No description provided."
-                elif isinstance(desc, dict):
-                    # Extract text from Atlassian Document Format (ADF)
-                    extracted = extract_text_from_adf(desc)
-                    desc = extracted if extracted else "No description provided."
 
                 tasks.append({
                     "title": fields.get("summary", "Untitled Task"),
                     "desc": str(desc),
                     "category": category,
                     "status": "OPEN",
-                    "jiraId": issue.get("key")
+                    "jiraId": jira_id
                 })
             
+            if not tasks and issues:
+                return Response({"tasks": [], "message": "All fetched tasks have already been imported to SprintPilot previously!"}, status=status.HTTP_200_OK)
+                
             return Response({"tasks": tasks}, status=status.HTTP_200_OK)
             
         except requests.exceptions.RequestException as e:

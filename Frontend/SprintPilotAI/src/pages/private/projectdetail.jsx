@@ -159,6 +159,12 @@ export default function ProjectDetail() {
     }
   }, [projectId]);
 
+  useEffect(() => {
+    if (sessionStorage.getItem('open_jira_modal') === 'true') {
+      setShowUploadSprintModal(true);
+    }
+  }, []);
+
   // Compute sprint metadata details list for presentation
   const sprintListDetails = useMemo(() => {
     if (!Array.isArray(sprints)) return [];

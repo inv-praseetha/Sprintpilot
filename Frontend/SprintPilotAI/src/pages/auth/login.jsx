@@ -32,7 +32,7 @@ export default function Login() {
       } catch (err) {
         console.error("[auth] Google auth error caught:", err);
         let errorMsg = "Authentication failed. Please contact your administrator.";
-        
+
         if (err.response) {
           // The request was made and the server responded with a status code
           // that falls out of the range of 2xx
@@ -44,7 +44,7 @@ export default function Login() {
           // Something happened in setting up the request that triggered an Error
           errorMsg = err.message || errorMsg;
         }
-        
+
         setError(errorMsg);
       } finally {
         setLoading(false);
