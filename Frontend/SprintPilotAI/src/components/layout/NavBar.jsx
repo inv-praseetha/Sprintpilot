@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './MainLayouut';
 import { useAuth } from '../../context/AuthContext';
-import { HelpCircle, Bell, Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 
 const getInitials = (name) => {
   if (!name) return '';

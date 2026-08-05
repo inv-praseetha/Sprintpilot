@@ -334,10 +334,6 @@ class SprintTaskStatusView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             column = request.query_params.get('column')
-            search = request.query_params.get('search')
-            project_id = request.query_params.get('project_id')
-            if project_id == 'ALL':
-                project_id = None
 
             def get_int_param(name, default):
                 val = request.query_params.get(name)
@@ -362,9 +358,7 @@ class SprintTaskStatusView(APIView):
                 today_offset=today_offset,
                 today_limit=today_limit,
                 tomorrow_offset=tomorrow_offset,
-                tomorrow_limit=tomorrow_limit,
-                search=search,
-                project_id=project_id
+                tomorrow_limit=tomorrow_limit
             )
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:

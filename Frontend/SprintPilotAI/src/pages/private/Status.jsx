@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Loader2, Calendar, Clock, AlertTriangle, User, ChevronRight, Filter } from 'lucide-react';
+import { Loader2, Calendar, Clock, AlertTriangle, User, ChevronRight } from 'lucide-react';
 import apiClient from '../../api/apiClient';
 
 const getInitials = (name) => {
@@ -12,19 +12,22 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-
 const Status = () => {
   const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user } = useAuth();
   
   const [loading, setLoading] = useState(true);
-  const [projectsList, setProjectsList] = useState([]);
   
   // Tasks lists
   const [overdueTasks, setOverdueTasks] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
   const [tomorrowTasks, setTomorrowTasks] = useState([]);
+
+  // Total counts from API
+  const [overdueCount, setOverdueCount] = useState(0);
+  const [todayCount, setTodayCount] = useState(0);
+  const [tomorrowCount, setTomorrowCount] = useState(0);
 
   // hasMore flags
   const [hasMoreOverdue, setHasMoreOverdue] = useState(false);
@@ -36,9 +39,6 @@ const Status = () => {
   const [loadingMoreToday, setLoadingMoreToday] = useState(false);
   const [loadingMoreTomorrow, setLoadingMoreTomorrow] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProject, setSelectedProject] = useState('ALL');
-
   // Refs for scroll elements
   const overdueContainerRef = useRef(null);
   const todayContainerRef = useRef(null);
@@ -47,19 +47,8 @@ const Status = () => {
   const fetchInitialTasks = async () => {
     try {
       setLoading(true);
-      // Fetch projects once
-      if (projectsList.length === 0) {
-        const projectsResponse = await apiClient.get('projects/?page_size=100');
-        const projects = (Array.isArray(projectsResponse.data) 
-          ? projectsResponse.data 
-          : projectsResponse.data.results || []).filter(proj => proj.status !== 'COMPLETED');
-        setProjectsList(projects);
-      }
-
       const tasksResponse = await apiClient.get('sprints/tasks/status/', {
         params: {
-          search: searchQuery || undefined,
-          project_id: selectedProject === 'ALL' ? undefined : selectedProject,
           overdue_offset: 0,
           overdue_limit: 5,
           today_offset: 0,
@@ -72,12 +61,15 @@ const Status = () => {
       const data = tasksResponse.data;
       setOverdueTasks(data.overdue?.tasks || []);
       setHasMoreOverdue(data.overdue?.has_more || false);
+      setOverdueCount(data.overdue?.total_count || 0);
 
       setTodayTasks(data.today?.tasks || []);
       setHasMoreToday(data.today?.has_more || false);
+      setTodayCount(data.today?.total_count || 0);
 
       setTomorrowTasks(data.tomorrow?.tasks || []);
       setHasMoreTomorrow(data.tomorrow?.has_more || false);
+      setTomorrowCount(data.tomorrow?.total_count || 0);
     } catch (err) {
       console.error('Error fetching tasks data:', err);
     } finally {
@@ -85,13 +77,9 @@ const Status = () => {
     }
   };
 
-  // Debounced search / filter trigger
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchInitialTasks();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedProject]);
+    fetchInitialTasks();
+  }, []);
 
   const loadMoreTasks = async (columnType) => {
     if (columnType === 'OVERDUE') {
@@ -102,14 +90,13 @@ const Status = () => {
           params: {
             column: 'OVERDUE',
             overdue_offset: overdueTasks.length,
-            overdue_limit: 5,
-            search: searchQuery || undefined,
-            project_id: selectedProject === 'ALL' ? undefined : selectedProject
+            overdue_limit: 5
           }
         });
         const data = res.data.overdue;
         setOverdueTasks(prev => [...prev, ...(data.tasks || [])]);
         setHasMoreOverdue(data.has_more || false);
+        if (data.total_count !== undefined) setOverdueCount(data.total_count);
       } catch (err) {
         console.error('Error loading more overdue tasks:', err);
       } finally {
@@ -123,14 +110,13 @@ const Status = () => {
           params: {
             column: 'TODAY',
             today_offset: todayTasks.length,
-            today_limit: 5,
-            search: searchQuery || undefined,
-            project_id: selectedProject === 'ALL' ? undefined : selectedProject
+            today_limit: 5
           }
         });
         const data = res.data.today;
         setTodayTasks(prev => [...prev, ...(data.tasks || [])]);
         setHasMoreToday(data.has_more || false);
+        if (data.total_count !== undefined) setTodayCount(data.total_count);
       } catch (err) {
         console.error('Error loading more today tasks:', err);
       } finally {
@@ -144,14 +130,13 @@ const Status = () => {
           params: {
             column: 'TOMORROW',
             tomorrow_offset: tomorrowTasks.length,
-            tomorrow_limit: 5,
-            search: searchQuery || undefined,
-            project_id: selectedProject === 'ALL' ? undefined : selectedProject
+            tomorrow_limit: 5
           }
         });
         const data = res.data.tomorrow;
         setTomorrowTasks(prev => [...prev, ...(data.tasks || [])]);
         setHasMoreTomorrow(data.has_more || false);
+        if (data.total_count !== undefined) setTomorrowCount(data.total_count);
       } catch (err) {
         console.error('Error loading more tomorrow tasks:', err);
       } finally {
@@ -187,7 +172,7 @@ const Status = () => {
       if (todayEl) todayEl.removeEventListener('scroll', onTodayScroll);
       if (tomorrowEl) tomorrowEl.removeEventListener('scroll', onTomorrowScroll);
     };
-  }, [overdueTasks.length, todayTasks.length, tomorrowTasks.length, hasMoreOverdue, hasMoreToday, hasMoreTomorrow, loadingMoreOverdue, loadingMoreToday, loadingMoreTomorrow, searchQuery, selectedProject]);
+  }, [overdueTasks.length, todayTasks.length, tomorrowTasks.length, hasMoreOverdue, hasMoreToday, hasMoreTomorrow, loadingMoreOverdue, loadingMoreToday, loadingMoreTomorrow]);
 
   if (loading) {
     return (
@@ -210,44 +195,6 @@ const Status = () => {
             Task Urgency Status 🎯
           </h1>
         </div>
-
-        {/* FILTERS PANEL */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          {/* Project dropdown */}
-          <div className="relative w-full sm:w-64">
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2.5 rounded-2xl border text-sm font-semibold focus:outline-none transition-all appearance-none cursor-pointer ${
-                darkMode
-                  ? 'bg-slate-900 border-slate-800 text-slate-200 focus:border-orange-500'
-                  : 'bg-white border-slate-200 text-slate-800 focus:border-orange-500 shadow-sm'
-              }`}
-            >
-              <option value="ALL">All Projects</option>
-              {projectsList.map(proj => (
-                <option key={proj.id} value={proj.id}>{proj.name}</option>
-              ))}
-            </select>
-            <Filter className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
-
-          {/* Search bar */}
-          <div className="relative w-full sm:w-72">
-            <input
-              type="text"
-              placeholder="Search tasks, assignees..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2.5 rounded-2xl border text-sm focus:outline-none transition-all ${
-                darkMode
-                  ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500 focus:border-orange-500'
-                  : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-orange-500 shadow-sm'
-              }`}
-            />
-            <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
-        </div>
       </section>
 
       {/* KANBAN BOARD */}
@@ -265,7 +212,7 @@ const Status = () => {
               <h3 className={`font-extrabold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>Overdue</h3>
             </div>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-red-600 text-white">
-              {overdueTasks.length}
+              {overdueCount}
             </span>
           </div>
 
@@ -300,7 +247,7 @@ const Status = () => {
               <h3 className={`font-extrabold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>Due Today</h3>
             </div>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-orange-600 text-white">
-              {todayTasks.length}
+              {todayCount}
             </span>
           </div>
 
@@ -335,7 +282,7 @@ const Status = () => {
               <h3 className={`font-extrabold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>Due Tomorrow</h3>
             </div>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white">
-              {tomorrowTasks.length}
+              {tomorrowCount}
             </span>
           </div>
 
