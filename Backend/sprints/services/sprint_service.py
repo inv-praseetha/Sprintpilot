@@ -823,13 +823,10 @@ class SprintService:
         today_offset: int = 0,
         today_limit: int = 5,
         tomorrow_offset: int = 0,
-        tomorrow_limit: int = 5,
-        search: str = None,
-        project_id: str = None
+        tomorrow_limit: int = 5
     ) -> dict:
         from django.utils import timezone
         from datetime import timedelta
-        from django.db.models import Q
         from project.models import Project
 
         today = timezone.localdate()
@@ -845,17 +842,6 @@ class SprintService:
         ).exclude(status__in=['CLOSED', 'RESOLVED']).select_related(
             'sprint', 'sprint__project', 'assigned_employee', 'assigned_employee__user'
         )
-
-        if project_id:
-            tasks = tasks.filter(sprint__project_id=project_id)
-
-        if search:
-            tasks = tasks.filter(
-                Q(title__icontains=search) |
-                Q(assigned_employee__user__full_name__icontains=search) |
-                Q(sprint__project__name__icontains=search) |
-                Q(sprint__milestone__icontains=search)
-            )
 
         overdue_list = []
         today_list = []
@@ -906,21 +892,24 @@ class SprintService:
             overdue_slice = overdue_list[overdue_offset:overdue_offset + overdue_limit]
             response_data['overdue'] = {
                 'tasks': overdue_slice,
-                'has_more': len(overdue_list) > (overdue_offset + overdue_limit)
+                'has_more': len(overdue_list) > (overdue_offset + overdue_limit),
+                'total_count': len(overdue_list)
             }
 
         if not column or column.upper() == 'TODAY':
             today_slice = today_list[today_offset:today_offset + today_limit]
             response_data['today'] = {
                 'tasks': today_slice,
-                'has_more': len(today_list) > (today_offset + today_limit)
+                'has_more': len(today_list) > (today_offset + today_limit),
+                'total_count': len(today_list)
             }
 
         if not column or column.upper() == 'TOMORROW':
             tomorrow_slice = tomorrow_list[tomorrow_offset:tomorrow_offset + tomorrow_limit]
             response_data['tomorrow'] = {
                 'tasks': tomorrow_slice,
-                'has_more': len(tomorrow_list) > (tomorrow_offset + tomorrow_limit)
+                'has_more': len(tomorrow_list) > (tomorrow_offset + tomorrow_limit),
+                'total_count': len(tomorrow_list)
             }
 
         return response_data
