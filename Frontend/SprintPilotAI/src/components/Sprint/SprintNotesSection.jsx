@@ -18,7 +18,6 @@ const quillModules = {
     [{ 'header': [1, 2, false] }],
     ['bold', 'italic', 'underline', 'strike'],
     [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-    ['clean']
   ],
 };
 
