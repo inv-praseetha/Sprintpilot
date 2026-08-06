@@ -415,6 +415,23 @@ export default function TaskUploadModal({
       return;
     }
 
+    for (const t of selectedTasks) {
+      if (!t.title || !t.title.trim()) {
+        setErrorMsg('All selected tasks must have a title.');
+        return;
+      }
+      if (!t.category || !t.category.trim()) {
+        setErrorMsg(`Task "${t.title}" must have a category.`);
+        return;
+      }
+      if (t.estimated_hours !== undefined && t.estimated_hours !== null) {
+        if (parseFloat(t.estimated_hours) < 0) {
+          setErrorMsg(`Task "${t.title}" cannot have negative estimated hours.`);
+          return;
+        }
+      }
+    }
+
     const targetProjectKey = parsedProjectInfo.matchedKey || activeProject;
 
     // Call parent handler

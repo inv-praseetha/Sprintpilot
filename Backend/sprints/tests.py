@@ -16,6 +16,7 @@ from sprints.services.schedule_service import (
 )
 from sprints.services.ai_scheduler import get_schedule_suggestions
 from sprints.services.gemini_client import generate_schedule_content
+from sprints.services.sprint_service import SprintService
 
 class SprintModelTests(APITestCase):
     def setUp(self):
@@ -830,5 +831,128 @@ class SprintClosureTests(APITestCase):
         url = reverse('sprint_close', kwargs={'pk': self.sprint.id})
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_sprint_task_validation_dates_ordered(self):
+        data = {
+            "title": "Invalid Date Task",
+            "category": "UI",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": "2026-07-25",
+            "planned_end_date": "2026-07-20",
+            "description": "Valid description"
+        }
+        with self.assertRaises(ValueError):
+            SprintService.create_task(self.sprint.id, data)
+
+        task = SprintTask.objects.create(
+            sprint=self.sprint,
+            title="Valid Task",
+            category="UI",
+            status="OPEN",
+            assigned_employee=self.profile,
+            planned_start_date=datetime.date(2026, 7, 20),
+            planned_end_date=datetime.date(2026, 7, 22),
+            description="Valid description"
+        )
+        with self.assertRaises(ValueError):
+            SprintService.update_task(task.id, {"planned_start_date": "2026-07-25"})
+
+    def test_sprint_task_validation_sprint_boundaries(self):
+        data = {
+            "title": "Boundary Task",
+            "category": "UI",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": "2026-07-01",
+            "planned_end_date": "2026-07-20",
+            "description": "Valid description"
+        }
+        with self.assertRaises(ValueError):
+            SprintService.create_task(self.sprint.id, data)
+
+        task = SprintTask.objects.create(
+            sprint=self.sprint,
+            title="Valid Task",
+            category="UI",
+            status="OPEN",
+            assigned_employee=self.profile,
+            planned_start_date=datetime.date(2026, 7, 20),
+            planned_end_date=datetime.date(2026, 7, 22),
+            description="Valid description"
+        )
+        with self.assertRaises(ValueError):
+            SprintService.update_task(task.id, {"planned_end_date": "2026-08-30"})
+
+    def test_sprint_task_validation_negative_hours(self):
+        data = {
+            "title": "Negative Hours Task",
+            "category": "UI",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": "2026-07-20",
+            "planned_end_date": "2026-07-22",
+            "estimated_hours": -5.0,
+            "description": "Valid description"
+        }
+        with self.assertRaises(ValueError):
+            SprintService.create_task(self.sprint.id, data)
+
+        task = SprintTask.objects.create(
+            sprint=self.sprint,
+            title="Valid Task",
+            category="UI",
+            status="OPEN",
+            assigned_employee=self.profile,
+            planned_start_date=datetime.date(2026, 7, 20),
+            planned_end_date=datetime.date(2026, 7, 22),
+            description="Valid description"
+        )
+        with self.assertRaises(ValueError):
+            SprintService.update_task(task.id, {"estimated_hours": -2})
+
+    def test_sprint_creation_validation_dates(self):
+        sprint_data = {
+            "milestone": "Sprint 99",
+            "start_date": "2026-08-10",
+            "end_date": "2026-08-05",
+            "status": "ACTIVE"
+        }
+        with self.assertRaises(ValueError):
+            SprintService.create_sprint(self.project.id, sprint_data)
+
+    def test_task_estimated_hours_working_days_capacity(self):
+        # 22 hours require at least 3 working days (Ceil(22 / 8) = 3)
+        # 2026-07-20 is Monday, 2026-07-21 is Tuesday (2 working days)
+        data = {
+            "title": "Mismatched Hours Task",
+            "category": "UI",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": "2026-07-20",
+            "planned_end_date": "2026-07-21",
+            "estimated_hours": 22.0,
+            "description": "Valid description"
+        }
+        with self.assertRaises(ValueError):
+            SprintService.create_task(self.sprint.id, data)
+
+        # A task that fits capacity: 16 hours on 2 working days (2026-07-20 to 2026-07-21)
+        data_valid = {
+            "title": "Matched Hours Task",
+            "category": "UI",
+            "status": "OPEN",
+            "assigned_employee_id": str(self.profile.id),
+            "planned_start_date": "2026-07-20",
+            "planned_end_date": "2026-07-21",
+            "estimated_hours": 16.0,
+            "description": "Valid description"
+        }
+        task = SprintService.create_task(self.sprint.id, data_valid)
+        self.assertEqual(task.estimated_hours, 16.0)
+
+        # Trying to update estimated_hours to 22.0 on a 2 working day range should fail
+        with self.assertRaises(ValueError):
+            SprintService.update_task(task.id, {"estimated_hours": 22.0})
 
 

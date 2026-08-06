@@ -38,6 +38,76 @@ const getCleanCategory = (cat) => {
   return c;
 };
 
+const getWorkingDaysCount = (startStr, endStr) => {
+  if (!startStr || !endStr) return 0;
+  const [sy, sm, sd] = startStr.split('-').map(Number);
+  const [ey, em, ed] = endStr.split('-').map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  let count = 0;
+  let current = new Date(start);
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) {
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+};
+
+const calculateMinEndDate = (startStr, estimatedHours) => {
+  if (!startStr) return '';
+  const hours = parseFloat(estimatedHours);
+  if (isNaN(hours) || hours <= 0) return startStr;
+
+  const minDays = Math.ceil(hours / 8);
+  const [year, month, day] = startStr.split('-').map(Number);
+  const current = new Date(year, month - 1, day);
+
+  let workingDaysCount = 0;
+  while (workingDaysCount < minDays) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      workingDaysCount++;
+    }
+    if (workingDaysCount < minDays) {
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  const y = current.getFullYear();
+  const m = String(current.getMonth() + 1).padStart(2, '0');
+  const d = String(current.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const calculateMaxStartDate = (endStr, estimatedHours) => {
+  if (!endStr) return '';
+  const hours = parseFloat(estimatedHours);
+  if (isNaN(hours) || hours <= 0) return endStr;
+
+  const minDays = Math.ceil(hours / 8);
+  const [year, month, day] = endStr.split('-').map(Number);
+  const current = new Date(year, month - 1, day);
+
+  let workingDaysCount = 0;
+  while (workingDaysCount < minDays) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      workingDaysCount++;
+    }
+    if (workingDaysCount < minDays) {
+      current.setDate(current.getDate() - 1);
+    }
+  }
+
+  const y = current.getFullYear();
+  const m = String(current.getMonth() + 1).padStart(2, '0');
+  const d = String(current.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const getCategoryConfig = (category) => {
   const c = String(category).toUpperCase().trim();
   if (c === 'UI') return categoryConfig.UI;
@@ -175,6 +245,15 @@ export default function SprintTasksTable({
       return;
     }
 
+    if (currentTask && currentTask.estimated_hours && currentTask.planned_end_date) {
+      const workingDays = getWorkingDaysCount(newDate, currentTask.planned_end_date);
+      const minDays = Math.ceil(parseFloat(currentTask.estimated_hours) / 8);
+      if (workingDays < minDays) {
+        alert(`Invalid Start Date: Estimated hours (${currentTask.estimated_hours}h) require at least ${minDays} working day(s). Selected range would only have ${workingDays} working day(s).`);
+        return;
+      }
+    }
+
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
         return { ...t, planned_start_date: newDate };
@@ -205,6 +284,15 @@ export default function SprintTasksTable({
     if (currentTask && currentTask.planned_start_date && newDate < currentTask.planned_start_date) {
       alert("Invalid End Date: The end date cannot be before the planned start date.");
       return;
+    }
+
+    if (currentTask && currentTask.estimated_hours && currentTask.planned_start_date) {
+      const workingDays = getWorkingDaysCount(currentTask.planned_start_date, newDate);
+      const minDays = Math.ceil(parseFloat(currentTask.estimated_hours) / 8);
+      if (workingDays < minDays) {
+        alert(`Invalid End Date: Estimated hours (${currentTask.estimated_hours}h) require at least ${minDays} working day(s). Selected range would only have ${workingDays} working day(s).`);
+        return;
+      }
     }
 
     setTasks(prev => prev.map(t => {
@@ -651,7 +739,13 @@ export default function SprintTasksTable({
                           <CustomDatePicker
                             value={task.planned_start_date}
                             minDate={sprint?.start_date}
-                            maxDate={task.planned_end_date || sprint?.end_date}
+                            maxDate={
+                              (task.planned_end_date && task.estimated_hours)
+                                ? (calculateMaxStartDate(task.planned_end_date, task.estimated_hours) < sprint?.start_date
+                                  ? sprint?.start_date
+                                  : calculateMaxStartDate(task.planned_end_date, task.estimated_hours))
+                                : (task.planned_end_date || sprint?.end_date)
+                            }
                             onChange={(newDate) => handleStartDateChange(task.id, newDate)}
                             darkMode={darkMode}
                             onOpen={() => setActiveDatePickerId(`${task.id}-start`)}
@@ -672,7 +766,13 @@ export default function SprintTasksTable({
                         {isEditing && task.status !== 'CLOSED' ? (
                           <CustomDatePicker
                             value={task.planned_end_date}
-                            minDate={task.planned_start_date || sprint?.start_date}
+                            minDate={
+                              (task.planned_start_date && task.estimated_hours)
+                                ? (calculateMinEndDate(task.planned_start_date, task.estimated_hours) > sprint?.end_date
+                                  ? sprint?.end_date
+                                  : calculateMinEndDate(task.planned_start_date, task.estimated_hours))
+                                : (task.planned_start_date || sprint?.start_date)
+                            }
                             maxDate={sprint?.end_date}
                             onChange={(newDate) => handleEndDateChange(task.id, newDate)}
                             darkMode={darkMode}

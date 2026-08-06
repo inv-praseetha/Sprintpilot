@@ -437,6 +437,23 @@ class SprintService:
         if not milestone or not start_date or not end_date:
             raise ValueError("Sprint milestone, start_date, and end_date are required.")
 
+        # Parse and validate sprint dates
+        from datetime import datetime
+        try:
+            if isinstance(start_date, str):
+                parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            else:
+                parsed_start = start_date
+            if isinstance(end_date, str):
+                parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            else:
+                parsed_end = end_date
+                
+            if parsed_start > parsed_end:
+                raise ValueError("Sprint start date must be before or equal to end date.")
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid date formats: {str(e)}")
+
         with transaction.atomic():
             sprint = Sprint.objects.create(
                 project=project,
@@ -622,6 +639,56 @@ class SprintService:
             else:
                 task.assigned_employee = None
 
+        # Validate dates and values if updated
+        new_start = data.get('planned_start_date') or data.get('startDate')
+        new_end = data.get('planned_end_date') or data.get('endDate')
+        
+        chk_start = new_start if ('planned_start_date' in data or 'startDate' in data) else task.planned_start_date
+        chk_end = new_end if ('planned_end_date' in data or 'endDate' in data) else task.planned_end_date
+        
+        import datetime
+        if isinstance(chk_start, str):
+            try:
+                chk_start = datetime.datetime.strptime(chk_start, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid start date format. Must be YYYY-MM-DD.")
+        if isinstance(chk_end, str):
+            try:
+                chk_end = datetime.datetime.strptime(chk_end, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid end date format. Must be YYYY-MM-DD.")
+                
+        if chk_start and chk_end:
+            if chk_start > chk_end:
+                raise ValueError("Planned start date must be before or equal to planned end date.")
+            if task.sprint:
+                if chk_start < task.sprint.start_date or chk_end > task.sprint.end_date:
+                    raise ValueError(f"Task dates must fall within the sprint range ({task.sprint.start_date} to {task.sprint.end_date}).")
+                    
+        new_hours = data.get('estimated_hours') if 'estimated_hours' in data else data.get('estimatedHours')
+        chk_hours = new_hours if new_hours is not None else task.estimated_hours
+        
+        if chk_hours is not None:
+            try:
+                hours_val = float(chk_hours)
+                if hours_val < 0:
+                    raise ValueError("Estimated hours cannot be negative.")
+                if chk_start and chk_end and hours_val > 0:
+                    from math import ceil
+                    working_days = 0
+                    curr = chk_start
+                    while curr <= chk_end:
+                        if curr.weekday() < 5:
+                            working_days += 1
+                        curr += datetime.timedelta(days=1)
+                    min_days = ceil(hours_val / 8.0)
+                    if working_days < min_days:
+                        raise ValueError(f"Estimated hours ({hours_val}h) require at least {min_days} working day(s). Selected range has only {working_days} working day(s).")
+            except (ValueError, TypeError) as e:
+                if "require at least" in str(e):
+                    raise ValueError(str(e))
+                raise ValueError("Estimated hours must be a valid number.")
+
         start_changed = 'planned_start_date' in data or 'startDate' in data
         end_changed = 'planned_end_date' in data or 'endDate' in data
         hours_changed = 'estimated_hours' in data or 'estimatedHours' in data
@@ -748,7 +815,7 @@ class SprintService:
         if sprint.project.status == 'COMPLETED':
             raise ValueError("Cannot add tasks to a completed project.")
 
-        serializer = SprintTaskSerializer(data=data)
+        serializer = SprintTaskSerializer(data=data, context={'sprint': sprint})
         if not serializer.is_valid():
             raise ValueError(serializer.errors)
 
