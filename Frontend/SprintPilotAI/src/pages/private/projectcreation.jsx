@@ -503,10 +503,10 @@ export default function ProjectCreation() {
   };
 
   return (
-    <main className="p-8 lg:p-10 space-y-8 max-w-[1400px] mx-auto text-left">
+    <main className="p-8 lg:p-10 space-y-8 mx-auto text-left">
 
       {/* PAGE HEADER */}
-      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6">
+      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <span className="text-sm font-semibold text-orange-500 uppercase tracking-wider">Create Project</span>
           <h1 className="text-4xl font-black tracking-tight mt-1">
