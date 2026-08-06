@@ -155,6 +155,15 @@ export default function JiraSyncModal({
   if (!isOpen) return null;
 
 
+  const groupedTasks = tasks.reduce((acc, task, idx) => {
+    const cats = task.category ? task.category.split(', ') : ['UI'];
+    cats.forEach(c => {
+      if (!acc[c]) acc[c] = [];
+      acc[c].push({ ...task, originalIndex: idx });
+    });
+    return acc;
+  }, {});
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -260,7 +269,7 @@ export default function JiraSyncModal({
                         <th className="p-3 font-bold w-12 text-center">Inc</th>
                         <th className="p-3 font-bold w-24">Jira ID</th>
                         <th className="p-3 font-bold min-w-[150px]">Task Title</th>
-                        <th className="p-3 font-bold w-28 text-center">Category</th>
+                        <th className="p-3 font-bold w-36 text-center">Category</th>
                         <th className="p-3 font-bold w-24 text-center">Status</th>
                         <th className="p-3 font-bold w-24 text-center">Priority</th>
                         <th className="p-3 font-bold w-32 text-center">Assignee</th>
@@ -286,22 +295,33 @@ export default function JiraSyncModal({
                             {t.title}
                           </td>
                           <td className="p-3 text-center align-middle">
-                            <select
-                              multiple
-                              value={t.category ? t.category.split(', ') : []}
-                              onChange={(e) => {
-                                const vals = Array.from(e.target.selectedOptions, option => option.value).join(', ');
-                                handleTaskCategoryChange(idx, vals);
-                              }}
-                              className={`w-full text-[10px] font-bold rounded-lg px-2 py-1 outline-none transition-colors border overflow-y-auto min-h-[60px] ${
-                                darkMode ? 'border-slate-700 bg-slate-800 focus:border-blue-500' : 'border-slate-200 focus:border-blue-500'
-                              }`}
-                            >
-                              <option value="UI">UI</option>
-                              <option value="BACKEND">BACKEND</option>
-                              <option value="INFRA">INFRA</option>
-                              <option value="QA">QA</option>
-                            </select>
+                            <div className="flex flex-wrap gap-1 justify-center max-w-[120px] mx-auto">
+                              {['UI', 'BACKEND', 'INFRA', 'QA'].map(cat => {
+                                const isSelected = t.category && t.category.split(', ').includes(cat);
+                                return (
+                                  <button
+                                    key={cat}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      let current = t.category ? t.category.split(', ').filter(c => c.trim() !== '') : [];
+                                      if (isSelected) {
+                                        current = current.filter(c => c !== cat);
+                                      } else {
+                                        current.push(cat);
+                                      }
+                                      handleTaskCategoryChange(idx, current.join(', '));
+                                    }}
+                                    className={`px-1.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition-colors border ${
+                                      isSelected 
+                                        ? (darkMode ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-600 border-blue-200')
+                                        : (darkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50')
+                                    }`}
+                                  >
+                                    {cat}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </td>
                           <td className="p-3 text-center align-middle">
                             <select

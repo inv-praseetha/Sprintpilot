@@ -911,23 +911,32 @@ export default function TaskUploadModal({
                             <td className="py-2 px-3 font-semibold truncate max-w-[150px]" title={row.title}>{row.title}</td>
                             <td className="py-2 px-3 text-slate-500 truncate max-w-[180px]" title={row.desc}>{row.desc}</td>
                             <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="relative w-max">
-                                <select
-                                  multiple
-                                  value={row.category ? row.category.split(', ') : []}
-                                  onChange={(e) => {
-                                      const vals = Array.from(e.target.selectedOptions, option => option.value).join(', ');
-                                      handleTaskCategoryChange(idx, vals);
-                                  }}
-                                  className={`appearance-none px-2 py-1 rounded text-[9px] font-bold border cursor-pointer outline-none transition-all shadow-sm hover:brightness-95 dark:hover:brightness-110 overflow-y-auto min-h-[50px] ${
-                                    darkMode ? 'border-slate-700 bg-slate-800 focus:border-blue-500 text-white' : 'border-slate-200 focus:border-blue-500 bg-white'
-                                  }`}
-                                >
-                                  <option value="UI" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">UI</option>
-                                  <option value="BACKEND" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">BACKEND</option>
-                                  <option value="QA" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">QA</option>
-                                  <option value="INFRA" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">INFRA</option>
-                                </select>
+                              <div className="flex flex-wrap gap-1 max-w-[120px]">
+                                {['UI', 'BACKEND', 'INFRA', 'QA'].map(cat => {
+                                  const isSelected = row.category && row.category.split(', ').includes(cat);
+                                  return (
+                                    <button
+                                      key={cat}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        let current = row.category ? row.category.split(', ').filter(c => c.trim() !== '') : [];
+                                        if (isSelected) {
+                                          current = current.filter(c => c !== cat);
+                                        } else {
+                                          current.push(cat);
+                                        }
+                                        handleTaskCategoryChange(idx, current.join(', '));
+                                      }}
+                                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition-colors border ${
+                                        isSelected 
+                                          ? (darkMode ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-600 border-blue-200')
+                                          : (darkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50')
+                                      }`}
+                                    >
+                                      {cat}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || row.initialJiraId || 'N/A'}</td>

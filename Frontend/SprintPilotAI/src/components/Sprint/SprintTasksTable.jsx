@@ -54,12 +54,20 @@ const getCategoryConfig = (category) => {
 };
 
 const getUniqueCategories = (tasks) => {
-  const categories = new Set(tasks.map(t => t.category || 'UI'));
+  const categories = new Set();
+  tasks.forEach(t => {
+    if (t.category) {
+      t.category.split(',').forEach(c => categories.add(c.trim()));
+    } else {
+      categories.add('UI');
+    }
+  });
+  
   const defaultCats = ['UI', 'Backend', 'INFRA', 'QA'];
   const result = [...defaultCats];
   categories.forEach(c => {
     const clean = String(c).toUpperCase().trim();
-    if (!['UI', 'BACKEND', 'INFRA', 'SYSTEM DESIGN & INFRA', 'QA'].includes(clean)) {
+    if (!['UI', 'BACKEND', 'INFRA', 'SYSTEM DESIGN & INFRA', 'QA'].includes(clean) && clean !== '') {
       result.push(c);
     }
   });
@@ -424,7 +432,10 @@ export default function SprintTasksTable({
 
         <tbody className={`divide-y text-xs font-semibold ${darkMode ? 'divide-slate-800/80 text-slate-300 border-b border-slate-800' : 'divide-slate-200 text-slate-700 border-b border-slate-200'}`}>
           {getUniqueCategories(tasks).map((category) => {
-            const catTasks = tasks.filter(t => getCleanCategory(t.category) === getCleanCategory(category));
+            const catTasks = tasks.filter(t => {
+              const tCats = t.category ? t.category.split(',').map(s => getCleanCategory(s.trim())) : ['UI'];
+              return tCats.includes(getCleanCategory(category));
+            });
             const config = getCategoryConfig(category);
 
             if (catTasks.length === 0) return null;
