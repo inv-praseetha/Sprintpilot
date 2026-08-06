@@ -113,6 +113,7 @@ class SprintSerializer(serializers.ModelSerializer):
             'tasks',
             'holidays',
             'project_custom_id',
+            'backlog_version_id',
             'workspace_url',
             'backlog_status',
             'progress_percentage',

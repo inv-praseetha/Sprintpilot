@@ -70,7 +70,7 @@ class SprintTask(models.Model):
     priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL)
     story_points = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
     estimated_hours = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    category = models.CharField(max_length=20, choices=Category.choices, default=Category.UI)
+    category = models.CharField(max_length=255, default=Category.UI)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     assigned_employee = models.ForeignKey(
         EmployeeProfile, 

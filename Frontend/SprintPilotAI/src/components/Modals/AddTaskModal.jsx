@@ -184,10 +184,14 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
                 Category <span className="text-red-500">*</span>
               </label>
               <select
+                multiple
                 name="category"
-                value={formData.category}
-                onChange={handleChange}
-                className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${darkMode
+                value={formData.category ? formData.category.split(', ') : []}
+                onChange={(e) => {
+                  const values = Array.from(e.target.selectedOptions, option => option.value).join(', ');
+                  handleChange({ target: { name: 'category', value: values } });
+                }}
+                className={`w-full px-2 py-2 rounded-xl border text-xs font-semibold focus:outline-none transition-colors overflow-y-auto min-h-[80px] ${darkMode
                     ? 'bg-slate-950 border-slate-800 focus:border-orange-500 text-white'
                     : 'bg-white border-slate-200 focus:border-orange-500 text-slate-800'
                   }`}

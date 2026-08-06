@@ -443,7 +443,8 @@ class SprintService:
                 milestone=milestone,
                 start_date=start_date,
                 end_date=end_date,
-                status=data.get('status') or 'ACTIVE'
+                status=data.get('status') or 'ACTIVE',
+                backlog_version_id=data.get('backlog_version_id')
             )
 
             holidays_data = data.get('holidays') or []
@@ -464,18 +465,11 @@ class SprintService:
                 if not title:
                     continue
 
-                cat = task_item.get('category', 'UI')
-                cat_upper = str(cat).upper().strip()
-                if cat_upper == 'BACKEND':
-                    cat = 'Backend'
-                elif cat_upper == 'INFRA':
-                    cat = 'INFRA'
-                elif cat_upper == 'UI':
-                    cat = 'UI'
-                elif cat_upper == 'QA':
-                    cat = 'QA'
+                cat_val = task_item.get('category', 'UI')
+                if isinstance(cat_val, list):
+                    cat = ", ".join(cat_val)
                 else:
-                    cat = 'UI'
+                    cat = str(cat_val).strip()
 
                 priority = task_item.get('priority', 'Normal')
                 if priority not in ['Low', 'Normal', 'High', 'Critical']:

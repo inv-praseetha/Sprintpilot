@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Activity, LayoutTemplate } from 'lucide-react';
 import apiClient from '../../api/apiClient';
 
 export default function JiraCallback() {
@@ -30,6 +30,7 @@ export default function JiraCallback() {
         setTimeout(() => {
           const redirectUrl = sessionStorage.getItem('jira_redirect_back_url') || '/dashboard';
           sessionStorage.removeItem('jira_redirect_back_url');
+          sessionStorage.setItem('open_jira_modal', 'true');
           navigate(redirectUrl);
         }, 2000);
       } catch (err) {
@@ -42,56 +43,105 @@ export default function JiraCallback() {
   }, [searchParams, navigate]);
 
   return (
-    <div className="min-h-screen bg-blue-600 dark:bg-blue-950 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
       {/* Decorative background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full blur-3xl opacity-50 dark:opacity-20"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-700 rounded-full blur-3xl opacity-50 dark:opacity-20"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/10 blur-[100px] rounded-full"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full"></div>
       </div>
 
-      <div className="relative w-full max-w-md bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-8 shadow-2xl text-center space-y-6">
+      <style>{`
+        @keyframes dataFlow {
+          0% { transform: translateX(-100%) scale(1); opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateX(300%) scale(1.5); opacity: 0; }
+        }
+        .particle-1 { animation: dataFlow 2s linear infinite; }
+        .particle-2 { animation: dataFlow 2s linear infinite 0.7s; }
+        .particle-3 { animation: dataFlow 2s linear infinite 1.4s; }
+        
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+          50% { box-shadow: 0 0 35px rgba(59, 130, 246, 0.8); }
+        }
+        .animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+      `}</style>
+
+      <div className="relative w-full max-w-md bg-white border border-slate-200 rounded-[2rem] p-8 sm:p-10 shadow-2xl shadow-blue-500/10 text-center z-10 animate-pulse-glow">
+        
         {status === 'processing' && (
-          <>
-            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto">
-              <Loader2 className="w-10 h-10 text-white animate-spin" />
+          <div className="space-y-6">
+            {/* Animated Connection Graphic */}
+            <div className="flex items-center justify-center w-full mb-8 relative px-2">
+              {/* SprintPilot Side */}
+              <div className="relative z-10 w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 p-[2px] shadow-[0_0_30px_-5px_rgba(249,115,22,0.4)] shrink-0">
+                <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
+                  <Activity className="w-7 h-7 text-orange-500" />
+                </div>
+                {/* Ping effect */}
+                <div className="absolute inset-0 rounded-2xl border-2 border-orange-500/30 animate-ping" style={{ animationDuration: '3s' }}></div>
+              </div>
+
+              {/* Connection Line */}
+              <div className="relative flex-1 h-[2px] mx-3 flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 border-t-[3px] border-dashed border-slate-300"></div>
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full shadow-[0_0_10px_#3b82f6] particle-1 absolute left-0"></div>
+                  <div className="w-3 h-3 bg-orange-500 rounded-full shadow-[0_0_10px_#f97316] particle-2 absolute left-0"></div>
+                  <div className="w-3 h-3 bg-indigo-500 rounded-full shadow-[0_0_10px_#6366f1] particle-3 absolute left-0"></div>
+                </div>
+              </div>
+
+              {/* Jira Side */}
+              <div className="relative z-10 w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 p-[2px] shadow-[0_0_30px_-5px_rgba(59,130,246,0.4)] shrink-0">
+                <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
+                  <LayoutTemplate className="w-7 h-7 text-blue-500" />
+                </div>
+                {/* Ping effect */}
+                <div className="absolute inset-0 rounded-2xl border-2 border-blue-500/30 animate-ping" style={{ animationDuration: '3s', animationDelay: '1.5s' }}></div>
+              </div>
             </div>
-            <h2 className="text-2xl font-black text-white">Connecting Jira</h2>
-          </>
+            
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Connecting to Jira</h2>
+            <p className="text-sm font-semibold text-slate-500">
+              Please wait while we establish a secure connection...
+            </p>
+          </div>
         )}
         
         {status === 'success' && (
-          <>
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto animate-bounce shadow-[0_0_40px_rgba(16,185,129,0.3)]">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+          <div className="space-y-6 animate-in fade-in zoom-in duration-500">
+            <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(16,185,129,0.2)]">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
             </div>
-            <h2 className="text-2xl font-black text-white">Success!</h2>
-          </>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Connection Successful</h2>
+            <p className="text-sm font-semibold text-emerald-600 bg-emerald-500/5 p-4 rounded-xl">
+              {message}
+            </p>
+          </div>
         )}
 
         {status === 'error' && (
-          <>
-            <div className="w-20 h-20 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(244,63,94,0.3)]">
-              <AlertCircle className="w-10 h-10 text-rose-400" />
+          <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(244,63,94,0.2)]">
+              <AlertCircle className="w-10 h-10 text-rose-500" />
             </div>
-            <h2 className="text-2xl font-black text-white">Connection Failed</h2>
-          </>
-        )}
-
-        <p className="text-sm font-semibold text-blue-100 dark:text-blue-200">
-          {message}
-        </p>
-
-        {status === 'error' && (
-          <button
-            onClick={() => {
-              const redirectUrl = sessionStorage.getItem('jira_redirect_back_url') || '/dashboard';
-              sessionStorage.removeItem('jira_redirect_back_url');
-              navigate(redirectUrl);
-            }}
-            className="w-full py-3.5 bg-white text-blue-600 hover:bg-blue-50 rounded-2xl font-black transition-all shadow-xl"
-          >
-            Return to App
-          </button>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Connection Failed</h2>
+            <p className="text-sm font-semibold text-rose-600 bg-rose-500/5 p-4 rounded-xl">
+              {message}
+            </p>
+            <button
+              onClick={() => {
+                const redirectUrl = sessionStorage.getItem('jira_redirect_back_url') || '/dashboard';
+                sessionStorage.removeItem('jira_redirect_back_url');
+                navigate(redirectUrl);
+              }}
+              className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 active:scale-95 rounded-xl font-black transition-all shadow-lg"
+            >
+              Return to App
+            </button>
+          </div>
         )}
       </div>
     </div>
