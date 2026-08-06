@@ -285,7 +285,8 @@ class ProjectDetailView(APIView):
 
 
 
-from datetime import date, timedelta
+from datetime import timedelta
+from django.utils import timezone
 from sprints.models import SprintTask
 from django.db.models import Count
 
@@ -311,7 +312,7 @@ class DashboardView(APIView):
             if s not in status_distribution:
                 status_distribution[s] = 0
 
-        today = date.today()
+        today = timezone.localdate()
         tomorrow = today + timedelta(days=1)
 
         # Due Today
