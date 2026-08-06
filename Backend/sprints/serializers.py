@@ -34,10 +34,50 @@ class SprintTaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"status": "Status is required."})
         if not attrs.get('assigned_employee'):
             raise serializers.ValidationError({"assigned_employee_id": "Assignee is required."})
-        if not attrs.get('planned_start_date'):
+        
+        start_date = attrs.get('planned_start_date')
+        end_date = attrs.get('planned_end_date')
+        if not start_date:
             raise serializers.ValidationError({"planned_start_date": "Planned start date is required."})
-        if not attrs.get('planned_end_date'):
+        if not end_date:
             raise serializers.ValidationError({"planned_end_date": "Planned end date is required."})
+            
+        if start_date > end_date:
+            raise serializers.ValidationError({"planned_start_date": "Planned start date must be before or equal to planned end date."})
+            
+        # Get sprint from context (if set during creation) or from instance
+        sprint = self.context.get('sprint') or (self.instance.sprint if self.instance else None)
+        if sprint:
+            if start_date < sprint.start_date or end_date > sprint.end_date:
+                raise serializers.ValidationError({
+                    "planned_start_date": f"Task dates must fall within the sprint range ({sprint.start_date} to {sprint.end_date})."
+                })
+
+        estimated_hours = attrs.get('estimated_hours')
+        if estimated_hours is not None:
+            try:
+                hours_val = float(estimated_hours)
+                if hours_val < 0:
+                    raise serializers.ValidationError({"estimated_hours": "Estimated hours cannot be negative."})
+                if start_date and end_date and hours_val > 0:
+                    import datetime
+                    from math import ceil
+                    working_days = 0
+                    curr = start_date
+                    while curr <= end_date:
+                        if curr.weekday() < 5:
+                            working_days += 1
+                        curr += datetime.timedelta(days=1)
+                    min_days = ceil(hours_val / 8.0)
+                    if working_days < min_days:
+                        raise serializers.ValidationError({
+                            "planned_end_date": f"Estimated hours ({estimated_hours}h) require at least {min_days} working day(s). Selected range has only {working_days} working day(s)."
+                        })
+            except (ValueError, TypeError) as e:
+                if isinstance(e, serializers.ValidationError):
+                    raise e
+                raise serializers.ValidationError({"estimated_hours": "Estimated hours must be a valid number."})
+
         description = attrs.get('description')
         if not description or not description.strip():
             raise serializers.ValidationError({"description": "Description is required."})
