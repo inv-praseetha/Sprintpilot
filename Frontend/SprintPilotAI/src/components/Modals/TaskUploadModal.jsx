@@ -251,6 +251,7 @@ export default function TaskUploadModal({
         const descIndex = headers.indexOf('description');
         const catIndex = headers.indexOf('category');
         const jiraIndex = headers.findIndex(h => h.includes('jira'));
+        const estHoursIndex = headers.findIndex(h => h.includes('estimatedhours') || h.includes('estimatehours') || h.includes('esthours') || h.includes('hours'));
 
         if (titleIndex === -1 || descIndex === -1 || catIndex === -1) {
           setErrorMsg('Invalid format. Missing required columns (Task Title, Description, Category).');
@@ -348,16 +349,26 @@ export default function TaskUploadModal({
           const descVal = row[descIndex] !== undefined ? row[descIndex] : '';
           const catVal = row[catIndex] !== undefined ? row[catIndex] : '';
           const jiraVal = jiraIndex !== -1 && row[jiraIndex] !== undefined ? row[jiraIndex] : '';
+          const estHoursVal = estHoursIndex !== -1 && row[estHoursIndex] !== undefined ? row[estHoursIndex] : '';
 
           const cat = catVal.toString().toUpperCase().trim();
           const validCats = ['UI', 'BACKEND', 'INFRA', 'QA'];
+
+          let parsedEstHours = null;
+          if (estHoursVal !== undefined && estHoursVal !== null && estHoursVal !== '') {
+            const num = parseFloat(estHoursVal);
+            if (!isNaN(num)) {
+              parsedEstHours = num;
+            }
+          }
 
           parsedRows.push({
             title: titleVal.toString().trim(),
             desc: (descVal || 'No description provided.').toString().trim(),
             category: validCats.includes(cat) ? cat : 'UI',
             status: 'OPEN',
-            jiraId: jiraVal.toString().trim()
+            jiraId: jiraVal.toString().trim(),
+            estimated_hours: parsedEstHours
           });
         }
 
@@ -402,6 +413,23 @@ export default function TaskUploadModal({
     if (selectedTasks.length === 0) {
       setErrorMsg('No tasks selected to import.');
       return;
+    }
+
+    for (const t of selectedTasks) {
+      if (!t.title || !t.title.trim()) {
+        setErrorMsg('All selected tasks must have a title.');
+        return;
+      }
+      if (!t.category || !t.category.trim()) {
+        setErrorMsg(`Task "${t.title}" must have a category.`);
+        return;
+      }
+      if (t.estimated_hours !== undefined && t.estimated_hours !== null) {
+        if (parseFloat(t.estimated_hours) < 0) {
+          setErrorMsg(`Task "${t.title}" cannot have negative estimated hours.`);
+          return;
+        }
+      }
     }
 
     const targetProjectKey = parsedProjectInfo.matchedKey || activeProject;
@@ -850,6 +878,7 @@ export default function TaskUploadModal({
                           <th className="py-2.5 px-3">Title</th>
                           <th className="py-2.5 px-3">Description</th>
                           <th className="py-2.5 px-3">Category</th>
+                          <th className="py-2.5 px-3">Hours</th>
                           <th className="py-2.5 px-3">Jira ID</th>
                         </tr>
                       </thead>
@@ -868,6 +897,7 @@ export default function TaskUploadModal({
                                 );
                               }) : null}
                             </td>
+                            <td className="py-2 px-3 text-slate-400 font-semibold">{row.estimated_hours !== null && row.estimated_hours !== undefined ? `${row.estimated_hours}h` : 'N/A'}</td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || 'N/A'}</td>
                           </tr>
                         ))}
@@ -890,6 +920,7 @@ export default function TaskUploadModal({
                           <th className="py-2.5 px-3">Title</th>
                           <th className="py-2.5 px-3">Description</th>
                           <th className="py-2.5 px-3">Category</th>
+                          <th className="py-2.5 px-3">Hours</th>
                           <th className="py-2.5 px-3">Jira ID</th>
                         </tr>
                       </thead>
@@ -939,6 +970,7 @@ export default function TaskUploadModal({
                                 })}
                               </div>
                             </td>
+                            <td className="py-2 px-3 text-slate-400 font-semibold">{row.estimated_hours !== null && row.estimated_hours !== undefined ? `${row.estimated_hours}h` : 'N/A'}</td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || row.initialJiraId || 'N/A'}</td>
                           </tr>
                         ))}
