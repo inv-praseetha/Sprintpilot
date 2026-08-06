@@ -256,11 +256,42 @@ export default function ProjectCreation() {
     setFormError(null);
     setSubmitting(true);
 
+    if (!projectId || !projectId.trim()) {
+      setFormError("Project ID is required.");
+      setSubmitting(false);
+      return;
+    }
+    if (!/^[A-Z0-9\-]+$/.test(projectId.trim())) {
+      setFormError("Project ID must be alphanumeric and uppercase (hyphens allowed).");
+      setSubmitting(false);
+      return;
+    }
+
+    if (jiraId && jiraId.trim()) {
+      if (jiraId.trim().length > 10) {
+        setFormError("Jira ID cannot exceed 10 characters.");
+        setSubmitting(false);
+        return;
+      }
+      if (!/^[A-Z][A-Z0-9]+$/.test(jiraId.trim())) {
+        setFormError("Jira ID must start with an uppercase letter and be uppercase alphanumeric.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
     if (!name.trim()) {
       setFormError("Project Name is required.");
       setSubmitting(false);
       return;
     }
+
+    if (description && description.trim().length === 0) {
+      setFormError("Description cannot be purely whitespace.");
+      setSubmitting(false);
+      return;
+    }
+
     if (!teamLead) {
       setFormError("A Team Lead must be assigned.");
       setSubmitting(false);
