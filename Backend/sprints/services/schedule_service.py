@@ -172,16 +172,13 @@ def import_schedule(sprint, payload):
                 if has_est:
                     val = item.get('estimated_hours') or item.get('estimatedHours')
                     task.estimated_hours = val if val is not None else (wd * 8)
-                elif has_start or has_end or task.estimated_hours is None:
+                elif task.estimated_hours is None:
                     task.estimated_hours = wd * 8
                     
                 if has_sp:
                     val = item.get('story_points') or item.get('storyPoints')
                     task.story_points = val if val is not None else (wd * 2)
-                elif has_start or has_end or task.story_points is None:
+                elif task.story_points is None:
                     task.story_points = wd * 2
-            else:
-                task.story_points = None
-                task.estimated_hours = None
                 
             task.save()
