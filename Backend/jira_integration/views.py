@@ -1,5 +1,6 @@
 import os
 import requests
+import django.core.exceptions
 from django.shortcuts import redirect
 from rest_framework import status
 from rest_framework.views import APIView
@@ -145,6 +146,7 @@ class JiraFetchTasksView(APIView):
             return Response({"detail": "Jira Project Key is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not sprint_name:
             return Response({"detail": "Jira Sprint Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
         # Retrieve token from DB
         token_obj = JiraOAuthToken.objects.first()
         if not token_obj:
@@ -172,8 +174,9 @@ class JiraFetchTasksView(APIView):
         
         try:
             res = requests.post(search_url, json=payload, headers=headers)
+            is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
             
-            if res.status_code == 401:
+            if is_unauthorized:
                 JiraOAuthToken.objects.all().delete()
                 return Response(
                     {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
@@ -191,16 +194,20 @@ class JiraFetchTasksView(APIView):
             if not issues:
                 return Response({"tasks": [], "message": "No tasks found in Jira matching the specified Project Key and Sprint Name."}, status=status.HTTP_200_OK)
                 
-            # Filter out tasks that already exist in the database (by jira_id)
             from sprints.models import SprintTask
             fetched_jira_ids = [issue.get("key") for issue in issues if issue.get("key")]
-            existing_jira_ids = set(SprintTask.objects.filter(jira_id__in=fetched_jira_ids, is_deleted=False).values_list('jira_id', flat=True))
+            
+            # Check if any of these tasks already exist in the system for this project
+            existing_tasks_count = SprintTask.objects.filter(jira_id__in=fetched_jira_ids, is_deleted=False).count()
+            if existing_tasks_count > 0:
+                return Response({
+                    "detail": f"This Jira sprint (or its tasks) has already been imported. To fetch newly created tasks, please use the 'Fetch from Jira' button inside the Sprint Details page.",
+                    "auth_required": False
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             tasks = []
             for issue in issues:
                 jira_id = issue.get("key")
-                if jira_id in existing_jira_ids:
-                    continue # Skip tasks that are already imported
                     
                 fields = issue.get("fields", {})
                 issue_type = fields.get("issuetype", {}).get("name", "").upper()
@@ -228,10 +235,206 @@ class JiraFetchTasksView(APIView):
                     "jiraId": jira_id
                 })
             
-            if not tasks and issues:
-                return Response({"tasks": [], "message": "All fetched tasks have already been imported to SprintPilot previously!"}, status=status.HTTP_200_OK)
-                
             return Response({"tasks": tasks}, status=status.HTTP_200_OK)
             
         except requests.exceptions.RequestException as e:
             return Response({"detail": f"Network error connecting to Jira: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
+
+class JiraSprintSyncView(APIView):
+    """
+    Syncs an existing Sprint in SprintPilot with Jira, importing any new tasks.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        from sprints.models import Sprint, SprintTask
+        
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        token_obj = JiraOAuthToken.objects.first()
+        if not token_obj:
+            return Response(
+                {"detail": "Jira account is not connected. Please connect Jira first.", "auth_required": True},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+            
+        project_key = sprint.project.jira_id or sprint.project.project_id
+        override_name = request.data.get('sprint_name')
+        sprint_name = override_name or sprint.backlog_version_id or sprint.milestone
+        
+        # Ensure we don't use purely numeric sprint names as defaults if they were accidentally saved
+        if sprint.backlog_version_id and sprint.backlog_version_id.isdigit() and not override_name:
+            sprint_name = sprint.milestone
+
+        
+        search_url = f"https://api.atlassian.com/ex/jira/{token_obj.cloud_id}/rest/api/3/search/jql"
+        headers = {
+            "Authorization": f"Bearer {token_obj.access_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        jql = f'project="{project_key}" AND sprint="{sprint_name}" ORDER BY created DESC'
+        payload = {
+            "jql": jql,
+            "maxResults": 100,
+            "fields": ["summary", "description", "issuetype"]
+        }
+        
+        try:
+            res = requests.post(search_url, json=payload, headers=headers)
+            is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
+            
+            if is_unauthorized:
+                JiraOAuthToken.objects.all().delete()
+                return Response(
+                    {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            if res.status_code != 200:
+                return Response({"detail": f"Failed to fetch from Jira: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
+
+                
+            data = res.json()
+            issues = data.get("issues", [])
+            
+            # Fallback for older sprints where backlog_version_id wasn't saved 
+            # and milestone name might be prefixed with project key
+            if not issues and not sprint.backlog_version_id:
+                clean_name = sprint.milestone.replace(f"{project_key} ", "").strip()
+                if clean_name != sprint.milestone:
+                    fallback_jql = f'project="{project_key}" AND sprint="{clean_name}" ORDER BY created DESC'
+                    payload["jql"] = fallback_jql
+                    fallback_res = requests.post(search_url, json=payload, headers=headers)
+                    if fallback_res.status_code == 200:
+                        issues = fallback_res.json().get("issues", [])
+
+            # Ultimate Fallback 1: Auto-detect tasks from ANY currently active open sprint for this project
+            if not issues and not sprint.backlog_version_id:
+                fallback_jql = f'project="{project_key}" AND sprint in openSprints() ORDER BY created DESC'
+                payload["jql"] = fallback_jql
+                fallback_res = requests.post(search_url, json=payload, headers=headers)
+                if fallback_res.status_code == 200:
+                    issues = fallback_res.json().get("issues", [])
+
+            # Save the successful sprint name if an override was provided
+            if issues and override_name and override_name != sprint.backlog_version_id:
+                sprint.backlog_version_id = override_name
+                sprint.save(update_fields=['backlog_version_id'])
+
+            if not issues:
+                return Response({"detail": "No tasks found in Jira for this sprint."}, status=status.HTTP_200_OK)
+                
+            fetched_jira_ids = [issue.get("key") for issue in issues if issue.get("key")]
+            existing_jira_ids = set(SprintTask.objects.filter(sprint=sprint, jira_id__in=fetched_jira_ids, is_deleted=False).values_list('jira_id', flat=True))
+            
+            new_tasks = []
+            for issue in issues:
+                jira_id = issue.get("key")
+                if jira_id in existing_jira_ids:
+                    continue
+                    
+                fields = issue.get("fields", {})
+                issue_type = fields.get("issuetype", {}).get("name", "").upper()
+                desc = fields.get("description")
+                if not desc:
+                    desc = "No description provided."
+                elif isinstance(desc, dict):
+                    extracted = extract_text_from_adf(desc)
+                    desc = extracted if extracted else "No description provided."
+                    
+                category = "UI"
+                if "BACKEND" in issue_type or "SERVER" in issue_type:
+                    category = "BACKEND"
+                elif "BUG" in issue_type or "QA" in issue_type:
+                    category = "QA"
+                elif "INFRA" in issue_type or "OPS" in issue_type or "TASK" in issue_type:
+                    category = "INFRA"
+                    
+                new_tasks.append({
+                    "title": fields.get("summary", "Untitled Task"),
+                    "description": str(desc),
+                    "category": category,
+                    "jiraId": jira_id
+                })
+                
+            if len(new_tasks) > 0:
+                return Response({"tasks": new_tasks, "detail": f"Found {len(new_tasks)} new tasks in Jira.", "sprint_name": sprint.backlog_version_id or sprint.milestone}, status=status.HTTP_200_OK)
+            else:
+                return Response({"tasks": [], "detail": "Sprint is already up to date with Jira. No new tasks found.", "sprint_name": sprint.backlog_version_id or sprint.milestone}, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            return Response({"detail": f"An error occurred during Jira sync: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class JiraSprintAppendView(APIView):
+    """
+    Appends newly selected Jira tasks to an existing Sprint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        from sprints.models import Sprint, SprintTask
+        from accounts.models import EmployeeProfile
+        
+        try:
+            sprint = Sprint.objects.get(id=sprint_id)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        sprint_name_override = request.data.get("sprint_name")
+        if sprint_name_override and sprint.backlog_version_id != sprint_name_override:
+            sprint.backlog_version_id = sprint_name_override
+            sprint.save(update_fields=['backlog_version_id'])
+            
+        tasks_data = request.data.get("tasks", [])
+        if not tasks_data:
+            return Response({"detail": "No tasks provided to append."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        new_tasks_created = 0
+        for task_item in tasks_data:
+            assignee_id = task_item.get("assignee")
+            assignee_profile = None
+            if assignee_id:
+                try:
+                    assignee_profile = EmployeeProfile.objects.get(id=assignee_id)
+                except EmployeeProfile.DoesNotExist:
+                    pass
+
+            start_date_str = task_item.get("startDate") or None
+            end_date_str = task_item.get("endDate") or None
+            
+            story_points = None
+            estimated_hours = None
+            if start_date_str and end_date_str:
+                from sprints.services.schedule_service import calculate_working_days
+                holidays = list(sprint.holidays.values_list('date', flat=True))
+                wd = calculate_working_days(start_date_str, end_date_str, holidays=holidays)
+                story_points = wd * 2
+                estimated_hours = wd * 8
+
+            cat_val = task_item.get("category", "UI")
+            if isinstance(cat_val, list):
+                cat_val = ", ".join(cat_val)
+
+            try:
+                SprintTask.objects.create(
+                    sprint=sprint,
+                    assigned_employee=assignee_profile,
+                    title=task_item.get("title", "Untitled Task"),
+                    description=task_item.get("description", "No description provided."),
+                    category=cat_val,
+                    status=task_item.get("status", "OPEN").upper(),
+                    priority=task_item.get("priority", "NORMAL").upper(),
+                    jira_id=task_item.get("jiraId", ""),
+                    planned_start_date=start_date_str,
+                    planned_end_date=end_date_str,
+                    story_points=story_points,
+                    estimated_hours=estimated_hours
+                )
+                new_tasks_created += 1
+            except django.core.exceptions.ValidationError as e:
+                return Response({"detail": f"Validation Error on task '{task_item.get('title')}': {str(e.message_dict if hasattr(e, 'message_dict') else e.messages)}"}, status=status.HTTP_400_BAD_REQUEST)
+                
+        return Response({"detail": f"Successfully appended {new_tasks_created} tasks to the sprint!"}, status=status.HTTP_200_OK)

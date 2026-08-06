@@ -4,6 +4,7 @@ import { useTheme } from '../../components/layout/MainLayouut';
 import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
 import AddTaskModal from '../../components/Modals/AddTaskModal';
+import JiraSyncModal from '../../components/Modals/JiraSyncModal';
 import SprintTasksTable from '../../components/Sprint/SprintTasksTable';
 import SprintNotesSection from '../../components/Sprint/SprintNotesSection';
 
@@ -21,7 +22,8 @@ import {
   ChevronDown,
   Download,
   Plus,
-  Trash2
+  Trash2,
+  Database
 } from 'lucide-react';
 
 
@@ -100,6 +102,8 @@ export default function SprintDetail() {
   const [editSource, setEditSource] = useState(null); // 'ai' or 'manual'
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingJira, setIsSyncingJira] = useState(false);
+  const [showJiraSyncModal, setShowJiraSyncModal] = useState(false);
   const [loadingText, setLoadingText] = useState('');
   const [showSyncConfirm, setShowSyncConfirm] = useState(false);
 
@@ -445,6 +449,10 @@ export default function SprintDetail() {
     }
   };
 
+  const handleSyncJira = () => {
+    setShowJiraSyncModal(true);
+  };
+
   const handleDownloadSchedule = async () => {
     if (!sprint) return;
     try {
@@ -736,8 +744,24 @@ export default function SprintDetail() {
                         Download
                       </button>
                       <button
+                        onClick={handleSyncJira}
+                        disabled={isSyncingJira || isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED'}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
+                            ? 'border-blue-900/40 hover:bg-blue-900/20 text-blue-400'
+                            : 'border-blue-200 hover:bg-blue-50 text-blue-600'
+                          }`}
+                        title="Fetch newly created tasks from Jira"
+                      >
+                        {isSyncingJira ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Database className="w-3.5 h-3.5" />
+                        )}
+                        Fetch from Jira
+                      </button>
+                      <button
                         onClick={handleSyncClick}
-                        disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || !isSyncNeeded}
+                        disabled={isSyncing || isSyncingJira || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || !isSyncNeeded}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                             ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
                             : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -748,7 +772,7 @@ export default function SprintDetail() {
                         ) : (
                           <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
                         )}
-                        Sync
+                        Sync to Backlog
                       </button>
                       <button
                         onClick={() => setIsAddTaskModalOpen(true)}
@@ -851,6 +875,15 @@ export default function SprintDetail() {
           employees={employees}
           darkMode={darkMode}
           onTaskCreated={refreshSprint}
+        />
+
+        <JiraSyncModal
+          isOpen={showJiraSyncModal}
+          onClose={() => setShowJiraSyncModal(false)}
+          darkMode={darkMode}
+          sprint={sprint}
+          onSyncSuccess={refreshSprint}
+          employees={employees}
         />
       </div>
 

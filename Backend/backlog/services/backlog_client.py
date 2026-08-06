@@ -191,8 +191,7 @@ class BacklogService:
             "startDate": task.planned_start_date.isoformat() if task.planned_start_date else None,
             "dueDate": task.planned_end_date.isoformat() if task.planned_end_date else None,
             "estimatedHours": float(task.estimated_hours) if task.estimated_hours else None,
-            "priorityId": priority_id,
-            "statusId": status_map.get(task_status, 1)
+            "priorityId": priority_id
         }
 
         # Add milestone if sprint is available
@@ -211,9 +210,14 @@ class BacklogService:
 
         # Map Category
         if task.category:
-            category_id = self._get_or_create_category(task.category)
-            if category_id:
-                payload["categoryId[]"] = category_id
+            cat_list = [c.strip() for c in task.category.split(',')]
+            category_ids = []
+            for cat_name in cat_list:
+                cat_id = self._get_or_create_category(cat_name)
+                if cat_id:
+                    category_ids.append(cat_id)
+            if category_ids:
+                payload["categoryId[]"] = category_ids
         
         # Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
@@ -225,7 +229,20 @@ class BacklogService:
             response = requests.post(url, params=params, data=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
-            return data.get("issueKey")
+            issue_key = data.get("issueKey")
+            
+            # Since Backlog does not allow setting statusId on creation,
+            # we must patch it immediately after creation if the status is not OPEN.
+            target_status = status_map.get(task_status, 1)
+            if issue_key and target_status != 1:
+                patch_url = f"{self.workspace_url}/api/v2/issues/{issue_key}"
+                patch_payload = {"statusId": target_status}
+                try:
+                    requests.patch(patch_url, params=params, data=patch_payload, headers=headers)
+                except Exception as patch_e:
+                    logger.warning(f"Failed to set initial status for newly created task {issue_key}: {patch_e}")
+                    
+            return issue_key
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to sync task to Backlog: {e}")
             if e.response is not None:

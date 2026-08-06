@@ -153,7 +153,7 @@ export default function TaskUploadModal({
       });
       if (res.data.tasks && res.data.tasks.length > 0) {
         setExcelData(res.data.tasks.map(t => ({ ...t, selected: true, initialJiraId: t.jiraId || '' })));
-        setMilestoneName(`${jiraProjectKey.toUpperCase()} Sprint Import`);
+        setMilestoneName(jiraSprintName.trim());
         setParsedProjectInfo({ id: jiraProjectKey, name: 'Jira Project', matchedKey: activeProject });
       } else {
         setErrorMsg(res.data.message || 'No tasks found for this project key in Jira.');
@@ -413,7 +413,8 @@ export default function TaskUploadModal({
       holidays: excelHolidays,
       sprintStartDate,
       sprintEndDate: finalEndDate,
-      targetProjectKey
+      targetProjectKey,
+      jiraSprintName: importMode === 'JIRA' ? jiraSprintName.trim() : null
     });
 
     closeModal();
@@ -857,10 +858,15 @@ export default function TaskUploadModal({
                           <tr key={idx} className={darkMode ? 'bg-slate-900/40 text-slate-300' : 'bg-white text-slate-700'}>
                             <td className="py-2 px-3 font-semibold truncate max-w-[150px]">{row.title}</td>
                             <td className="py-2 px-3 text-slate-500 truncate max-w-[180px]" title={row.desc}>{row.desc}</td>
-                            <td className="py-2 px-3">
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${categoryConfig[row.category]?.bg || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                {row.category}
-                              </span>
+                            <td className="py-2 px-3 flex flex-wrap gap-1">
+                              {row.category ? row.category.split(',').map((cat) => {
+                                const cleanCat = cat.trim();
+                                return (
+                                  <span key={cleanCat} className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${categoryConfig[cleanCat]?.bg || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                    {cleanCat}
+                                  </span>
+                                );
+                              }) : null}
                             </td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || 'N/A'}</td>
                           </tr>
@@ -905,12 +911,16 @@ export default function TaskUploadModal({
                             <td className="py-2 px-3 font-semibold truncate max-w-[150px]" title={row.title}>{row.title}</td>
                             <td className="py-2 px-3 text-slate-500 truncate max-w-[180px]" title={row.desc}>{row.desc}</td>
                             <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="relative group/select w-max">
+                              <div className="relative w-max">
                                 <select
-                                  value={row.category}
-                                  onChange={(e) => handleTaskCategoryChange(idx, e.target.value)}
-                                  className={`appearance-none pl-1.5 pr-5 py-0.5 rounded text-[9px] font-bold border cursor-pointer outline-none transition-all shadow-sm hover:brightness-95 dark:hover:brightness-110 ${
-                                    categoryConfig[row.category]?.bg || 'bg-slate-100 text-slate-500 border-slate-200'
+                                  multiple
+                                  value={row.category ? row.category.split(', ') : []}
+                                  onChange={(e) => {
+                                      const vals = Array.from(e.target.selectedOptions, option => option.value).join(', ');
+                                      handleTaskCategoryChange(idx, vals);
+                                  }}
+                                  className={`appearance-none px-2 py-1 rounded text-[9px] font-bold border cursor-pointer outline-none transition-all shadow-sm hover:brightness-95 dark:hover:brightness-110 overflow-y-auto min-h-[50px] ${
+                                    darkMode ? 'border-slate-700 bg-slate-800 focus:border-blue-500 text-white' : 'border-slate-200 focus:border-blue-500 bg-white'
                                   }`}
                                 >
                                   <option value="UI" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">UI</option>
@@ -918,11 +928,6 @@ export default function TaskUploadModal({
                                   <option value="QA" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">QA</option>
                                   <option value="INFRA" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-semibold">INFRA</option>
                                 </select>
-                                <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-60">
-                                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </div>
                               </div>
                             </td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || row.initialJiraId || 'N/A'}</td>
