@@ -384,7 +384,10 @@ class JiraSprintAppendView(APIView):
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
             
         sprint_name_override = request.data.get("sprint_name")
-        if sprint_name_override and sprint.backlog_version_id != sprint_name_override:
+        if not sprint_name_override or not sprint_name_override.strip():
+            return Response({"detail": "Jira Sprint Name is required to import tasks."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if sprint.backlog_version_id != sprint_name_override:
             sprint.backlog_version_id = sprint_name_override
             sprint.save(update_fields=['backlog_version_id'])
             
