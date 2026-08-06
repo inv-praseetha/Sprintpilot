@@ -48,7 +48,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     )
     description = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=5000)
     team_lead = serializers.UUIDField(required=True)
-    number_of_days = serializers.IntegerField(required=False, allow_null=True, validators=[MinValueValidator(1), MaxValueValidator(3650)])
+    number_of_days = serializers.IntegerField(required=False, allow_null=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
     team_size = serializers.IntegerField(required=False, default=1, validators=[MinValueValidator(1)])
     members = serializers.ListField(
         child=serializers.UUIDField(), 
@@ -106,10 +106,17 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         if description:
             attrs["description"] = description.strip()
             
-        team_size = attrs.get("team_size", 1)
-        members = attrs.get("members", [])
-        if team_size < len(members):
-            raise ProjectValidationException(f"Team size ({team_size}) cannot be less than the number of provided members ({len(members)}).")
+        team_size = attrs.get("team_size", getattr(self.instance, "team_size", 1))
+        members = attrs.get("members", None)
+        
+        # Check against provided members if available, otherwise check existing members for updates
+        if members is not None:
+            if team_size < len(members):
+                raise ProjectValidationException(f"Team size ({team_size}) cannot be less than the number of provided members ({len(members)}).")
+        elif self.instance:
+            existing_count = self.instance.members.count()
+            if team_size < existing_count:
+                raise ProjectValidationException(f"Team size ({team_size}) cannot be less than the number of currently assigned members ({existing_count}).")
 
         # Validate Team Lead UUID directly via validator (which returns Model)
         team_lead_id = attrs.get("team_lead")

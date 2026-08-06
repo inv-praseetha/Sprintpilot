@@ -256,11 +256,42 @@ export default function ProjectCreation() {
     setFormError(null);
     setSubmitting(true);
 
+    if (!projectId || !projectId.trim()) {
+      setFormError("Project ID is required.");
+      setSubmitting(false);
+      return;
+    }
+    if (!/^[A-Z0-9\-]+$/.test(projectId.trim())) {
+      setFormError("Project ID must be alphanumeric and uppercase (hyphens allowed).");
+      setSubmitting(false);
+      return;
+    }
+
+    if (jiraId && jiraId.trim()) {
+      if (jiraId.trim().length > 10) {
+        setFormError("Jira ID cannot exceed 10 characters.");
+        setSubmitting(false);
+        return;
+      }
+      if (!/^[A-Z][A-Z0-9]+$/.test(jiraId.trim())) {
+        setFormError("Jira ID must start with an uppercase letter and be uppercase alphanumeric.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
     if (!name.trim()) {
       setFormError("Project Name is required.");
       setSubmitting(false);
       return;
     }
+
+    if (description && description.trim().length === 0) {
+      setFormError("Description cannot be purely whitespace.");
+      setSubmitting(false);
+      return;
+    }
+
     if (!teamLead) {
       setFormError("A Team Lead must be assigned.");
       setSubmitting(false);
@@ -472,10 +503,10 @@ export default function ProjectCreation() {
   };
 
   return (
-    <main className="p-8 lg:p-10 space-y-8 max-w-[1400px] mx-auto text-left">
+    <main className="p-8 lg:p-10 space-y-8 mx-auto text-left">
 
       {/* PAGE HEADER */}
-      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6">
+      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <span className="text-sm font-semibold text-orange-500 uppercase tracking-wider">Create Project</span>
           <h1 className="text-4xl font-black tracking-tight mt-1">
