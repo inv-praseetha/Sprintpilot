@@ -229,7 +229,6 @@ class SprintService:
                         jira_url = f"{clean_base}/browse/{task.jira_id}"
                         
                     # Use a very safe Excel formula. 
-                    # We append the URL to the title so the user sees both, separated by a space.
                     jira_url = jira_url.strip()
                     safe_title = task.title.replace('"', "''").replace('\n', ' ')
                     
@@ -238,7 +237,7 @@ class SprintService:
                     # Formula overhead: 16 chars + len(jira_url) + len(display_text)
                     max_display_len = 250 - 16 - len(jira_url)
                     
-                    display_text = f"{safe_title} ({jira_url})"
+                    display_text = f"{safe_title}"
                     if len(display_text) > max_display_len:
                         display_text = display_text[:max_display_len-3] + "..."
                         
