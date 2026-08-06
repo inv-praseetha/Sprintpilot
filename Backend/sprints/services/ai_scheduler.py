@@ -77,6 +77,23 @@ def get_schedule_suggestions(sprint, tasks, api_key):
     effective_end_str = effective_end_date.strftime("%Y-%m-%d")
     empty_period_start = (effective_end_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
+    # Generate list of valid working days (excluding weekends and holidays)
+    valid_working_days = []
+    if isinstance(sprint.start_date, str):
+        start_dt = datetime.datetime.strptime(sprint.start_date, "%Y-%m-%d").date()
+    else:
+        start_dt = sprint.start_date
+        
+    curr = start_dt
+    while curr <= effective_end_date:
+        if curr.weekday() < 5:  # Monday to Friday
+            curr_str = curr.strftime("%Y-%m-%d")
+            if curr_str not in holidays:
+                valid_working_days.append(curr_str)
+        curr += timedelta(days=1)
+        
+    valid_working_days_str = "\n".join([f"- {d}" for d in valid_working_days])
+
     prompt = f"""
 You are an expert Agile project manager and workload scheduling AI.
 Your task is to assign members and schedule tasks for the sprint: "{sprint.milestone}".
@@ -87,6 +104,9 @@ Sprint Details:
 - Valid Scheduling Period: {sprint.start_date} to {effective_end_str} (inclusive). Tasks MUST be completed by {effective_end_str} or earlier.
 - Sprint/Project Holidays (Non-working days): {holidays_str}
 
+Valid Working Days (in chronological order):
+{valid_working_days_str}
+
 Project Roster (Available Employees & Skills):
 {employees_data}
 
@@ -94,19 +114,46 @@ Sprint Task List:
 {tasks_data}
 
 Rules & Constraints:
-1. Every task must be assigned a `planned_start_date` and `planned_end_date` that fall strictly within the valid scheduling boundaries: {sprint.start_date} to {effective_end_str} (inclusive). Do NOT schedule any tasks on or after {empty_period_start} up to the sprint end date {sprint.end_date}; these last 2 days of the sprint must remain completely empty and unscheduled.
-   - Spread and stagger task start dates across the scheduling duration to utilize all pending days. Do NOT group all tasks to start on Day 1. However, ensure that the first task(s) scheduled for each assigned member starts on Day 1 ({sprint.start_date}) so they do not sit idle.
+1. Every task must be assigned a `planned_start_date` and `planned_end_date` chosen STRICTLY from the list of Valid Working Days. Under NO circumstances should a task be scheduled on any other date (such as a weekend, holiday, or day after {effective_end_str}).
+   - For each assigned employee, schedule their first task to start on the first available date in the Valid Working Days list so they do not sit idle.
 2. Planned start date must be less than or equal to planned end date.
-3. Weekend & Holiday Exclusion: Saturdays, Sundays, and the following sprint holidays are non-working days: [{holidays_str}]. Under NO circumstances should `planned_start_date` or `planned_end_date` be set to a Saturday, Sunday, or any of these holiday dates. If a task's duration spans across a weekend or a holiday, you must extend the `planned_end_date` forward to skip those non-working days.
-4. Working Days Calculation: Calculate `working_days` as the exact count of weekdays (Monday through Friday) between `planned_start_date` and `planned_end_date` (inclusive), excluding Saturdays, Sundays, and any of the holiday dates listed: [{holidays_str}].
+3. Weekend & Holiday Exclusion: You MUST NOT assign any task start/end dates on weekends or holidays. The list of Valid Working Days has already excluded weekends and holidays. Therefore, you are strictly prohibited from using any dates NOT listed under Valid Working Days.
+4. Working Days Calculation: Calculate `working_days` as the exact count of days from the Valid Working Days list between `planned_start_date` and `planned_end_date` (inclusive).
 5. Task Assignment: Every single task in the list MUST be assigned to an employee from the roster. Do not leave any task unassigned (do not return null for `assigned_employee_id`). Even if the roster is small or does not have exact skill matches, assign each task to the employee who is relatively the closest fit or has adjacent skills.
    - Multiple tasks CAN be assigned to the same employee.
-   - For any single employee, task execution timelines may overlap, but you must prevent workload overhead by scheduling no more than 2 to 3 tasks to run concurrently (overlapping) at any point in time. Stagger the start and end dates of the employee's assigned tasks across the scheduling duration (utilizing the later days of the scheduling window up to the deadline {effective_end_str}) to achieve this balance. Do not accumulate too many parallel tasks on the same days.
-6. Timeline Estimations & Difficulty: You must carefully analyze the task's title, description, and complexity (difficulty) alongside the assigned employee's designation, experience level, and skills.
-   - If a task has high difficulty/complexity, allocate more working days (e.g., 5-7 working days) by spacing out start and end dates to give them ample time to do the task.
-   - If a task has standard difficulty or is highly routine, schedule shorter start and end dates (e.g., 1-3 working days).
-   - If an employee has lower experience/skills relative to the task, adjust and increase the working days duration accordingly.
-   - Adjust the task's planned start and end dates within the valid scheduling boundaries (up to {effective_end_str}) to match this estimated duration.
+6. Capacity-Based Sequential Scheduling & Overlaps Algorithm:
+   - Day allocation must be done strictly based on `estimated_hours` (8 hours = 1 day). Do NOT estimate the duration based on title, description, or difficulty.
+   - If a task's `estimated_hours` is missing or null, default to 8.0 hours (1.0 working day).
+   - An employee's maximum capacity is exactly 8.0 working hours per day.
+   - For each employee, you MUST schedule their assigned tasks sequentially using the following exact date/capacity simulation:
+     a. Order the employee's assigned tasks (e.g. by priority or logical dependency).
+     b. Start at the first date in the Valid Working Days list. Set the leftover capacity for this date to 8.0 hours.
+     c. For each task in sequence:
+        - Let the task's required hours be H.
+        - The task will start on the current date.
+        - Whenever you advance the current date to the next date in the Valid Working Days list, you MUST immediately reset the leftover capacity for that new date to 8.0 hours.
+        - If H <= leftover capacity of the current date:
+          - Set task's planned_start_date = current date, and planned_end_date = current date.
+          - Subtract H from the current date's leftover capacity: leftover = leftover - H.
+          - If leftover == 0, advance current date to the next date in the Valid Working Days list, and reset leftover capacity to 8.0 hours.
+        - If H > leftover capacity of the current date:
+          - Set task's planned_start_date = current date.
+          - The task consumes all of the leftover capacity of the current date.
+          - Subtract the consumed capacity from H: H = H - leftover.
+          - While H > 0:
+            - Advance current date to the next date in the Valid Working Days list (which resets the leftover capacity for this new date to 8.0 hours).
+            - If H <= 8.0:
+              - Set the task's planned_end_date = current date.
+              - The task consumes H hours of the current date.
+              - Set the leftover capacity of the current date to: leftover = 8.0 - H.
+              - If leftover == 0, advance current date to the next date in the Valid Working Days list, and reset leftover capacity to 8.0 hours.
+              - Set H = 0 (loop terminates).
+            - If H > 8.0:
+              - The task consumes 8.0 hours of the current date.
+              - H = H - 8.0.
+     d. Transition/Overlap Days: If a task ends on a date with leftover capacity > 0, the next task in the sequence MUST start on that exact same date to consume the remaining capacity (resulting in an overlap where Task A's planned_end_date matches Task B's planned_start_date).
+     e. Strict Daily Cap: For any single employee and any given date, the sum of hours allocated to all tasks scheduled on that day MUST NOT exceed 8.0 hours under any circumstances. If a task requires 8 hours, and the employee only has 4 hours capacity left on a day, you MUST start the task on that day (using the 4 hours) and end it on the next working day in the Valid Working Days list (using the remaining 4 hours).
+   - In the `reason` field of the response, write down a detailed step-by-step trace of how the hours for that specific task were allocated across the dates and what leftover capacity remained on the final date (e.g. "Task starts Aug 10, consumes 8h. Continues Aug 11, consumes 4h. Ends Aug 11 with 4h leftover capacity"). The planned_end_date field in the JSON MUST match the final date of this allocation trace exactly.
 7. Return a list of recommendations, one for each task.
 
 Return the response in the specified schema format.

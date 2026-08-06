@@ -382,6 +382,32 @@ class SprintAPITests(APITestCase):
         self.assertEqual(self.task.assigned_employee, self.profile)
         self.assertEqual(self.task.story_points, 10) # 5 working days * 2 SP/day
 
+    def test_import_schedule_preserves_custom_hours(self):
+        # Set predefined custom hours and story points
+        self.task.estimated_hours = 12.0
+        self.task.story_points = 3.0
+        self.task.save()
+
+        url = reverse('sprint_import_schedule', kwargs={'sprint_id': self.sprint.id})
+        start_date = self.sprint.start_date
+        while start_date.weekday() != 0:  # Find next Monday
+            start_date += datetime.timedelta(days=1)
+        end_date = start_date + datetime.timedelta(days=4)  # Friday (5 working days)
+        data = [
+            {
+                "task_id": str(self.task.id),
+                "assigned_employee_id": str(self.profile.id),
+                "planned_start_date": str(start_date),
+                "planned_end_date": str(end_date)
+            }
+        ]
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.task.refresh_from_db()
+        # Verify custom estimated_hours and story_points are preserved (not overwritten by 5 working days default)
+        self.assertEqual(self.task.estimated_hours, 12.0)
+        self.assertEqual(self.task.story_points, 3.0)
+
     def test_import_schedule_completed_project_blocked(self):
         self.active_project.status = "COMPLETED"
         self.active_project.save()

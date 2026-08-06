@@ -640,7 +640,8 @@ class SprintService:
                 from sprints.services.schedule_service import calculate_working_days
                 holidays = list(task.sprint.holidays.values_list('date', flat=True)) if task.sprint else None
                 wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)
-                task.estimated_hours = wd * 8
+                if task.estimated_hours is None:
+                    task.estimated_hours = wd * 8
             
         if sp_changed:
             task.story_points = data.get('story_points') if 'story_points' in data else data.get('storyPoints')
@@ -649,7 +650,8 @@ class SprintService:
                 from sprints.services.schedule_service import calculate_working_days
                 holidays = list(task.sprint.holidays.values_list('date', flat=True)) if task.sprint else None
                 wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)
-                task.story_points = wd * 2
+                if task.story_points is None:
+                    task.story_points = wd * 2
             
         if 'title' in data:
             task.title = data.get('title')
