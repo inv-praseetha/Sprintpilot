@@ -26,8 +26,7 @@ class EmployeeProfileSerializerTests(APITestCase):
         # Create a skill
         self.skill = Skill.objects.create(
             name="Python",
-            category="BACKEND",
-            description="Python Programming"
+            category="BACKEND"
         )
         
         # Link skill to profile
