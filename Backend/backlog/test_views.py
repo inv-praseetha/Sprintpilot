@@ -39,16 +39,25 @@ class SprintSyncBacklogViewTests(APITestCase):
             employee_profile=self.profile
         )
         
+        # Calculate a safe base date (next Monday)
+        base_date = timezone.now().date()
+        if base_date.weekday() >= 5:
+            base_date += timedelta(days=(7 - base_date.weekday()))
+
         # Create sprint
         self.sprint = Sprint.objects.create(
             project=self.project,
             milestone="Sprint 1",
-            start_date=timezone.now().date(),
-            end_date=timezone.now().date() + timedelta(days=14),
+            start_date=base_date,
+            end_date=base_date + timedelta(days=14),
             status=Sprint.Status.ACTIVE
         )
         
         # Create task
+        task_end_date = base_date + timedelta(days=2)
+        if task_end_date.weekday() >= 5:
+            task_end_date -= timedelta(days=2)
+            
         self.task1 = SprintTask.objects.create(
             sprint=self.sprint,
             title="Task 1",
@@ -56,8 +65,8 @@ class SprintSyncBacklogViewTests(APITestCase):
             category=SprintTask.Category.UI,
             status=SprintTask.Status.OPEN,
             assigned_employee=self.profile,
-            planned_start_date=timezone.now().date(),
-            planned_end_date=timezone.now().date() + timedelta(days=2)
+            planned_start_date=base_date,
+            planned_end_date=task_end_date
         )
         
         # Helper to generate URL
