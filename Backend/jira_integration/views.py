@@ -211,7 +211,6 @@ class JiraFetchTasksView(APIView):
         try:
             res = requests.post(search_url, json=payload, headers=headers)
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
-            i
             if is_unauthorized:
                 JiraOAuthToken.objects.filter(user=request.user).delete()
                 return Response(
