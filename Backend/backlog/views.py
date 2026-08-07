@@ -109,6 +109,9 @@ class SprintSyncBacklogView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY
             )
             
+        sprint.synced_at = timezone.now()
+        sprint.save(update_fields=['synced_at'])
+            
         return Response(
             {"detail": message, "synced_count": total_success, "errors": errors}, 
             status=status.HTTP_200_OK
