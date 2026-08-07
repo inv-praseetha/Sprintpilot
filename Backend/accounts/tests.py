@@ -185,6 +185,91 @@ class GoogleAuthTests(APITestCase):
         self.assertEqual(response.data["error"], "expired_google_token")
         self.assertEqual(response.data["detail"], "The Google ID token has expired.")
 
+    @override_settings(GOOGLE_CLIENT_ID=None)
+    def test_missing_google_client_id(self):
+        """
+        If GOOGLE_CLIENT_ID is not configured, it should raise InvalidGoogleTokenException.
+        """
+        response = self.client.post(self.url, {"token": "valid_token_string"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["error"], "invalid_google_token")
+
+    @patch("accounts.services.id_token.verify_oauth2_token")
+    def test_invalid_issuer_rejected(self, mock_verify):
+        """
+        If the issuer is not accounts.google.com or https://accounts.google.com, reject.
+        """
+        mock_verify.return_value = {
+            "sub": "new_google_sub",
+            "email": "authorized@example.com",
+            "email_verified": True,
+            "iss": "invalid.issuer.com"
+        }
+        response = self.client.post(self.url, {"token": "valid_token_string"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "Invalid token issuer.")
+
+    @patch("accounts.services.id_token.verify_oauth2_token")
+    def test_unverified_email_rejected(self, mock_verify):
+        """
+        If email_verified is False, reject.
+        """
+        mock_verify.return_value = {
+            "sub": "new_google_sub",
+            "email": "authorized@example.com",
+            "email_verified": False,
+            "iss": "accounts.google.com"
+        }
+        response = self.client.post(self.url, {"token": "valid_token_string"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "Google email address is not verified.")
+
+    @patch("accounts.services.id_token.verify_oauth2_token")
+    def test_unexpected_exception_in_verify(self, mock_verify):
+        """
+        Any unexpected exception should be caught and raise InvalidGoogleTokenException.
+        """
+        mock_verify.side_effect = Exception("Some weird error")
+        response = self.client.post(self.url, {"token": "valid_token_string"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "Invalid Google ID token.")
+
+    @patch("accounts.services.id_token.verify_oauth2_token")
+    def test_missing_email_in_payload(self, mock_verify):
+        """
+        If the payload doesn't contain an email, reject.
+        """
+        mock_verify.return_value = {
+            "sub": "new_google_sub",
+            "email_verified": True,
+            "iss": "accounts.google.com"
+        }
+        response = self.client.post(self.url, {"token": "valid_token_string"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "Email missing from Google token payload.")
+
+    @patch("accounts.services.id_token.verify_oauth2_token")
+    def test_unauthorized_role_rejected(self, mock_verify):
+        """
+        If employee role is not PROJECT_MANAGER or TEAM_LEAD, reject.
+        """
+        # Create developer employee
+        Employee.objects.create(
+            email="developer@example.com",
+            full_name="Dev",
+            role="DEVELOPER",
+            is_active=True
+        )
+        mock_verify.return_value = {
+            "sub": "new_google_sub",
+            "email": "developer@example.com",
+            "email_verified": True,
+            "iss": "accounts.google.com"
+        }
+        response = self.client.post(self.url, {"token": "valid_token_string"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"], "Only Project Managers and Team Leads are authorized to log in.")
+
     def test_missing_token_payload(self):
         """
         If the token field is missing, return HTTP 400 validation error.

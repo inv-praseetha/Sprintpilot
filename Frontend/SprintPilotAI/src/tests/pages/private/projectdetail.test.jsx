@@ -2,16 +2,16 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ProjectDetail from './projectdetail';
-import { AuthContext } from '../../context/AuthContext';
-import apiClient from '../../api/apiClient';
+import ProjectDetail from '../../../pages/private/projectdetail';
+import { AuthContext } from '../../../context/AuthContext';
+import apiClient from '../../../api/apiClient';
 
 // Mock dependencies
-vi.mock('../../components/layout/MainLayouut', () => ({
+vi.mock('../../../components/layout/MainLayouut', () => ({
   useTheme: () => ({ darkMode: false })
 }));
 
-vi.mock('../../api/apiClient', () => ({
+vi.mock('../../../api/apiClient', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -20,14 +20,22 @@ vi.mock('../../api/apiClient', () => ({
   }
 }));
 
-vi.mock('../../services/SprintServices', () => ({
+vi.mock('../../../services/SprintServices', () => ({
   default: {
     getProjectSprints: vi.fn().mockResolvedValue([])
   }
 }));
 
-vi.mock('../../context/AuthContext', () => ({
+vi.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u1', role: 'PROJECT_MANAGER', full_name: 'Test Manager' }, logout: vi.fn() })
+}));
+
+vi.mock('../../../context/ToastContext', () => ({
+  useToast: () => ({ error: vi.fn(), success: vi.fn() })
+}));
+
+vi.mock('../../../context/ConfirmContext', () => ({
+  useConfirm: () => vi.fn()
 }));
 
 vi.mock('react-router-dom', async () => {

@@ -32,6 +32,14 @@ def extract_text_from_adf(node):
                 
     return text.strip()
 
+def check_project_access(user, project):
+    """
+    Checks if the given user is the creator, team lead, or a member of the project.
+    """
+    if project.created_by == user or project.team_lead == user:
+        return True
+    return project.members.filter(employee_profile__user=user).exists()
+
 class JiraAuthUrlView(APIView):
     """
     Returns the Atlassian OAuth authorization URL.
@@ -45,6 +53,13 @@ class JiraAuthUrlView(APIView):
         if not client_id:
             return Response({"detail": "Jira OAuth is not configured on the backend."}, status=status.HTTP_501_NOT_IMPLEMENTED)
 
+        import secrets
+        from django.core.cache import cache
+        
+        state = secrets.token_urlsafe(32)
+        # Store state in cache for 10 minutes, bound to user id
+        cache.set(f"jira_oauth_state_{request.user.id}", state, timeout=600)
+        
         # Scopes required to read Jira issues
         scopes = "read:jira-work read:jira-user offline_access"
         
@@ -54,7 +69,8 @@ class JiraAuthUrlView(APIView):
             "scope": scopes,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "prompt": "consent"
+            "prompt": "consent",
+            "state": state
         }
         
         auth_url = f"https://auth.atlassian.com/authorize?{urllib.parse.urlencode(params)}"
@@ -69,8 +85,17 @@ class JiraTokenExchangeView(APIView):
 
     def post(self, request, *args, **kwargs):
         code = request.data.get("code")
-        if not code:
-            return Response({"detail": "Authorization code is required."}, status=status.HTTP_400_BAD_REQUEST)
+        state = request.data.get("state")
+        
+        if not code or not state:
+            return Response({"detail": "Authorization code and state are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.core.cache import cache
+        expected_state = cache.get(f"jira_oauth_state_{request.user.id}")
+        if not expected_state or expected_state != state:
+            return Response({"detail": "Invalid or expired state parameter. Security validation failed."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        cache.delete(f"jira_oauth_state_{request.user.id}")
 
         client_id = config("JIRA_CLIENT_ID", default=None)
         client_secret = config("JIRA_CLIENT_SECRET", default=None)
@@ -116,9 +141,10 @@ class JiraTokenExchangeView(APIView):
             cloud_id = resources[0].get("id")
             workspace_url = resources[0].get("url")
 
-            # Save to Database (Singleton)
-            JiraOAuthToken.objects.all().delete() # Clear existing tokens
+            # Save to Database (User-specific)
+            JiraOAuthToken.objects.filter(user=request.user).delete() # Clear existing tokens for this user
             JiraOAuthToken.objects.create(
+                user=request.user,
                 access_token=access_token,
                 refresh_token=refresh_token,
                 cloud_id=cloud_id,
@@ -146,9 +172,19 @@ class JiraFetchTasksView(APIView):
             return Response({"detail": "Jira Project Key is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not sprint_name:
             return Response({"detail": "Jira Sprint Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from project.models import Project
+        from django.db.models import Q
+        project = Project.objects.filter(Q(project_id=project_key) | Q(jira_id=project_key), is_deleted=False).first()
+        
+        if not project:
+            return Response({"detail": f"Project '{project_key}' not found in SprintPilot."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if not check_project_access(request.user, project):
+            return Response({"detail": "You do not have permission to access this project."}, status=status.HTTP_403_FORBIDDEN)
             
         # Retrieve token from DB
-        token_obj = JiraOAuthToken.objects.first()
+        token_obj = JiraOAuthToken.objects.filter(user=request.user).first()
         if not token_obj:
             return Response(
                 {"detail": "Jira account is not connected. Please connect Jira first.", "auth_required": True},
@@ -175,9 +211,8 @@ class JiraFetchTasksView(APIView):
         try:
             res = requests.post(search_url, json=payload, headers=headers)
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
-            
             if is_unauthorized:
-                JiraOAuthToken.objects.all().delete()
+                JiraOAuthToken.objects.filter(user=request.user).delete()
                 return Response(
                     {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
                     status=status.HTTP_401_UNAUTHORIZED
@@ -253,8 +288,11 @@ class JiraSprintSyncView(APIView):
             sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_project_access(request.user, sprint.project):
+            return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
             
-        token_obj = JiraOAuthToken.objects.first()
+        token_obj = JiraOAuthToken.objects.filter(user=request.user).first()
         if not token_obj:
             return Response(
                 {"detail": "Jira account is not connected. Please connect Jira first.", "auth_required": True},
@@ -288,7 +326,7 @@ class JiraSprintSyncView(APIView):
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
             
             if is_unauthorized:
-                JiraOAuthToken.objects.all().delete()
+                JiraOAuthToken.objects.filter(user=request.user).delete()
                 return Response(
                     {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
                     status=status.HTTP_401_UNAUTHORIZED
@@ -382,6 +420,9 @@ class JiraSprintAppendView(APIView):
             sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_project_access(request.user, sprint.project):
+            return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
             
         sprint_name_override = request.data.get("sprint_name")
         if sprint_name_override and sprint.backlog_version_id != sprint_name_override:

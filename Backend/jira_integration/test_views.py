@@ -77,8 +77,11 @@ class JiraIntegrationViewsTest(APITestCase):
         mock_get_response.status_code = 200
         mock_get_response.json.return_value = [{"id": "cloud123", "url": "https://test.atlassian.net"}]
         
+        from django.core.cache import cache
+        cache.set(f"jira_oauth_state_{self.user.id}", "test_state", timeout=600)
+        
         url = reverse('jira_token_exchange')
-        response = self.client.post(url, {'code': 'authcode123'})
+        response = self.client.post(url, {'code': 'authcode123', 'state': 'test_state'})
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(JiraOAuthToken.objects.filter(cloud_id='cloud123').exists())
@@ -92,6 +95,7 @@ class JiraIntegrationViewsTest(APITestCase):
     def test_jira_fetch_tasks_success(self, mock_post):
         # Create token
         JiraOAuthToken.objects.create(
+            user=self.user,
             access_token='acc_tok',
             refresh_token='ref_tok',
             cloud_id='cloud123',
@@ -133,6 +137,7 @@ class JiraIntegrationViewsTest(APITestCase):
     @patch('jira_integration.views.requests.post')
     def test_jira_sprint_sync_success(self, mock_post):
         JiraOAuthToken.objects.create(
+            user=self.user,
             access_token='acc_tok',
             refresh_token='ref_tok',
             cloud_id='cloud123',
@@ -219,4 +224,4 @@ class JiraIntegrationViewsTest(APITestCase):
         url = reverse('jira_append_tasks', kwargs={'sprint_id': str(self.sprint.id)})
         response = self.client.post(url, {'tasks': []}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Jira Sprint Name is required", response.data['detail'])
+        self.assertIn("No tasks provided to append.", response.data['detail'])

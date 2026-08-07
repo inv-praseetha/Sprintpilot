@@ -12,10 +12,11 @@ export default function JiraCallback() {
 
   useEffect(() => {
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     
-    if (!code) {
+    if (!code || !state) {
       setStatus('error');
-      setMessage('No authorization code found. Please try connecting Jira again.');
+      setMessage('Missing authorization code or state parameter. Please try connecting Jira again.');
       return;
     }
 
@@ -24,7 +25,7 @@ export default function JiraCallback() {
 
     const exchangeToken = async () => {
       try {
-        await apiClient.post('jira/token/', { code });
+        await apiClient.post('jira/token/', { code, state });
         setStatus('success');
         setMessage('Jira connected successfully! You can now import Jira tasks.');
         setTimeout(() => {

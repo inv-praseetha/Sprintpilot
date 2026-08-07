@@ -74,7 +74,7 @@ def custom_exception_handler(exc, context):
         }
     else:
         # Standardize other DRF exceptions (like ValidationError, PermissionDenied, NotAuthenticated)
-        detail = response.data.get("detail", response.data)
+        detail = response.data.get("detail", response.data) if isinstance(response.data, dict) else response.data
         
         if isinstance(detail, dict):
             # Grab all error detail messages
