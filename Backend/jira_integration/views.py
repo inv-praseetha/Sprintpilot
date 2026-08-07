@@ -141,9 +141,10 @@ class JiraTokenExchangeView(APIView):
             cloud_id = resources[0].get("id")
             workspace_url = resources[0].get("url")
 
-            # Save to Database (Singleton)
-            JiraOAuthToken.objects.all().delete() # Clear existing tokens
+            # Save to Database (User-specific)
+            JiraOAuthToken.objects.filter(user=request.user).delete() # Clear existing tokens for this user
             JiraOAuthToken.objects.create(
+                user=request.user,
                 access_token=access_token,
                 refresh_token=refresh_token,
                 cloud_id=cloud_id,
@@ -183,7 +184,7 @@ class JiraFetchTasksView(APIView):
             return Response({"detail": "You do not have permission to access this project."}, status=status.HTTP_403_FORBIDDEN)
             
         # Retrieve token from DB
-        token_obj = JiraOAuthToken.objects.first()
+        token_obj = JiraOAuthToken.objects.filter(user=request.user).first()
         if not token_obj:
             return Response(
                 {"detail": "Jira account is not connected. Please connect Jira first.", "auth_required": True},
@@ -210,9 +211,9 @@ class JiraFetchTasksView(APIView):
         try:
             res = requests.post(search_url, json=payload, headers=headers)
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
-            
+            i
             if is_unauthorized:
-                JiraOAuthToken.objects.all().delete()
+                JiraOAuthToken.objects.filter(user=request.user).delete()
                 return Response(
                     {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
                     status=status.HTTP_401_UNAUTHORIZED
@@ -292,7 +293,7 @@ class JiraSprintSyncView(APIView):
         if not check_project_access(request.user, sprint.project):
             return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
             
-        token_obj = JiraOAuthToken.objects.first()
+        token_obj = JiraOAuthToken.objects.filter(user=request.user).first()
         if not token_obj:
             return Response(
                 {"detail": "Jira account is not connected. Please connect Jira first.", "auth_required": True},
@@ -326,7 +327,7 @@ class JiraSprintSyncView(APIView):
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
             
             if is_unauthorized:
-                JiraOAuthToken.objects.all().delete()
+                JiraOAuthToken.objects.filter(user=request.user).delete()
                 return Response(
                     {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
                     status=status.HTTP_401_UNAUTHORIZED
