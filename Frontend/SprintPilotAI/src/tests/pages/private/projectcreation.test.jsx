@@ -2,17 +2,17 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ProjectCreation from './projectcreation';
-import { AuthContext } from '../../context/AuthContext';
-import apiClient from '../../api/apiClient';
+import ProjectCreation from '../../../pages/private/projectcreation';
+import { AuthContext } from '../../../context/AuthContext';
+import apiClient from '../../../api/apiClient';
 
 // Mock the Theme hook since it's used in ProjectCreation
-vi.mock('../../components/layout/MainLayouut', () => ({
+vi.mock('../../../components/layout/MainLayouut', () => ({
   useTheme: () => ({ darkMode: false })
 }));
 
 // Mock API Client
-vi.mock('../../api/apiClient', () => ({
+vi.mock('../../../api/apiClient', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -21,8 +21,16 @@ vi.mock('../../api/apiClient', () => ({
   }
 }));
 
-vi.mock('../../context/AuthContext', () => ({
+vi.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u1', role: 'PROJECT_MANAGER', full_name: 'Test Manager' }, logout: vi.fn() })
+}));
+
+vi.mock('../../../context/ToastContext', () => ({
+  useToast: () => ({ error: vi.fn(), success: vi.fn() })
+}));
+
+vi.mock('../../../context/ConfirmContext', () => ({
+  useConfirm: () => vi.fn()
 }));
 
 describe('ProjectCreation Component', () => {
