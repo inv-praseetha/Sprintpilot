@@ -342,8 +342,15 @@ export default function TaskUploadModal({
           if (!row || row.length === 0) continue;
 
           const titleVal = row[titleIndex] !== undefined ? row[titleIndex] : '';
-          if (!titleVal || titleVal.toString().trim() === '') {
+          let cleanTitle = titleVal.toString().trim();
+          if (!cleanTitle) {
             continue;
+          }
+          
+          // Strip any trailing Jira URL in parentheses that might be present from older Excel exports
+          const urlMatch = cleanTitle.match(/\s+\(https?:\/\/[^)]+\)$/i);
+          if (urlMatch) {
+            cleanTitle = cleanTitle.replace(urlMatch[0], '');
           }
 
           const descVal = row[descIndex] !== undefined ? row[descIndex] : '';
@@ -363,7 +370,7 @@ export default function TaskUploadModal({
           }
 
           parsedRows.push({
-            title: titleVal.toString().trim(),
+            title: cleanTitle,
             desc: (descVal || 'No description provided.').toString().trim(),
             category: validCats.includes(cat) ? cat : 'UI',
             status: 'OPEN',
@@ -525,7 +532,15 @@ export default function TaskUploadModal({
         {/* Mode Toggle - Segmented Control */}
         <div className="flex gap-4 mb-8">
           <button
-            onClick={() => setImportMode('EXCEL')}
+            onClick={() => {
+              if (importMode !== 'EXCEL') {
+                setExcelData([]);
+                setExcelHolidays([]);
+                setErrorMsg('');
+                setImportMode('EXCEL');
+                setJiraSprintName('');
+              }
+            }}
             className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 border ${importMode === 'EXCEL'
                 ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/20 text-white scale-[1.02]'
                 : 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 cursor-pointer'
@@ -535,7 +550,16 @@ export default function TaskUploadModal({
             Excel Upload
           </button>
           <button
-            onClick={() => setImportMode('JIRA')}
+            onClick={() => {
+              if (importMode !== 'JIRA') {
+                setExcelData([]);
+                setExcelHolidays([]);
+                setErrorMsg('');
+                setImportMode('JIRA');
+                setExcelFile(null);
+                setParsedProjectInfo({ id: '', name: '', matchedKey: '' });
+              }
+            }}
             className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 border ${importMode === 'JIRA'
                 ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20 text-white scale-[1.02]'
                 : 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 cursor-pointer'

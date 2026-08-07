@@ -135,6 +135,10 @@ export default function JiraSyncModal({
       setErrorMsg('No tasks selected to import.');
       return;
     }
+    if (!searchSprintName.trim()) {
+      setErrorMsg('Jira Sprint Name is required to import tasks.');
+      return;
+    }
 
     setIsSaving(true);
     setErrorMsg('');
@@ -175,7 +179,7 @@ export default function JiraSyncModal({
       />
 
       {/* Modal Card */}
-      <div className={`relative w-full max-w-3xl rounded-3xl border shadow-2xl p-6 sm:p-8 overflow-hidden z-10 flex flex-col max-h-[85vh] ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'}`}>
+      <div className={`relative w-full max-w-5xl rounded-3xl border shadow-2xl p-6 sm:p-8 overflow-hidden z-10 flex flex-col max-h-[85vh] ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'}`}>
         
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -202,7 +206,9 @@ export default function JiraSyncModal({
           {/* Manual Search Override */}
           <div className="flex items-end gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-bold mb-1.5 text-slate-500">Jira Sprint Name (Edit if not found)</label>
+              <label className="block text-xs font-bold mb-1.5 text-slate-500">
+                Jira Sprint Name (Edit if not found) <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={searchSprintName}
@@ -265,7 +271,7 @@ export default function JiraSyncModal({
               {/* Data Table */}
               <div className={`rounded-2xl border overflow-hidden ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                 <div className="overflow-x-auto max-h-[40vh] overflow-y-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full min-w-[1000px] text-left border-collapse text-xs">
                     <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-slate-800/90 backdrop-blur text-slate-300' : 'bg-slate-50/90 backdrop-blur text-slate-600'}`}>
                       <tr>
                         <th className="p-3 font-bold w-12 text-center">Inc</th>
