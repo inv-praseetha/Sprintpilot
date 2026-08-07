@@ -117,14 +117,18 @@ class JiraTokenExchangeView(APIView):
             workspace_url = resources[0].get("url")
 
             # Save to Database (Singleton)
-            JiraOAuthToken.objects.all().delete() # Clear existing tokens
-            JiraOAuthToken.objects.create(
-                access_token=access_token,
-                refresh_token=refresh_token,
-                cloud_id=cloud_id,
-                workspace_url=workspace_url,
-                expires_at=expires_at
-            )
+            from django.db import transaction
+            with transaction.atomic():
+                JiraOAuthToken.objects.all().delete() # Clear existing tokens
+                token = JiraOAuthToken(
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    cloud_id=cloud_id,
+                    workspace_url=workspace_url,
+                    expires_at=expires_at
+                )
+                token.full_clean()
+                token.save()
 
             return Response({"detail": "Jira account connected successfully."}, status=status.HTTP_200_OK)
 
@@ -396,48 +400,59 @@ class JiraSprintAppendView(APIView):
             return Response({"detail": "No tasks provided to append."}, status=status.HTTP_400_BAD_REQUEST)
             
         new_tasks_created = 0
-        for task_item in tasks_data:
-            assignee_id = task_item.get("assignee")
-            assignee_profile = None
-            if assignee_id:
-                try:
-                    assignee_profile = EmployeeProfile.objects.get(id=assignee_id)
-                except EmployeeProfile.DoesNotExist:
-                    pass
+        from django.db import transaction
+        
+        try:
+            with transaction.atomic():
+                for task_item in tasks_data:
+                    assignee_id = task_item.get("assignee")
+                    assignee_profile = None
+                    if assignee_id:
+                        try:
+                            assignee_profile = EmployeeProfile.objects.get(id=assignee_id)
+                        except EmployeeProfile.DoesNotExist:
+                            pass
 
-            start_date_str = task_item.get("startDate") or None
-            end_date_str = task_item.get("endDate") or None
-            
-            story_points = None
-            estimated_hours = None
-            if start_date_str and end_date_str:
-                from sprints.services.schedule_service import calculate_working_days
-                holidays = list(sprint.holidays.values_list('date', flat=True))
-                wd = calculate_working_days(start_date_str, end_date_str, holidays=holidays)
-                story_points = wd * 2
-                estimated_hours = wd * 8
+                    start_date_str = task_item.get("startDate") or None
+                    end_date_str = task_item.get("endDate") or None
+                    
+                    story_points = None
+                    estimated_hours = None
+                    if start_date_str and end_date_str:
+                        from sprints.services.schedule_service import calculate_working_days
+                        holidays = list(sprint.holidays.values_list('date', flat=True))
+                        wd = calculate_working_days(start_date_str, end_date_str, holidays=holidays)
+                        story_points = wd * 2
+                        estimated_hours = wd * 8
 
-            cat_val = task_item.get("category", "UI")
-            if isinstance(cat_val, list):
-                cat_val = ", ".join(cat_val)
+                    cat_val = task_item.get("category", "UI")
+                    if isinstance(cat_val, list):
+                        cat_val = ", ".join(cat_val)
 
-            try:
-                SprintTask.objects.create(
-                    sprint=sprint,
-                    assigned_employee=assignee_profile,
-                    title=task_item.get("title", "Untitled Task"),
-                    description=task_item.get("description", "No description provided."),
-                    category=cat_val,
-                    status=task_item.get("status", "OPEN").upper(),
-                    priority=task_item.get("priority", "NORMAL").upper(),
-                    jira_id=task_item.get("jiraId", ""),
-                    planned_start_date=start_date_str,
-                    planned_end_date=end_date_str,
-                    story_points=story_points,
-                    estimated_hours=estimated_hours
-                )
-                new_tasks_created += 1
-            except django.core.exceptions.ValidationError as e:
-                return Response({"detail": f"Validation Error on task '{task_item.get('title')}': {str(e.message_dict if hasattr(e, 'message_dict') else e.messages)}"}, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        task = SprintTask(
+                            sprint=sprint,
+                            assigned_employee=assignee_profile,
+                            title=task_item.get("title", "Untitled Task"),
+                            description=task_item.get("description", "No description provided."),
+                            category=cat_val,
+                            status=task_item.get("status", "OPEN").upper(),
+                            priority=task_item.get("priority", "Normal").title(),
+                            jira_id=task_item.get("jiraId", ""),
+                            planned_start_date=start_date_str,
+                            planned_end_date=end_date_str,
+                            story_points=story_points,
+                            estimated_hours=estimated_hours
+                        )
+                        task.full_clean()
+                        task.save()
+                        new_tasks_created += 1
+                    except django.core.exceptions.ValidationError as e:
+                        raise ValueError(f"Validation Error on task '{task_item.get('title')}': {str(e.message_dict if hasattr(e, 'message_dict') else e.messages)}")
+                        
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": f"An error occurred while saving tasks: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
         return Response({"detail": f"Successfully appended {new_tasks_created} tasks to the sprint!"}, status=status.HTTP_200_OK)
