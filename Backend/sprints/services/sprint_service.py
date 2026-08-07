@@ -551,6 +551,9 @@ class SprintService:
         if sprint.status == 'COMPLETED':
             raise ValueError("Sprint is already closed.")
 
+        if not sprint.backlog_version_id:
+            raise ValueError("Sprint is not connected to Backlog. Please sync tasks from Backlog first.")
+
         tasks = sprint.tasks.filter(is_deleted=False)
         total_tasks = tasks.count()
         if total_tasks == 0:
@@ -574,6 +577,9 @@ class SprintService:
 
         if sprint.status == 'COMPLETED':
             raise ValueError("Sprint is already closed.")
+
+        if not sprint.backlog_version_id:
+            raise ValueError("Sprint is not connected to Backlog. Please sync tasks from Backlog first.")
 
         with transaction.atomic():
             tasks = sprint.tasks.filter(is_deleted=False)
