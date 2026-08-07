@@ -95,6 +95,7 @@ class JiraIntegrationViewsTest(APITestCase):
     def test_jira_fetch_tasks_success(self, mock_post):
         # Create token
         JiraOAuthToken.objects.create(
+            user=self.user,
             access_token='acc_tok',
             refresh_token='ref_tok',
             cloud_id='cloud123',
@@ -136,6 +137,7 @@ class JiraIntegrationViewsTest(APITestCase):
     @patch('jira_integration.views.requests.post')
     def test_jira_sprint_sync_success(self, mock_post):
         JiraOAuthToken.objects.create(
+            user=self.user,
             access_token='acc_tok',
             refresh_token='ref_tok',
             cloud_id='cloud123',
