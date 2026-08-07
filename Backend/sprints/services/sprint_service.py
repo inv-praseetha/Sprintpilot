@@ -437,14 +437,13 @@ class SprintService:
             raise ValueError("Sprint milestone, start_date, and end_date are required.")
 
         # Parse and validate sprint dates
-        from datetime import datetime
         try:
             if isinstance(start_date, str):
-                parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+                parsed_start = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
             else:
                 parsed_start = start_date
             if isinstance(end_date, str):
-                parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+                parsed_end = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
             else:
                 parsed_end = end_date
                 
