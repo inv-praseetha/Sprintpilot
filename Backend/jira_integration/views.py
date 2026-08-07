@@ -45,6 +45,13 @@ class JiraAuthUrlView(APIView):
         if not client_id:
             return Response({"detail": "Jira OAuth is not configured on the backend."}, status=status.HTTP_501_NOT_IMPLEMENTED)
 
+        import secrets
+        from django.core.cache import cache
+        
+        state = secrets.token_urlsafe(32)
+        # Store state in cache for 10 minutes, bound to user id
+        cache.set(f"jira_oauth_state_{request.user.id}", state, timeout=600)
+        
         # Scopes required to read Jira issues
         scopes = "read:jira-work read:jira-user offline_access"
         
@@ -54,7 +61,8 @@ class JiraAuthUrlView(APIView):
             "scope": scopes,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "prompt": "consent"
+            "prompt": "consent",
+            "state": state
         }
         
         auth_url = f"https://auth.atlassian.com/authorize?{urllib.parse.urlencode(params)}"
@@ -69,8 +77,17 @@ class JiraTokenExchangeView(APIView):
 
     def post(self, request, *args, **kwargs):
         code = request.data.get("code")
-        if not code:
-            return Response({"detail": "Authorization code is required."}, status=status.HTTP_400_BAD_REQUEST)
+        state = request.data.get("state")
+        
+        if not code or not state:
+            return Response({"detail": "Authorization code and state are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.core.cache import cache
+        expected_state = cache.get(f"jira_oauth_state_{request.user.id}")
+        if not expected_state or expected_state != state:
+            return Response({"detail": "Invalid or expired state parameter. Security validation failed."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        cache.delete(f"jira_oauth_state_{request.user.id}")
 
         client_id = config("JIRA_CLIENT_ID", default=None)
         client_secret = config("JIRA_CLIENT_SECRET", default=None)
