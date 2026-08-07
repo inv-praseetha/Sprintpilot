@@ -32,6 +32,14 @@ def extract_text_from_adf(node):
                 
     return text.strip()
 
+def check_project_access(user, project):
+    """
+    Checks if the given user is the creator, team lead, or a member of the project.
+    """
+    if project.created_by == user or project.team_lead == user:
+        return True
+    return project.members.filter(employee_profile__user=user).exists()
+
 class JiraAuthUrlView(APIView):
     """
     Returns the Atlassian OAuth authorization URL.
@@ -163,6 +171,16 @@ class JiraFetchTasksView(APIView):
             return Response({"detail": "Jira Project Key is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not sprint_name:
             return Response({"detail": "Jira Sprint Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from project.models import Project
+        from django.db.models import Q
+        project = Project.objects.filter(Q(project_id=project_key) | Q(jira_id=project_key), is_deleted=False).first()
+        
+        if not project:
+            return Response({"detail": f"Project '{project_key}' not found in SprintPilot."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if not check_project_access(request.user, project):
+            return Response({"detail": "You do not have permission to access this project."}, status=status.HTTP_403_FORBIDDEN)
             
         # Retrieve token from DB
         token_obj = JiraOAuthToken.objects.first()
@@ -270,6 +288,9 @@ class JiraSprintSyncView(APIView):
             sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_project_access(request.user, sprint.project):
+            return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
             
         token_obj = JiraOAuthToken.objects.first()
         if not token_obj:
@@ -399,6 +420,9 @@ class JiraSprintAppendView(APIView):
             sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not check_project_access(request.user, sprint.project):
+            return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
             
         sprint_name_override = request.data.get("sprint_name")
         if sprint_name_override and sprint.backlog_version_id != sprint_name_override:
