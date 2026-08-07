@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AlertCircle, Code, Check, Users, Loader2, X, Info } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import { useValidationLimits } from '../../hooks/useValidationLimits';
+import { useToast } from '../../context/ToastContext';
 
 export default function ProjectForm({
   handleSubmit,
@@ -47,6 +48,7 @@ export default function ProjectForm({
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const limits = useValidationLimits();
+  const toast = useToast();
 
   const getTodayStr = () => {
     const d = new Date();
@@ -100,7 +102,7 @@ export default function ProjectForm({
       const currentCount = selectedMembers.length;
       const remaining = limit - currentCount;
       if (limit > 0 && remaining <= 0) {
-        alert(`Cannot select more members. Team size limit of ${limit} reached.`);
+        toast.error(`Cannot select more members. Team size limit of ${limit} reached.`);
         return;
       }
       let count = 0;

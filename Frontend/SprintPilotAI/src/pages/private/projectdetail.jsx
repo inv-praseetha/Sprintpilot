@@ -6,6 +6,8 @@ import apiClient from '../../api/apiClient';
 import TaskUploadModal from '../../components/Modals/TaskUploadModal';
 import { getEffectiveSkills } from './projectcreation';
 import SprintServices from '../../services/SprintServices';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import {
   FolderKanban,
   Layers,
@@ -36,6 +38,8 @@ export default function ProjectDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { darkMode } = useTheme();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState(null);
@@ -61,8 +65,7 @@ export default function ProjectDetail() {
   const [updatingMembers, setUpdatingMembers] = useState(false);
   const [modalError, setModalError] = useState(null);
 
-  // Success Toast Alert State
-  const [successAlert, setSuccessAlert] = useState(null);
+
 
   // Close Sprint Modal State
   const [showCloseSprintModal, setShowCloseSprintModal] = useState(false);
@@ -257,7 +260,7 @@ export default function ProjectDetail() {
       if (onSuccessCallback) onSuccessCallback();
     } catch (err) {
       console.error('[ProjectDetail] Error adding members:', err);
-      alert(err.response?.data?.detail || 'Failed to add members.');
+      toast.error(err.response?.data?.detail || 'Failed to add members.');
     } finally {
       setUpdatingMembers(false);
     }
@@ -287,7 +290,7 @@ export default function ProjectDetail() {
       setShowEditLeadModal(false);
     } catch (err) {
       console.error('[ProjectDetail] Error changing team lead:', err);
-      alert(err.response?.data?.detail || 'Failed to change team lead.');
+      toast.error(err.response?.data?.detail || 'Failed to change team lead.');
     }
   };
 
@@ -301,7 +304,13 @@ export default function ProjectDetail() {
 
   // Remove member from project
   const handleRemoveMember = async (memberProfileId) => {
-    if (!window.confirm('Are you sure you want to remove this member from the project?')) {
+    const isConfirmed = await confirm({
+      title: 'Remove Project Member',
+      message: 'Are you sure you want to remove this member from the project?',
+      confirmText: 'Remove',
+      type: 'danger',
+    });
+    if (!isConfirmed) {
       return;
     }
 
@@ -329,7 +338,7 @@ export default function ProjectDetail() {
       await fetchEmployees();
     } catch (err) {
       console.error('[ProjectDetail] Error removing member:', err);
-      alert(err.response?.data?.detail || 'Failed to remove member.');
+      toast.error(err.response?.data?.detail || 'Failed to remove member.');
     }
   };
 
@@ -349,11 +358,10 @@ export default function ProjectDetail() {
       await SprintServices.createSprint(projectId, sprintData);
       await fetchSprints();
 
-      setSuccessAlert(`Successfully imported Milestone "${milestoneName}" with ${tasks.length} tasks!`);
-      setTimeout(() => setSuccessAlert(null), 5000);
+      toast.success(`Successfully imported Milestone "${milestoneName}" with ${tasks.length} tasks!`);
     } catch (err) {
       console.error('[ProjectDetail] Error creating sprint:', err);
-      alert(err.response?.data?.detail || 'Failed to import sprint tasks.');
+      toast.error(err.response?.data?.detail || 'Failed to import sprint tasks.');
     }
   };
 
@@ -368,7 +376,7 @@ export default function ProjectDetail() {
       setShowCloseSprintModal(true);
     } catch (err) {
       console.error('[ProjectDetail] Error fetching closure summary:', err);
-      alert(err.response?.data?.detail || 'Failed to fetch sprint closure summary.');
+      toast.error(err.response?.data?.detail || 'Failed to fetch sprint closure summary.');
       setClosingSprintId(null);
     }
   };
@@ -381,12 +389,13 @@ export default function ProjectDetail() {
       setShowCloseSprintModal(false);
       setClosingSprintId(null);
       setClosingSprintSummary(null);
-      setSuccessAlert("Milestone closed successfully and synced with Backlog!");
-      setTimeout(() => setSuccessAlert(null), 5000);
+      toast.success("Milestone closed successfully and synced with Backlog!");
       fetchSprints();
     } catch (err) {
       console.error('[ProjectDetail] Error closing sprint:', err);
-      setClosureError(err.response?.data?.detail || "Failed to close sprint. Please try again.");
+      const errMsg = err.response?.data?.detail || err.message || "Failed to close sprint. Please try again.";
+      setClosureError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsClosingSprint(false);
     }
@@ -1321,16 +1330,7 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {/* Toast Alert */}
-      {successAlert && (
-        <div className="fixed bottom-6 right-6 bg-emerald-500 text-white px-5 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 animate-slide-up border border-emerald-400/20">
-          <CheckCircle2 className="w-5 h-5" />
-          <span className="text-sm font-semibold">{successAlert}</span>
-          <button onClick={() => setSuccessAlert(null)} className="hover:text-emerald-100 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+
 
       {/* 4. MODAL: UPLOAD SPRINT */}
       {project && (

@@ -13,32 +13,39 @@ import SprintDetail from './pages/private/SprintDetail';
 import JiraCallback from './pages/public/JiraCallback';
 import Status from './pages/private/Status';
 
+import { ToastProvider } from './context/ToastContext';
+import { ConfirmProvider } from './context/ConfirmContext';
+
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          {/* PUBLIC ROUTES */}
-          <Route element={<PublicRoute />}>
-            <Route path="/" element={<Login />} />
-          </Route>
-
-          {/* PROTECTED ROUTES */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayouut />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/projects" element={<ProjectCreation/>} />
-              <Route path="/projects/:projectId" element={<ProjectDetail />} />
-              <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-              <Route path="/jira/callback" element={<JiraCallback />} />
-              <Route path="/status" element={<Status />} />
-
-              {/* Fallback to 404 page */}
-              <Route path="*" element={<NotFound />} />
+      <ToastProvider>
+        <ConfirmProvider>
+          <Router>
+            <Routes>
+            {/* PUBLIC ROUTES */}
+            <Route element={<PublicRoute />}>
+              <Route path="/" element={<Login />} />
             </Route>
-          </Route>
-        </Routes>
-      </Router>
+
+            {/* PROTECTED ROUTES */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<MainLayouut />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/projects" element={<ProjectCreation/>} />
+                <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
+                <Route path="/jira/callback" element={<JiraCallback />} />
+                <Route path="/status" element={<Status />} />
+
+                {/* Fallback to 404 page */}
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Route>
+          </Routes>
+          </Router>
+        </ConfirmProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

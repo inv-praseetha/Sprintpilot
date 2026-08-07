@@ -6,6 +6,8 @@ import ProjectForm from '../../components/Modals/projectform';
 import { useValidationLimits } from '../../hooks/useValidationLimits';
 import apiClient from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import {
   Plus,
   Search,
@@ -74,6 +76,8 @@ export default function ProjectCreation() {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
   const { user: currentUser, logout: handleLogout } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   // Domain Data States
   const [projects, setProjects] = useState([]);
@@ -465,12 +469,18 @@ export default function ProjectCreation() {
       fetchMetadata();
     } catch (err) {
       console.error("Error changing project status:", err);
-      alert(err.response?.data?.detail || "Failed to update project status.");
+      toast.error(err.response?.data?.detail || "Failed to update project status.");
     }
   };
 
   const handleDeleteProject = async (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project?")) {
+    const isConfirmed = await confirm({
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project?',
+      confirmText: 'Delete',
+      type: 'danger',
+    });
+    if (!isConfirmed) {
       return;
     }
     try {
@@ -479,7 +489,7 @@ export default function ProjectCreation() {
       fetchMetadata();
     } catch (err) {
       console.error("Error deleting project:", err);
-      alert(err.response?.data?.detail || err.message || "Failed to delete project.");
+      toast.error(err.response?.data?.detail || err.message || "Failed to delete project.");
     }
   };
 
