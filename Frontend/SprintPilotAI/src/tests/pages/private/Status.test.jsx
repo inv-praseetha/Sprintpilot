@@ -194,7 +194,9 @@ describe('Status Page Component', () => {
     Object.defineProperty(overdueContainer, 'clientHeight', { value: 500, configurable: true });
     Object.defineProperty(overdueContainer, 'scrollTop', { value: 480, configurable: true });
 
-    fireEvent.scroll(overdueContainer);
+    fireEvent.scroll(overdueContainer, {
+      target: { scrollHeight: 1000, clientHeight: 500, scrollTop: 480 }
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Fix secondary bug')).toBeInTheDocument();
