@@ -114,3 +114,132 @@ class TestBacklogSyncService(TestCase):
         self.assertEqual(summary["fetched"], 1)
         self.assertEqual(summary["skipped"], 1)
         self.assertEqual(summary["updated"], 0)
+
+from backlog.services.backlog_client import BacklogService
+
+class TestBacklogClientService(TestCase):
+    def setUp(self):
+        self.service = BacklogService(project_key="PROJ")
+        self.service.workspace_url = "https://example.backlog.com"
+        self.service.api_key = "test_key"
+        self.service.issue_type_id = "1"
+
+    @patch('backlog.services.backlog_client.requests.get')
+    def test_get_project_issue_types(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = [{"id": 1, "name": "Task", "projectId": 123}]
+        mock_get.return_value = mock_response
+
+        result = self.service.get_project_issue_types()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["id"], 1)
+
+    @patch.object(BacklogService, 'get_project_issue_types')
+    def test_resolve_project_and_issue_type(self, mock_get_types):
+        mock_get_types.return_value = [{"id": 1, "name": "Task", "projectId": 123}]
+        
+        project_id, issue_type_id = self.service._resolve_project_and_issue_type()
+        self.assertEqual(project_id, 123)
+        self.assertEqual(issue_type_id, 1)
+
+    @patch('backlog.services.backlog_client.requests.get')
+    @patch('backlog.services.backlog_client.requests.post')
+    def test_get_or_create_version(self, mock_post, mock_get):
+        # First try GET where version doesn't exist, then POST creates it
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = []
+        mock_get.return_value = mock_get_response
+
+        mock_post_response = MagicMock()
+        mock_post_response.json.return_value = {"id": 100}
+        mock_post.return_value = mock_post_response
+
+        version_id = self.service._get_or_create_version(123, "Sprint 1")
+        self.assertEqual(version_id, 100)
+
+    @patch('backlog.services.backlog_client.requests.get')
+    def test_get_assignee_id(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = [{"id": 5, "mailAddress": "test@example.com"}]
+        mock_get.return_value = mock_response
+
+        assignee_id = self.service._get_assignee_id("test@example.com")
+        self.assertEqual(assignee_id, 5)
+
+    @patch('backlog.services.backlog_client.requests.get')
+    def test_fetch_project_categories(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = [{"id": 10, "name": "UI"}]
+        mock_get.return_value = mock_response
+        
+        cats = self.service.fetch_project_categories()
+        self.assertEqual(cats[0]["name"], "UI")
+
+    @patch.object(BacklogService, '_resolve_project_and_issue_type')
+    @patch('backlog.services.backlog_client.requests.post')
+    def test_sync_task(self, mock_post, mock_resolve):
+        mock_resolve.return_value = (123, 1)
+        mock_post_response = MagicMock()
+        mock_post_response.json.return_value = {"issueKey": "PROJ-1"}
+        mock_post.return_value = mock_post_response
+        
+        # Need a dummy task object
+        task = MagicMock()
+        task.title = "Test"
+        task.description = "Test Desc"
+        task.planned_start_date = None
+        task.planned_end_date = None
+        task.estimated_hours = None
+        task.priority = 'NORMAL'
+        task.status = 'OPEN'
+        task.assigned_employee = None
+        task.category = None
+        task.sprint = None
+        task.jira_id = None
+        
+        issue_key = self.service.sync_task(task)
+        self.assertEqual(issue_key, "PROJ-1")
+
+    @patch('backlog.services.backlog_client.requests.patch')
+    def test_update_task(self, mock_patch):
+        mock_patch_response = MagicMock()
+        mock_patch_response.json.return_value = {"issueKey": "PROJ-2"}
+        mock_patch.return_value = mock_patch_response
+
+        task = MagicMock()
+        task.backlog_task_id = "PROJ-2"
+        task.title = "Test"
+        task.description = "Test Desc"
+        task.planned_start_date = None
+        task.planned_end_date = None
+        task.estimated_hours = None
+        task.priority = 'NORMAL'
+        task.status = 'OPEN'
+        task.assigned_employee = None
+        task.category = None
+        task.sprint = None
+        task.jira_id = None
+
+        issue_key = self.service.update_task(task)
+        self.assertEqual(issue_key, "PROJ-2")
+
+    @patch('backlog.services.backlog_client.requests.delete')
+    def test_delete_issue(self, mock_delete):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_delete.return_value = mock_response
+
+        result = self.service.delete_issue("PROJ-3")
+        self.assertTrue(result)
+
+    @patch.object(BacklogService, '_resolve_project_and_issue_type')
+    @patch('backlog.services.backlog_client.requests.get')
+    def test_fetch_updated_issues(self, mock_get, mock_resolve):
+        mock_resolve.return_value = (123, 1)
+        mock_response = MagicMock()
+        mock_response.json.return_value = [{"issueKey": "PROJ-4"}]
+        mock_get.return_value = mock_response
+        
+        issues = list(self.service.fetch_updated_issues())
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["issueKey"], "PROJ-4")
