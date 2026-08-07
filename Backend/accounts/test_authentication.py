@@ -53,7 +53,7 @@ class EmployeeJWTAuthenticationTests(TestCase):
         with self.assertRaises(AuthenticationFailed) as cm:
             self.auth.get_user(validated_token)
             
-        self.assertIn("employee_not_found", str(cm.exception.get_codes()))
+        self.assertEqual(str(cm.exception.detail['code']), "employee_not_found")
 
     def test_get_user_inactive_employee(self):
         """
@@ -66,4 +66,4 @@ class EmployeeJWTAuthenticationTests(TestCase):
         with self.assertRaises(AuthenticationFailed) as cm:
             self.auth.get_user(validated_token)
             
-        self.assertIn("employee_inactive", str(cm.exception.get_codes()))
+        self.assertEqual(str(cm.exception.detail['code']), "employee_inactive")
