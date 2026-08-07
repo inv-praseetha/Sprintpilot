@@ -3,8 +3,9 @@ from django.db import models
 class JiraOAuthToken(models.Model):
     """
     Stores the Atlassian OAuth 2.0 (3LO) tokens for the application.
-    Assuming a single-tenant integration, this table will typically have one row.
+    Linked to a specific user to prevent global token sharing.
     """
+    user = models.ForeignKey('accounts.Employee', on_delete=models.CASCADE, related_name='jira_tokens', null=True, blank=True)
     access_token = models.TextField()
     refresh_token = models.TextField()
     cloud_id = models.CharField(max_length=255)
