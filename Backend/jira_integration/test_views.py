@@ -77,9 +77,11 @@ class JiraIntegrationViewsTest(APITestCase):
         mock_get_response.status_code = 200
         mock_get_response.json.return_value = [{"id": "cloud123", "url": "https://test.atlassian.net"}]
         
+        from django.core.cache import cache
+        cache.set(f"jira_oauth_state_{self.user.id}", "test_state", timeout=600)
+        
         url = reverse('jira_token_exchange')
-        with patch('django.core.cache.cache.get', return_value='test_state'):
-            response = self.client.post(url, {'code': 'authcode123', 'state': 'test_state'})
+        response = self.client.post(url, {'code': 'authcode123', 'state': 'test_state'})
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(JiraOAuthToken.objects.filter(cloud_id='cloud123').exists())
