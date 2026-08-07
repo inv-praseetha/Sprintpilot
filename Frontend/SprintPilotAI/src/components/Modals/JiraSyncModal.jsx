@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadCloud, X, Database, AlertCircle, Loader2 } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import apiClient from '../../api/apiClient';
+import { useToast } from '../../context/ToastContext';
 
 const categoryConfig = {
   UI: { color: '#f97316', bg: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
@@ -25,6 +26,7 @@ export default function JiraSyncModal({
   const [successMsg, setSuccessMsg] = useState('');
   const [jiraAuthRequired, setJiraAuthRequired] = useState(false);
   const [searchSprintName, setSearchSprintName] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     if (isOpen && sprint) {
@@ -76,7 +78,7 @@ export default function JiraSyncModal({
       }
     } catch (err) {
       console.error('[Jira] Failed to get auth URL:', err);
-      alert('Failed to connect to Jira. Please try again.');
+      toast.error('Failed to connect to Jira. Please try again.');
     }
   };
 

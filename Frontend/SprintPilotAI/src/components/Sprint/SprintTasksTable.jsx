@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Trash2, ExternalLink } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
+import { useToast } from '../../context/ToastContext';
 
 const categoryConfig = {
   UI: {
@@ -171,6 +172,7 @@ export default function SprintTasksTable({
 }) {
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [activeDatePickerId, setActiveDatePickerId] = useState(null);
+  const toast = useToast();
 
   const toggleSelectTask = (taskId) => {
     setSelectedTaskIds(prev => {
@@ -230,18 +232,18 @@ export default function SprintTasksTable({
     }
 
     if (sprint && (newDate < sprint.start_date || newDate > sprint.end_date)) {
-      alert(`Invalid Start Date: Please choose a date within the sprint boundaries (${sprint.start_date} to ${sprint.end_date}).`);
+      toast.error(`Invalid Start Date: Please choose a date within the sprint boundaries (${sprint.start_date} to ${sprint.end_date}).`);
       return;
     }
 
     if (isWeekendStr(newDate)) {
-      alert("Invalid Start Date: Saturdays and Sundays cannot be selected as working days.");
+      toast.error("Invalid Start Date: Saturdays and Sundays cannot be selected as working days.");
       return;
     }
 
     const currentTask = tasks.find(t => t.id === taskId);
     if (currentTask && currentTask.planned_end_date && newDate > currentTask.planned_end_date) {
-      alert("Invalid Start Date: The start date cannot be after the planned end date.");
+      toast.error("Invalid Start Date: The start date cannot be after the planned end date.");
       return;
     }
 
@@ -249,7 +251,7 @@ export default function SprintTasksTable({
       const workingDays = getWorkingDaysCount(newDate, currentTask.planned_end_date);
       const minDays = Math.ceil(parseFloat(currentTask.estimated_hours) / 8);
       if (workingDays < minDays) {
-        alert(`Invalid Start Date: Estimated hours (${currentTask.estimated_hours}h) require at least ${minDays} working day(s). Selected range would only have ${workingDays} working day(s).`);
+        toast.error(`Invalid Start Date: Estimated hours (${currentTask.estimated_hours}h) require at least ${minDays} working day(s). Selected range would only have ${workingDays} working day(s).`);
         return;
       }
     }
@@ -271,18 +273,18 @@ export default function SprintTasksTable({
     }
 
     if (sprint && (newDate < sprint.start_date || newDate > sprint.end_date)) {
-      alert(`Invalid End Date: Please choose a date within the sprint boundaries (${sprint.start_date} to ${sprint.end_date}).`);
+      toast.error(`Invalid End Date: Please choose a date within the sprint boundaries (${sprint.start_date} to ${sprint.end_date}).`);
       return;
     }
 
     if (isWeekendStr(newDate)) {
-      alert("Invalid End Date: Saturdays and Sundays cannot be selected as working days.");
+      toast.error("Invalid End Date: Saturdays and Sundays cannot be selected as working days.");
       return;
     }
 
     const currentTask = tasks.find(t => t.id === taskId);
     if (currentTask && currentTask.planned_start_date && newDate < currentTask.planned_start_date) {
-      alert("Invalid End Date: The end date cannot be before the planned start date.");
+      toast.error("Invalid End Date: The end date cannot be before the planned start date.");
       return;
     }
 
@@ -290,7 +292,7 @@ export default function SprintTasksTable({
       const workingDays = getWorkingDaysCount(currentTask.planned_start_date, newDate);
       const minDays = Math.ceil(parseFloat(currentTask.estimated_hours) / 8);
       if (workingDays < minDays) {
-        alert(`Invalid End Date: Estimated hours (${currentTask.estimated_hours}h) require at least ${minDays} working day(s). Selected range would only have ${workingDays} working day(s).`);
+        toast.error(`Invalid End Date: Estimated hours (${currentTask.estimated_hours}h) require at least ${minDays} working day(s). Selected range would only have ${workingDays} working day(s).`);
         return;
       }
     }

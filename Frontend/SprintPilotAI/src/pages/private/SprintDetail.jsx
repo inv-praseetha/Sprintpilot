@@ -7,6 +7,8 @@ import AddTaskModal from '../../components/Modals/AddTaskModal';
 import JiraSyncModal from '../../components/Modals/JiraSyncModal';
 import SprintTasksTable from '../../components/Sprint/SprintTasksTable';
 import SprintNotesSection from '../../components/Sprint/SprintNotesSection';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 import {
   ArrowLeft,
@@ -87,6 +89,8 @@ export default function SprintDetail() {
   const { projectId, sprintId } = useParams();
   const { darkMode } = useTheme();
   const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   // Page level states
   const [sprint, setSprint] = useState(null);
@@ -168,16 +172,22 @@ export default function SprintDetail() {
   };
 
   const handleIndividualDelete = async (taskId) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
+    const isConfirmed = await confirm({
+      title: 'Delete Task',
+      message: 'Are you sure you want to delete this task?',
+      confirmText: 'Delete',
+      type: 'danger',
+    });
+    if (!isConfirmed) return;
     try {
       setPageLoading(true);
       await apiClient.delete(`sprints/tasks/${taskId}/`);
-      alert("Task deleted successfully.");
+      toast.success("Task deleted successfully.");
       await refreshSprint();
     } catch (err) {
       console.error('[SprintDetail] Error deleting task:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Failed to delete task.';
-      alert(`Delete failed: ${errMsg}`);
+      toast.error(`Delete failed: ${errMsg}`);
     } finally {
       setPageLoading(false);
     }
@@ -185,18 +195,24 @@ export default function SprintDetail() {
 
   const handleBulkDelete = async () => {
     if (selectedTaskIds.size === 0) return;
-    if (!window.confirm(`Are you sure you want to delete the ${selectedTaskIds.size} selected tasks?`)) return;
+    const isConfirmed = await confirm({
+      title: 'Delete Selected Tasks',
+      message: `Are you sure you want to delete the ${selectedTaskIds.size} selected tasks?`,
+      confirmText: 'Delete',
+      type: 'danger',
+    });
+    if (!isConfirmed) return;
     try {
       setPageLoading(true);
       const taskIds = Array.from(selectedTaskIds);
       await apiClient.post(`sprints/tasks/bulk-delete/`, { task_ids: taskIds });
-      alert("Selected tasks deleted successfully.");
+      toast.success("Selected tasks deleted successfully.");
       setSelectedTaskIds(new Set());
       await refreshSprint();
     } catch (err) {
       console.error('[SprintDetail] Error bulk deleting tasks:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Failed to delete selected tasks.';
-      alert(`Delete failed: ${errMsg}`);
+      toast.error(`Delete failed: ${errMsg}`);
     } finally {
       setPageLoading(false);
     }
@@ -330,7 +346,7 @@ export default function SprintDetail() {
       setIsGenerating(false);
       console.error('[SprintDetail] AI Suggestion failed:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Unknown error occurred.';
-      alert(`AI Generation Failed: ${errMsg}`);
+      toast.error(`AI Generation Failed: ${errMsg}`);
     }
   };
 
@@ -414,7 +430,7 @@ export default function SprintDetail() {
     } catch (err) {
       console.error('[SprintDetail] Error saving tasks:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Failed to save task schedules.';
-      alert(`Import Failed: ${errMsg}`);
+      toast.error(`Import Failed: ${errMsg}`);
     } finally {
       setIsSaving(false);
     }
@@ -432,7 +448,7 @@ export default function SprintDetail() {
     try {
       const payload = selectedTaskIds.size > 0 ? { task_ids: Array.from(selectedTaskIds) } : {};
       const response = await apiClient.post(`sprints/${sprintId}/sync-backlog/`, payload);
-      alert(`Success: ${response.data.detail}`);
+      toast.success(`Success: ${response.data.detail}`);
       
       // Auto-refresh the page data so the Backlog link and statuses update immediately
       await refreshSprint();
@@ -440,7 +456,7 @@ export default function SprintDetail() {
     } catch (err) {
       console.error('[SprintDetail] Error syncing to Backlog:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Failed to sync tasks to Backlog.';
-      alert(`Sync Failed: ${errMsg}`);
+      toast.error(`Sync Failed: ${errMsg}`);
     } finally {
       setIsSyncing(false);
       if (selectedTaskIds.size > 0) {
@@ -478,7 +494,7 @@ export default function SprintDetail() {
       link.parentNode.removeChild(link);
     } catch (error) {
       console.error("Download failed:", error);
-      alert("Failed to download schedule. Please try again.");
+      toast.error("Failed to download schedule. Please try again.");
     }
   };
 

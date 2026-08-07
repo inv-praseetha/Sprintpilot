@@ -7,8 +7,14 @@ from sprints.models import Sprint, SprintTask
 from mail_service.services import OverdueEmailService, DueTodayEmailService
 import datetime
 
+from unittest.mock import patch
+
 class MailServiceTests(TestCase):
     def setUp(self):
+        self.localdate_patcher = patch('django.utils.timezone.localdate')
+        self.mock_localdate = self.localdate_patcher.start()
+        self.mock_localdate.return_value = datetime.date(2026, 8, 5)
+
         # Create Employees
         self.pm_user = Employee.objects.create(
             email='pm@example.com',
@@ -65,6 +71,9 @@ class MailServiceTests(TestCase):
             start_date=timezone.localdate() - datetime.timedelta(days=10),
             end_date=timezone.localdate() + datetime.timedelta(days=10)
         )
+
+    def tearDown(self):
+        self.localdate_patcher.stop()
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_send_overdue_tasks_emails(self):

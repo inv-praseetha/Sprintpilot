@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const quillModules = {
   toolbar: [
@@ -24,7 +26,7 @@ const quillModules = {
 const quillFormats = [
   'header',
   'bold', 'italic', 'underline', 'strike',
-  'list', 'bullet'
+  'list'
 ];
 
 const stripHtml = (html) => {
@@ -57,6 +59,8 @@ export default function SprintNotesSection({
   pageLoading
 }) {
   const historyListRef = useRef(null);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const getAttachmentUrl = (path) => {
     if (!path) return '';
@@ -75,7 +79,7 @@ export default function SprintNotesSection({
     if (!file) return;
 
     if (file.type !== 'application/pdf') {
-      alert('Please upload a PDF file only.');
+      toast.error('Please upload a PDF file only.');
       return;
     }
 
@@ -102,14 +106,20 @@ export default function SprintNotesSection({
       setLastSavedNoteTime(new Date().toLocaleTimeString());
     } catch (err) {
       console.error('[SprintNotesSection] Error uploading attachment:', err);
-      alert('Failed to upload PDF attachment. Please try again.');
+      toast.error('Failed to upload PDF attachment. Please try again.');
     } finally {
       setIsSavingNote(false);
     }
   };
 
   const handleRemoveAttachment = async () => {
-    if (!window.confirm('Are you sure you want to delete this PDF attachment?')) return;
+    const isConfirmed = await confirm({
+      title: 'Delete Attachment',
+      message: 'Are you sure you want to delete this PDF attachment?',
+      confirmText: 'Delete',
+      type: 'danger',
+    });
+    if (!isConfirmed) return;
 
     const formData = new FormData();
     formData.append('date', selectedNoteDate);
@@ -134,7 +144,7 @@ export default function SprintNotesSection({
       setLastSavedNoteTime(new Date().toLocaleTimeString());
     } catch (err) {
       console.error('[SprintNotesSection] Error removing attachment:', err);
-      alert('Failed to remove PDF attachment. Please try again.');
+      toast.error('Failed to remove PDF attachment. Please try again.');
     } finally {
       setIsSavingNote(false);
     }
