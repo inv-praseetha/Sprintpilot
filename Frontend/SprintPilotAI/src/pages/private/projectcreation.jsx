@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import ProjectModal from '../../components/Modals/projectmodal';
 import ProjectForm from '../../components/Modals/projectform';
+import { useValidationLimits } from '../../hooks/useValidationLimits';
+import apiClient from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import {
   Plus,
   Search,
@@ -18,16 +21,59 @@ import {
   Loader2,
   Filter,
   CheckSquare,
-  ChevronDown
+  ChevronDown,
+  Edit,
+  Trash2
 } from 'lucide-react';
+
+const calculateEndDate = (startDateStr, workingDaysStr) => {
+  if (!startDateStr || !workingDaysStr) return '';
+  const totalDays = parseInt(workingDaysStr, 10);
+  if (isNaN(totalDays) || totalDays <= 0) return '';
+
+  let currentDate = new Date(startDateStr);
+  let addedDays = 0;
+
+  // Roll forward if starting on a weekend
+  while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  while (addedDays < totalDays - 1) {
+    currentDate.setDate(currentDate.getDate() + 1);
+    const dayOfWeek = currentDate.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      addedDays++;
+    }
+  }
+
+  const year = currentDate.getFullYear();
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const day = String(currentDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getEffectiveSkills = (project) => {
+  if (!project.skills || project.skills.length === 0) return [];
+  if (!project.members || project.members.length === 0) {
+    return project.skills;
+  }
+
+  const memberSkillIds = new Set();
+  project.members.forEach(member => {
+    if (member.skills) {
+      member.skills.forEach(s => memberSkillIds.add(s.id));
+    }
+  });
+
+  const effective = project.skills.filter(skill => memberSkillIds.has(skill.id));
+  return effective.length > 0 ? effective : project.skills;
+};
 
 export default function ProjectCreation() {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
-
-  // Authentication State
-  const [currentUser, setCurrentUser] = useState(null);
-  const [token, setToken] = useState('');
+  const { user: currentUser, logout: handleLogout } = useAuth();
 
   // Domain Data States
   const [projects, setProjects] = useState([]);
@@ -38,10 +84,20 @@ export default function ProjectCreation() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const limits = useValidationLimits();
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   // Form Field States
+  const [projectId, setProjectId] = useState('');
+  const [jiraId, setJiraId] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('ACTIVE');
@@ -62,102 +118,57 @@ export default function ProjectCreation() {
   const [metaError, setMetaError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Initialize Auth & load configuration
-  useEffect(() => {
-    const savedToken = localStorage.getItem('access_token');
-    const savedUser = localStorage.getItem('user');
-
-    if (!savedToken) {
-      navigate('/');
-      return;
-    }
-
-    setToken(savedToken);
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    navigate('/');
-  };
-
-  // Check if User is Project Manager
   const isProjectManager = useMemo(() => {
     return currentUser?.role === 'PROJECT_MANAGER';
   }, [currentUser]);
 
-  // Load Skills & Employee Profiles
-  const fetchMetadata = async (authToken) => {
+  const fetchMetadata = async () => {
     setLoadingMeta(true);
     setMetaError(null);
-    console.log("[fetchMetadata] Initiating metadata fetch with token:", authToken ? `${authToken.slice(0, 10)}...` : 'None');
+    console.log("[fetchMetadata] Initiating metadata fetch");
     try {
       // 1. Fetch Skills
-      const skillsRes = await fetch('http://localhost:8000/api/projects/skills/', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      console.log("[fetchMetadata] Skills response status:", skillsRes.status);
-      if (skillsRes.ok) {
-        const skillsData = await skillsRes.json();
-        console.log("[fetchMetadata] Skills data loaded:", skillsData);
-        setSkills(skillsData);
-      } else {
-        const errText = await skillsRes.text();
-        console.error("[fetchMetadata] Failed to fetch skills:", skillsRes.status, errText);
-        setMetaError(`Failed to load skills: Status ${skillsRes.status}`);
-      }
+      const skillsRes = await apiClient.get('projects/skills/');
+      setSkills(skillsRes.data.results !== undefined ? skillsRes.data.results : skillsRes.data);
 
       // 2. Fetch Employee Profiles
-      const employeesRes = await fetch('http://localhost:8000/api/projects/employees/', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      console.log("[fetchMetadata] Employees response status:", employeesRes.status);
-      if (employeesRes.ok) {
-        const employeesData = await employeesRes.json();
-        console.log("[fetchMetadata] Employees data loaded:", employeesData);
-        setEmployees(employeesData);
-      } else {
-        const errText = await employeesRes.text();
-        console.error("[fetchMetadata] Failed to fetch employees:", employeesRes.status, errText);
-        setMetaError(prev => prev ? `${prev} & Failed to load employees: Status ${employeesRes.status}` : `Failed to load employees: Status ${employeesRes.status}`);
-      }
-
+      const employeesRes = await apiClient.get('projects/employees/');
+      setEmployees(employeesRes.data.results !== undefined ? employeesRes.data.results : employeesRes.data);
     } catch (err) {
       console.error('[fetchMetadata] Error fetching metadata:', err);
-      setMetaError(`Network connection error: ${err.message}`);
+      setMetaError(`Network connection error: ${err.message || 'Error fetching metadata'}`);
     } finally {
       setLoadingMeta(false);
     }
   };
 
-  // Load Projects List
-  const fetchProjects = async (authToken) => {
+  const fetchProjects = async (page = 1) => {
     setLoadingProjects(true);
     try {
-      const res = await fetch('http://localhost:8000/api/projects/', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data);
+      const params = {
+        page,
+        name: searchQuery || undefined,
+        status: statusFilter !== 'ALL' ? statusFilter : undefined
+      };
+      const res = await apiClient.get('projects/', { params });
+      if (res.data && res.data.results !== undefined) {
+        setProjects(res.data.results);
+        setTotalCount(res.data.count);
+        setHasNextPage(res.data.next !== null);
+        setHasPrevPage(res.data.previous !== null);
+        setCurrentPage(page);
       } else {
-        console.error('Failed to fetch projects');
+        setProjects(Array.isArray(res.data) ? res.data : []);
+        setTotalCount(Array.isArray(res.data) ? res.data.length : 0);
+        setHasNextPage(false);
+        setHasPrevPage(false);
+        setCurrentPage(1);
       }
     } catch (err) {
       console.error('Error fetching projects:', err);
+      if (err.response?.status === 404 && page > 1) {
+        fetchProjects(1);
+      }
     } finally {
       setLoadingProjects(false);
     }
@@ -165,11 +176,17 @@ export default function ProjectCreation() {
 
   // Load initial data
   useEffect(() => {
-    if (token) {
-      fetchProjects(token);
-      fetchMetadata(token);
-    }
-  }, [token]);
+    fetchMetadata();
+  }, []);
+
+  // Fetch projects when searchQuery or statusFilter changes
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchProjects(1);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, statusFilter]);
 
   // Automatically update number of days when Type changes
   useEffect(() => {
@@ -193,15 +210,10 @@ export default function ProjectCreation() {
     }
   }, [startDate, endDate, type]);
 
-  // Filter Projects by Search and Status
+  // Filter Projects by Search and Status (Now handled on server-side pagination)
   const filteredProjects = useMemo(() => {
-    return projects.filter(project => {
-      const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesStatus = statusFilter === 'ALL' || project.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [projects, searchQuery, statusFilter]);
+    return projects;
+  }, [projects]);
 
   // Filter Team Leads (Employees with role TEAM_LEAD)
   const teamLeads = useMemo(() => {
@@ -218,20 +230,25 @@ export default function ProjectCreation() {
     }
   }, [teamLeads, teamLead]);
 
-  // Filter Skills by selected Category
+  // Filter Skills by selected Category (Show UI and BACKEND only)
   const filteredSkills = useMemo(() => {
-    if (skillCategoryFilter === 'ALL') return skills;
-    return skills.filter(skill => skill.category === skillCategoryFilter);
+    const allowedSkills = skills.filter(skill => skill.category === 'UI' || skill.category === 'BACKEND');
+    if (skillCategoryFilter === 'ALL') return allowedSkills;
+    return allowedSkills.filter(skill => skill.category === skillCategoryFilter);
   }, [skills, skillCategoryFilter]);
 
   // Dynamic filter: Show only employees who possess all of the selected skills.
   // If no skills are selected, show all active employees.
-    const filteredEmployeesForSelection = useMemo(() => {
-      if (selectedSkills.length === 0) return employees;
-      return employees.filter(emp =>
-        emp.skills && selectedSkills.every(skillId => emp.skills.some(empSkill => empSkill.id === skillId))
-      );
-    }, [employees, selectedSkills]);
+  const filteredEmployeesForSelection = useMemo(() => {
+    const activeEmployees = employees.filter(emp =>
+      (emp.status === 'ACTIVE' || emp.status === 'WFM' || selectedMembers.includes(emp.id)) &&
+      emp.user?.role !== 'TEAM_LEAD'
+    );
+    if (selectedSkills.length === 0) return activeEmployees;
+    return activeEmployees.filter(emp =>
+      emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId)))
+    );
+  }, [employees, selectedSkills, selectedMembers]);
 
   // Handle Project Creation Submission
   const handleSubmit = async (e) => {
@@ -239,11 +256,42 @@ export default function ProjectCreation() {
     setFormError(null);
     setSubmitting(true);
 
+    if (!projectId || !projectId.trim()) {
+      setFormError("Project ID is required.");
+      setSubmitting(false);
+      return;
+    }
+    if (!/^[A-Z0-9\-]+$/.test(projectId.trim())) {
+      setFormError("Project ID must be alphanumeric and uppercase (hyphens allowed).");
+      setSubmitting(false);
+      return;
+    }
+
+    if (jiraId && jiraId.trim()) {
+      if (jiraId.trim().length > 10) {
+        setFormError("Jira ID cannot exceed 10 characters.");
+        setSubmitting(false);
+        return;
+      }
+      if (!/^[A-Z][A-Z0-9]+$/.test(jiraId.trim())) {
+        setFormError("Jira ID must start with an uppercase letter and be uppercase alphanumeric.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
     if (!name.trim()) {
       setFormError("Project Name is required.");
       setSubmitting(false);
       return;
     }
+
+    if (description && description.trim().length === 0) {
+      setFormError("Description cannot be purely whitespace.");
+      setSubmitting(false);
+      return;
+    }
+
     if (!teamLead) {
       setFormError("A Team Lead must be assigned.");
       setSubmitting(false);
@@ -259,83 +307,121 @@ export default function ProjectCreation() {
       setSubmitting(false);
       return;
     }
+    let computedDays = numberOfDays ? parseInt(numberOfDays, 10) : null;
+    let computedEndDate = endDate || null;
     if (type === 'WATERFALL') {
       if (!startDate || !endDate) {
         setFormError("Start Date and End Date are required for Waterfall projects.");
         setSubmitting(false);
         return;
       }
-      if (new Date(endDate) <= new Date(startDate)) {
-        setFormError("End Date must be greater than Start Date.");
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (end < start) {
+        setFormError("End Date must be greater than or equal to Start Date.");
         setSubmitting(false);
         return;
       }
+      if (!editingProjectId && start < today) {
+        setFormError("Start Date must be greater than or equal to today.");
+        setSubmitting(false);
+        return;
+      }
+      if (!editingProjectId && end < today) {
+        setFormError("End Date must be greater than or equal to today.");
+        setSubmitting(false);
+        return;
+      }
+      const diffTime = Math.abs(end - start);
+      computedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     } else {
-      // AGILE requires number of days
+      // AGILE requires number of days and start date
+      if (!startDate) {
+        setFormError("Start Date is required for Agile projects.");
+        setSubmitting(false);
+        return;
+      }
+
+      const start = new Date(startDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!editingProjectId && start < today) {
+        setFormError("Start Date must be greater than or equal to today.");
+        setSubmitting(false);
+        return;
+      }
+
       if (!numberOfDays || parseInt(numberOfDays, 10) <= 0) {
         setFormError("Number of days is required for Agile projects.");
         setSubmitting(false);
         return;
       }
+      computedEndDate = calculateEndDate(startDate, numberOfDays);
     }
     if (!teamSize || parseInt(teamSize, 10) <= 0) {
       setFormError("Team size must be a positive number.");
       setSubmitting(false);
       return;
     }
-    if (selectedMembers.length === 0) {
+    const maxTeamSize = parseInt(teamSize, 10);
+    if (selectedMembers.length > maxTeamSize) {
+      setFormError(`Cannot allocate more members (${selectedMembers.length}) than the project team size (${maxTeamSize}).`);
+      setSubmitting(false);
+      return;
+    }
+    if (!editingProjectId && selectedMembers.length === 0) {
       setFormError("At least one team member must be selected.");
       setSubmitting(false);
       return;
     }
-    if (selectedSkills.length === 0) {
+    if (!editingProjectId && selectedSkills.length === 0) {
       setFormError("At least one skill must be selected.");
       setSubmitting(false);
       return;
     }
 
     const requestData = {
+      project_id: projectId.trim() || null,
+      jira_id: jiraId?.trim() || null,
       name,
       description: description.trim() || null,
       status,
       type,
       start_date: startDate || null,
-      end_date: endDate || null,
-      number_of_days: numberOfDays ? parseInt(numberOfDays, 10) : null,
+      end_date: computedEndDate,
+      number_of_days: computedDays,
       team_lead: teamLead,
-      members: selectedMembers,
-      skills: selectedSkills,
       team_size: teamSize ? parseInt(teamSize, 10) : 0
     };
 
+    if (!editingProjectId) {
+      requestData.members = selectedMembers;
+      requestData.skills = selectedSkills;
+    }
+
     try {
-      const res = await fetch('http://localhost:8000/api/projects/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-      });
+      const response = editingProjectId
+        ? await apiClient.put(`projects/${editingProjectId}/`, requestData)
+        : await apiClient.post('projects/', requestData);
 
-      const data = await res.json();
-
-      if (res.ok) {
-        fetchProjects(token);
-        setShowModal(false);
-        resetForm();
-      } else {
-        setFormError(data.detail || JSON.stringify(data));
-      }
+      fetchProjects(editingProjectId ? currentPage : 1);
+      fetchMetadata();
+      setShowModal(false);
+      resetForm();
     } catch (err) {
-      console.error('Error creating project:', err);
-      setFormError('Failed to connect to the server. Please check your network.');
+      console.error('Error saving project:', err);
+      setFormError(err.response?.data?.detail || err.message || 'Failed to save project.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const resetForm = () => {
+    setProjectId('');
+    setJiraId('');
     setName('');
     setDescription('');
     setStatus('ACTIVE');
@@ -353,34 +439,85 @@ export default function ProjectCreation() {
     setFormError(null);
   };
 
+  const handleEditProject = (project) => {
+    setEditingProjectId(project.id);
+    setProjectId(project.project_id || '');
+    setJiraId(project.jira_id || '');
+    setName(project.name || '');
+    setDescription(project.description || '');
+    setStatus(project.status || 'ACTIVE');
+    setType(project.type || 'AGILE');
+    setStartDate(project.start_date || '');
+    setEndDate(project.end_date || '');
+    setNumberOfDays(project.number_of_days ? String(project.number_of_days) : '10');
+    setTeamLead(project.team_lead?.id || '');
+    setSelectedMembers(project.members ? project.members.map(m => m.id || m) : []);
+    setSelectedSkills(project.skills ? project.skills.map(s => s.id || s) : []);
+    setTeamSize(project.team_size ? String(project.team_size) : '0');
+    setFormError(null);
+    setShowModal(true);
+  };
+
+  const handleStatusChange = async (projectId, newStatus) => {
+    try {
+      await apiClient.patch(`projects/${projectId}/`, { status: newStatus });
+      fetchProjects(currentPage);
+      fetchMetadata();
+    } catch (err) {
+      console.error("Error changing project status:", err);
+      alert(err.response?.data?.detail || "Failed to update project status.");
+    }
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (!window.confirm("Are you sure you want to delete this project?")) {
+      return;
+    }
+    try {
+      await apiClient.delete(`projects/${projectId}/`);
+      fetchProjects(currentPage);
+      fetchMetadata();
+    } catch (err) {
+      console.error("Error deleting project:", err);
+      alert(err.response?.data?.detail || err.message || "Failed to delete project.");
+    }
+  };
+
+  const handleRowClick = (e, projectId) => {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('svg') || e.target.closest('select')) {
+      return;
+    }
+    navigate(`/projects/${projectId}`);
+  };
+
   const toggleMemberSelection = (id) => {
-    setSelectedMembers(prev => 
+    setSelectedMembers(prev =>
       prev.includes(id) ? prev.filter(mId => mId !== id) : [...prev, id]
     );
   };
 
   const toggleSkillSelection = (id) => {
-    setSelectedSkills(prev => 
+    setSelectedSkills(prev =>
       prev.includes(id) ? prev.filter(sId => sId !== id) : [...prev, id]
     );
   };
 
   return (
-    <main className="p-8 lg:p-10 space-y-8 max-w-[1400px] mx-auto text-left">
-      
+    <main className="p-8 lg:p-10 space-y-8 mx-auto text-left">
+
       {/* PAGE HEADER */}
-      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6">
+      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <span className="text-sm font-semibold text-orange-500 uppercase tracking-wider">Create Project</span>
           <h1 className="text-4xl font-black tracking-tight mt-1">
-            Assign Your Sprints
+            Manage your Projects
           </h1>
         </div>
 
         <div>
           {isProjectManager ? (
             <button
-              onClick={() => { resetForm(); setShowModal(true); }}
+              onClick={() => { setEditingProjectId(null); resetForm(); setShowModal(true); }}
               className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-lg shadow-orange-500/25 hover:scale-[1.02] cursor-pointer"
             >
               <Plus className="w-5 h-5 stroke-[2.5]" />
@@ -402,14 +539,14 @@ export default function ProjectCreation() {
           <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search projects by name, description..."
+            placeholder="Search projects by name........."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${
-              darkMode 
-                ? 'bg-slate-900 border-slate-800/60 text-slate-200 placeholder-slate-500 focus:border-orange-500' 
-                : 'bg-white border-slate-100 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:shadow-md'
-            }`}
+            maxLength={limits.general.search.maxLength}
+            className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
+              ? 'bg-slate-900 border-slate-800/60 text-slate-200 placeholder-slate-500 focus:border-orange-500'
+              : 'bg-white border-slate-100 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:shadow-md'
+              }`}
           />
         </div>
 
@@ -419,15 +556,14 @@ export default function ProjectCreation() {
             <button
               key={filter}
               onClick={() => setStatusFilter(filter)}
-              className={`px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                statusFilter === filter
-                  ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/10'
-                  : darkMode
-                    ? 'bg-slate-900 border-slate-800/60 text-slate-400 hover:text-slate-200'
-                    : 'bg-white border-slate-150 text-slate-500 hover:bg-slate-50'
-              }`}
+              className={`px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${statusFilter === filter
+                ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/10'
+                : darkMode
+                  ? 'bg-slate-900 border-slate-800/60 text-slate-400 hover:text-slate-200'
+                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
             >
-              {filter === 'ALL' ? 'All Sprints' : filter.replace('_', ' ')}
+              {filter === 'ALL' ? 'All Projects' : filter.replace('_', ' ')}
             </button>
           ))}
         </div>
@@ -441,8 +577,8 @@ export default function ProjectCreation() {
             <div>
               <span className="block font-bold text-base">Session Expired or Unauthorized</span>
               <span className="text-xs font-medium opacity-90 text-rose-450 dark:text-rose-400">
-                {metaError.includes('401') 
-                  ? 'Your login session has expired. Please sign in again to obtain a fresh credentials token.' 
+                {metaError.includes('401')
+                  ? 'Your login session has expired. Please sign in again to obtain a fresh credentials token.'
                   : `${metaError}. Please verify the Django backend is active.`}
               </span>
             </div>
@@ -462,10 +598,9 @@ export default function ProjectCreation() {
           <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
           <span className="text-sm font-bold text-slate-400">Loading project portfolio...</span>
         </div>
-      ) : filteredProjects.length === 0 ? (
-        <div className={`p-16 rounded-3xl border-2 border-dashed text-center space-y-5 ${
-          darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-slate-50/50 border-slate-200'
-        }`}>
+      ) : totalCount === 0 ? (
+        <div className={`p-16 rounded-3xl border-2 border-dashed text-center space-y-5 ${darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-slate-50/50 border-slate-200'
+          }`}>
           <div className="w-14 h-14 rounded-2xl bg-slate-200/40 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
             <Briefcase className="w-7 h-7" />
           </div>
@@ -485,126 +620,260 @@ export default function ProjectCreation() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <div
-              key={project.id}
-              className={`p-6.5 rounded-3xl border flex flex-col justify-between transition-all hover:scale-[1.01] ${
-                darkMode 
-                  ? 'bg-slate-900 border-slate-850 hover:border-slate-750' 
-                  : 'bg-white border-slate-100 hover:shadow-2xl hover:shadow-slate-100/70 hover:border-slate-200/50'
-              }`}
-            >
-              <div className="space-y-4.5">
-                {/* Badges Row */}
-                <div className="flex items-center justify-between">
-                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                    project.type === 'AGILE'
-                      ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
-                      : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
-                  }`}>
-                    {project.type}
-                  </span>
-
-                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                    project.status === 'ACTIVE'
-                      ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                      : project.status === 'ON_HOLD'
-                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                        : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
-                  }`}>
-                    {project.status.replace('_', ' ')}
-                  </span>
-                </div>
-
-                {/* Project Title */}
-                <div>
-                  <h3 className="font-extrabold text-2xl tracking-tight line-clamp-1">
-                    {project.name}
-                  </h3>
-                  <p className="text-slate-400 text-xs mt-2 line-clamp-2 leading-relaxed font-medium">
-                    {project.description || 'No description provided.'}
-                  </p>
-                </div>
-
-                {/* Date / Timeline Offset */}
-                <div className={`p-4 rounded-2xl flex items-center justify-between gap-4 text-xs font-bold ${
-                  darkMode ? 'bg-slate-950/60' : 'bg-slate-50/50'
-                }`}>
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Calendar className="w-4.5 h-4.5 text-slate-450" />
-                    {project.start_date ? (
-                      <span>{project.start_date} - {project.end_date || 'Ongoing'}</span>
-                    ) : (
-                      <span>No timeline set</span>
-                    )}
-                  </div>
-                  {project.number_of_days && (
-                    <div className="flex items-center gap-1.5 text-orange-500 font-extrabold">
-                      <Clock className="w-4 h-4" />
-                      <span>{project.number_of_days} Days</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Technical Stack (Skills) */}
-                {project.skills && project.skills.length > 0 && (
-                  <div className="space-y-1.5 text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                      <Code className="w-3 h-3 text-slate-400" /> Technologies / Skills
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {project.skills.map((skill) => (
-                        <span
-                          key={skill.id}
-                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400"
-                        >
-                          {skill.name}
+        <div className={`overflow-hidden rounded-3xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/50'
+          }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-bold text-left uppercase tracking-wider select-none">
+                  <th className="py-5 px-6">Project Details</th>
+                  <th className="py-5 px-4">Type</th>
+                  <th className="py-5 px-4">Status</th>
+                  <th className="py-5 px-4">Timeline</th>
+                  <th className="py-5 px-4">Team Lead</th>
+                  <th className="py-5 px-4">Tech Stack</th>
+                  <th className="py-5 px-6 text-right">Team Size</th>
+                  {isProjectManager && <th className="py-5 px-6 text-right">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-left">
+                {filteredProjects.map((project) => (
+                  <tr
+                    key={project.id}
+                    onClick={(e) => handleRowClick(e, project.id)}
+                    className="text-sm font-semibold transition-colors hover:bg-slate-50/20 dark:hover:bg-slate-900/10 cursor-pointer"
+                  >
+                    {/* Project Title & Description */}
+                    <td className="py-5 px-6 max-w-sm">
+                      <div className="space-y-1">
+                        <span className={`block font-extrabold text-base tracking-tight truncate ${darkMode ? 'text-white' : 'text-slate-900'
+                          }`}>
+                          <Link
+                            to={`/projects/${project.id}`}
+                            className="hover:text-orange-500 transition-colors cursor-pointer"
+                          >
+                            {project.name}
+                          </Link>
                         </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Members / Team Section */}
-              <div className="border-t border-slate-100 dark:border-slate-800/80 mt-6 pt-4 flex items-center justify-between">
-                {/* Team Lead Info */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-xs border border-orange-500/20 shadow-sm">
-                    {project.team_lead?.full_name ? project.team_lead.full_name.charAt(0) : 'TL'}
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Team Lead</span>
-                    <span className="text-xs font-bold text-slate-655 dark:text-slate-300">
-                      {project.team_lead?.full_name || 'Unassigned'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Team Members List */}
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[10px] font-black px-2.5 py-1.5 rounded-xl bg-orange-500/10 text-orange-500 border border-orange-500/25 shadow-sm" title="Total Team Size">
-                    Size: {project.team_size || 0}
-                  </span>
-                  <div className="flex -space-x-2.5 overflow-hidden">
-                    {project.members && project.members.map((member) => (
-                      <div
-                        key={member.id}
-                        title={`${member.user?.full_name} (${member.designation})`}
-                        className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-450 flex items-center justify-center font-bold text-[10px] border-2 border-white dark:border-slate-900"
-                      >
-                        {member.user?.full_name ? member.user.full_name.charAt(0) : '?'}
+                        <span className="block text-slate-400 text-xs font-medium line-clamp-2 leading-relaxed">
+                          {project.description || 'No description provided.'}
+                        </span>
                       </div>
-                    ))}
-                    {(!project.members || project.members.length === 0) && (
-                      <span className="text-[10px] text-slate-400 font-semibold italic">No members</span>
+                    </td>
+
+                    {/* Type Badge */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest truncate max-w-[100px] inline-block ${project.type === 'AGILE'
+                        ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+                        : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
+                        }`}>
+                        {project.type}
+                      </span>
+                    </td>
+
+                    {/* Status Badge / Dropdown */}
+                    <td className="py-5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {isProjectManager ? (
+                        <select
+                          value={project.status}
+                          onChange={(e) => handleStatusChange(project.id, e.target.value)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer transition-all outline-none ${project.status === 'ACTIVE'
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20'
+                            : project.status === 'ON_HOLD'
+                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/25 hover:bg-amber-500/20'
+                              : 'bg-slate-500/10 text-slate-700 border-slate-500/25 hover:bg-slate-500/20'
+                            }`}
+                        >
+                          <option value="ACTIVE" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">ACTIVE</option>
+                          <option value="ON_HOLD" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">ON HOLD</option>
+                          <option value="COMPLETED" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">COMPLETED</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest truncate max-w-[100px] inline-block ${project.status === 'ACTIVE'
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : project.status === 'ON_HOLD'
+                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
+                          }`}>
+                          {project.status.replace('_', ' ')}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Timeline & Duration */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="truncate max-w-[150px]">
+                            {project.start_date ? `${project.start_date} - ${project.end_date || 'Ongoing'}` : 'No timeline set'}
+                          </span>
+                        </div>
+                        {project.number_of_days && (
+                          <div className="flex items-center gap-1 text-[10px] text-orange-500 font-extrabold">
+                            <Clock className="w-3 h-3" />
+                            <span>{project.number_of_days} Days</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Team Lead */}
+                    <td className="py-5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-[10px] border border-orange-500/20 shadow-sm">
+                          {project.team_lead?.full_name ? project.team_lead.full_name.charAt(0) : 'TL'}
+                        </div>
+                        <span className={`text-xs font-bold truncate max-w-[120px] ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                          {project.team_lead?.full_name || 'Unassigned'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Tech Stack Tags */}
+                    <td className="py-5 px-4 max-w-[200px]">
+                      {(() => {
+                        const effectiveSkills = getEffectiveSkills(project);
+                        const uniqueCats = Array.from(new Set(effectiveSkills.map(s => s.category).filter(Boolean)));
+                        return (
+                          <div className="space-y-1.5">
+                            {/* Unique Categories */}
+                            {uniqueCats.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {uniqueCats.map((cat) => (
+                                  <span
+                                    key={cat}
+                                    className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 border border-indigo-500/20"
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {effectiveSkills.length > 0 ? (
+                                effectiveSkills.slice(0, 3).map((skill) => (
+                                  <span
+                                    key={skill.id}
+                                    className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                  >
+                                    {skill.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-semibold italic">None</span>
+                              )}
+                              {effectiveSkills.length > 3 && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                                  +{effectiveSkills.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
+                    {/* Team Size Column */}
+                    <td className="py-5 px-6 whitespace-nowrap text-right">
+                      <span className="text-[10px] font-black px-2.5 py-1.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20 shadow-sm truncate max-w-[100px] inline-block">
+                        {project.team_size || 0} Members
+                      </span>
+                    </td>
+
+                    {/* Actions Column */}
+                    {isProjectManager && (
+                      <td className="py-5 px-6 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEditProject(project)}
+                            disabled={project.status === 'COMPLETED'}
+                            className={`p-2 rounded-xl border transition-all ${project.status === 'COMPLETED'
+                              ? 'bg-blue-500/5 text-blue-400/50 dark:text-blue-400/40 border-blue-500/10 cursor-not-allowed'
+                              : 'bg-blue-500/10 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border-blue-500/20 cursor-pointer'
+                              }`}
+                            title={project.status === 'COMPLETED' ? "Completed projects cannot be edited" : "Edit Project"}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            disabled={project.status === 'COMPLETED'}
+                            className={`p-2 rounded-xl border transition-all ${project.status === 'COMPLETED'
+                              ? 'bg-rose-500/5 text-rose-400/50 dark:text-rose-400/40 border-rose-500/10 cursor-not-allowed'
+                              : 'bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border-rose-500/20 cursor-pointer'
+                              }`}
+                            title={project.status === 'COMPLETED' ? "Completed projects cannot be deleted" : "Delete Project"}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${darkMode
+            ? 'border-slate-800 bg-slate-900/60'
+            : 'border-slate-100 bg-slate-50/30'
+            }`}>
+            <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{Math.ceil(totalCount / 5) || 1}</span> ({totalCount} total projects)
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fetchProjects(currentPage - 1)}
+                disabled={!hasPrevPage}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${hasPrevPage
+                  ? darkMode
+                    ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                    : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 cursor-pointer shadow-sm shadow-slate-100/50'
+                  : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                  }`}
+              >
+                Previous
+              </button>
+
+              {/* Dynamic Page Numbers */}
+              {Array.from({ length: Math.ceil(totalCount / 5) || 1 }, (_, i) => i + 1).map((p) => {
+                const isSelected = p === currentPage;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => fetchProjects(p)}
+                    className={`w-8.5 h-8.5 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${isSelected
+                      ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
+                      : darkMode
+                        ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
+                        : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
+                      }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => fetchProjects(currentPage + 1)}
+                disabled={!hasNextPage}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${hasNextPage
+                  ? darkMode
+                    ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
+                    : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 cursor-pointer shadow-sm shadow-slate-100/50'
+                  : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                  }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -613,11 +882,17 @@ export default function ProjectCreation() {
         show={showModal}
         onClose={() => setShowModal(false)}
         darkMode={darkMode}
+        title={editingProjectId ? 'Update your project' : 'Create New Project'}
       >
         <ProjectForm
           handleSubmit={handleSubmit}
           formError={formError}
+          calculateEndDate={calculateEndDate}
           darkMode={darkMode}
+          projectId={projectId}
+          setProjectId={setProjectId}
+          jiraId={jiraId}
+          setJiraId={setJiraId}
           name={name}
           setName={setName}
           description={description}
@@ -643,46 +918,14 @@ export default function ProjectCreation() {
           selectedSkills={selectedSkills}
           toggleSkillSelection={toggleSkillSelection}
           filteredEmployeesForSelection={filteredEmployeesForSelection}
+          employees={employees}
           selectedMembers={selectedMembers}
           toggleMemberSelection={toggleMemberSelection}
           onClose={() => setShowModal(false)}
           submitting={submitting}
+          editingProjectId={editingProjectId}
         />
       </ProjectModal>
-
-      {/* DEVELOPMENT STATE DIAGNOSTICS
-      <section className={`mt-12 p-6 rounded-3xl border text-xs font-mono space-y-3 ${
-        darkMode ? 'bg-slate-905/40 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
-      }`}>
-        <h4 className="font-bold text-sm text-orange-500 uppercase tracking-wider">System Integration Diagnostics</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <span className="block text-slate-400 font-bold">User Authenticated:</span>
-            <span>{currentUser ? `${currentUser.full_name} (${currentUser.role})` : 'No'}</span>
-          </div>
-          <div>
-            <span className="block text-slate-400 font-bold">Total Skills Loaded:</span>
-            <span>{skills.length} (Filtered: {filteredSkills.length})</span>
-          </div>
-          <div>
-            <span className="block text-slate-400 font-bold">Total Profiles Loaded:</span>
-            <span>{employees.length}</span>
-          </div>
-          <div>
-            <span className="block text-slate-400 font-bold">Filtered Team Leads:</span>
-            <span>{teamLeads.length}</span>
-          </div>
-        </div>
-        <div className="flex gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => fetchMetadata(token)}
-            className="px-3 py-1 rounded bg-orange-500 text-white font-bold text-[10px] hover:bg-orange-600 transition-all cursor-pointer"
-          >
-            Force Sync Metadata
-          </button>
-        </div>
-      </section> */}
 
     </main>
   );

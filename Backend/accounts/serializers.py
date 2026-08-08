@@ -52,9 +52,16 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_skills(self, obj):
+        relations = obj.employee_skill_relations.all()
         return [
-            {"id": s.id, "name": s.name, "category": s.category}
-            for s in obj.skills.all()
+            {
+                "id": rel.skill.id, 
+                "name": rel.skill.name, 
+                "category": rel.skill.category, 
+                "parent": rel.skill.parent_id,
+                "proficiency_level": rel.proficiency_level
+            }
+            for rel in relations
         ]
 
 

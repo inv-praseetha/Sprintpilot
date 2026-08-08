@@ -3,7 +3,6 @@ const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/'
 
 const apiClient = axios.create({
   baseURL: BACKEND_URL,
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,7 +11,6 @@ const apiClient = axios.create({
 // Dedicated instance for refreshing tokens (no interceptors attached)
 const refreshClient = axios.create({
   baseURL: BACKEND_URL,
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -33,12 +31,17 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Request Interceptor: Attach Access Token to every outgoing request
+// Request Interceptor: Attach Access Token to every outgoing request (except auth endpoints)
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    const authEndpoints = ['auth/google/', 'auth/refresh/', 'login/', 'register/', 'forgot-password/', 'reset-password/'];
+    const isAuthEndpoint = authEndpoints.some(endpoint => config.url && config.url.includes(endpoint));
+
+    if (!isAuthEndpoint) {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -106,8 +109,8 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
         
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
         }
         return Promise.reject(refreshError);
       } finally {
