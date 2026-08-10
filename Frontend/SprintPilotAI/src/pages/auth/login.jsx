@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import BrandHeader from "../../components/login/ BrandHeader";
+import BrandHeader from "../../components/login/BrandHeader";
 import ErrorAlert from "../../components/login/ErrorAlert";
 import GoogleButtonSkeleton from "../../components/login/GoogleButtonSkeleton";
 import LoginIllustration from "../../components/login/LoginIllustration";

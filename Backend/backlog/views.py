@@ -16,6 +16,20 @@ class SprintSyncBacklogView(APIView):
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Authorization check: Ensure user is creator, team lead, or project member
+        project = sprint.project
+        user = request.user
+        has_access = (
+            project.created_by == user or 
+            project.team_lead == user
+        )
+        
+        if not has_access:
+            return Response(
+                {"detail": "You do not have permission to access this sprint."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         if sprint.project.status == 'COMPLETED':
             return Response(
                 {"detail": "Cannot sync tasks for a completed project."}, 

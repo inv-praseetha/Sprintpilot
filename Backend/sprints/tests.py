@@ -4,6 +4,7 @@ import json
 from unittest.mock import patch, MagicMock
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from accounts.models import Employee, EmployeeProfile, EmployeeSkill
@@ -770,6 +771,9 @@ class SprintClosureTests(APITestCase):
         SprintTask.objects.create(sprint=self.sprint, title="T4", status="CLOSED", category="UI", description="d")
         SprintTask.objects.create(sprint=self.sprint, title="T5", status="OPEN", category="UI", description="d", is_deleted=True) # Ignored
 
+        self.sprint.synced_at = timezone.now()
+        self.sprint.save()
+
         url = reverse('sprint_closure_summary', kwargs={'pk': self.sprint.id})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -781,10 +785,19 @@ class SprintClosureTests(APITestCase):
         self.assertEqual(data['closed_tasks'], 1)
 
     def test_sprint_closure_summary_empty_sprint(self):
+        self.sprint.synced_at = timezone.now()
+        self.sprint.save()
         url = reverse('sprint_closure_summary', kwargs={'pk': self.sprint.id})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Sprint does not contain any tasks", response.data['detail'])
+
+    def test_sprint_closure_summary_not_synced(self):
+        # By default, synced_at is None
+        url = reverse('sprint_closure_summary', kwargs={'pk': self.sprint.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Sprint is not connected to Backlog. Please sync tasks to Backlog first.", response.data['detail'])
 
     def test_sprint_closure_summary_already_closed(self):
         self.sprint.status = "COMPLETED"
@@ -798,6 +811,9 @@ class SprintClosureTests(APITestCase):
     def test_sprint_close_success(self, mock_update_task):
         task1 = SprintTask.objects.create(sprint=self.sprint, title="T1", status="OPEN", category="UI", description="d", backlog_task_id="B-1")
         task2 = SprintTask.objects.create(sprint=self.sprint, title="T2", status="IN_PROGRESS", category="UI", description="d", backlog_task_id="B-2")
+        
+        self.sprint.synced_at = timezone.now()
+        self.sprint.save()
         
         url = reverse('sprint_close', kwargs={'pk': self.sprint.id})
         response = self.client.post(url)
@@ -815,6 +831,9 @@ class SprintClosureTests(APITestCase):
     def test_sprint_close_rollback_on_backlog_failure(self, mock_update_task):
         task1 = SprintTask.objects.create(sprint=self.sprint, title="T1", status="OPEN", category="UI", description="d", backlog_task_id="B-1")
         mock_update_task.side_effect = Exception("Backlog API Error")
+        
+        self.sprint.synced_at = timezone.now()
+        self.sprint.save()
         
         url = reverse('sprint_close', kwargs={'pk': self.sprint.id})
         response = self.client.post(url)
