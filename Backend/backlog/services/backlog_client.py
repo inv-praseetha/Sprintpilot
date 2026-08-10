@@ -427,3 +427,45 @@ class BacklogService:
                 if getattr(e, 'response', None) is not None:
                     logger.error(f"Backlog response: {e.response.text}")
                 raise Exception(f"Failed to fetch updated issues from Backlog: {e}")
+
+    def get_issue_comments(self, backlog_task_id):
+        if not self.workspace_url or not self.api_key:
+            raise ValueError("Backlog configuration missing.")
+            
+        url = f"{self.workspace_url}/api/v2/issues/{backlog_task_id}/comments"
+        params = {"apiKey": self.api_key, "count": 100}
+        
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        return response.json()
+
+    def post_issue_comment(self, backlog_task_id, content):
+        if not self.workspace_url or not self.api_key:
+            raise ValueError("Backlog configuration missing.")
+            
+        url = f"{self.workspace_url}/api/v2/issues/{backlog_task_id}/comments"
+        params = {"apiKey": self.api_key}
+        data = {"content": content}
+        
+        response = requests.post(url, params=params, data=data)
+        response.raise_for_status()
+        return response.json()
+
+    def get_issue_comments_count(self, backlog_task_id):
+        if not self.workspace_url or not self.api_key:
+            return 0
+            
+        url = f"{self.workspace_url}/api/v2/issues/{backlog_task_id}/comments"
+        params = {"apiKey": self.api_key, "count": 100}
+        
+        import requests
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            comments = response.json()
+            return sum(1 for c in comments if c.get('content') and str(c.get('content')).strip())
+        except requests.exceptions.RequestException as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to fetch comments count for issue {backlog_task_id}: {e}")
+            return 0
