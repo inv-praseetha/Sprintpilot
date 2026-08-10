@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity } from 'lucide-react';
+import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity, ChevronDown } from 'lucide-react';
 import ProjectService from '../../services/ProjectService';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import apiClient from '../../api/apiClient';
@@ -36,6 +36,84 @@ const calculateAgileEndDate = (startDateStr) => {
   const m = String(current.getMonth() + 1).padStart(2, '0');
   const d = String(current.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+};
+
+const CategoryDropdown = ({ categoryStr, onChange, darkMode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = React.useRef(null);
+  const selectedList = categoryStr ? categoryStr.split(', ').filter(c => c.trim() !== '') : [];
+
+  const toggleOpen = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const menuHeight = 150;
+      let top = rect.bottom + 4;
+      if (window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight) {
+        top = rect.top - menuHeight - 4;
+      }
+      setPos({ top, left: rect.left, width: Math.max(rect.width, 140) });
+    }
+    setIsOpen(!isOpen);
+  };
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleScroll = () => setIsOpen(false);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [isOpen]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={toggleOpen}
+        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold focus:outline-none flex items-center justify-between text-left transition-colors ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 focus:border-blue-500' : 'bg-white border-slate-200 text-slate-600 focus:border-blue-500'}`}
+      >
+        <span className="truncate max-w-[80px]">
+          {selectedList.length > 0 ? selectedList.join(', ') : 'Select...'}
+        </span>
+        <ChevronDown className={`w-3 h-3 ml-1 transition-transform duration-200 flex-shrink-0 ${isOpen ? 'transform rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
+          <div 
+            className={`fixed z-[70] p-1.5 rounded-xl border shadow-2xl flex flex-col gap-1 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
+          >
+            {['UI', 'BACKEND', 'INFRA', 'QA'].map(cat => {
+              const isSelected = selectedList.includes(cat);
+              return (
+                <label key={cat} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs font-bold transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`} onClick={e => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                       e.stopPropagation();
+                       let nextList;
+                       if (isSelected) {
+                         nextList = selectedList.filter(c => c !== cat);
+                       } else {
+                         nextList = [...selectedList, cat];
+                       }
+                       onChange(nextList.join(', '));
+                    }}
+                    className={`rounded w-3.5 h-3.5 cursor-pointer flex-shrink-0 ${darkMode ? 'bg-slate-900 border-slate-600 text-blue-500' : 'bg-white border-slate-300 text-blue-600 focus:ring-blue-500'}`}
+                  />
+                  <span>{cat}</span>
+                </label>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </>
+  );
 };
 
 export default function TaskUploadModal({
@@ -966,32 +1044,12 @@ export default function TaskUploadModal({
                             <td className="py-2 px-3 font-semibold truncate max-w-[150px]" title={row.title}>{row.title}</td>
                             <td className="py-2 px-3 text-slate-500 truncate max-w-[180px]" title={row.desc}>{row.desc}</td>
                             <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex flex-wrap gap-1 max-w-[120px]">
-                                {['UI', 'BACKEND', 'INFRA', 'QA'].map(cat => {
-                                  const isSelected = row.category && row.category.split(', ').includes(cat);
-                                  return (
-                                    <button
-                                      key={cat}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        let current = row.category ? row.category.split(', ').filter(c => c.trim() !== '') : [];
-                                        if (isSelected) {
-                                          current = current.filter(c => c !== cat);
-                                        } else {
-                                          current.push(cat);
-                                        }
-                                        handleTaskCategoryChange(idx, current.join(', '));
-                                      }}
-                                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition-colors border ${
-                                        isSelected 
-                                          ? (darkMode ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-600 border-blue-200')
-                                          : (darkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50')
-                                      }`}
-                                    >
-                                      {cat}
-                                    </button>
-                                  );
-                                })}
+                              <div className="w-[120px]">
+                                <CategoryDropdown
+                                  categoryStr={row.category}
+                                  onChange={(newCat) => handleTaskCategoryChange(idx, newCat)}
+                                  darkMode={darkMode}
+                                />
                               </div>
                             </td>
                             <td className="py-2 px-3 text-slate-400 font-semibold">{row.estimated_hours !== null && row.estimated_hours !== undefined ? `${row.estimated_hours}h` : 'N/A'}</td>
