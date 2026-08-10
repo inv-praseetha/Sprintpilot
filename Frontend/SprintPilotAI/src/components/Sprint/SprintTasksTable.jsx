@@ -413,13 +413,19 @@ export default function SprintTasksTable({
               END
             </th>
             <th
-              className={`py-2 px-4 sticky left-[760px] top-[36px] z-40 border-r w-52 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+              className={`py-2 px-3 sticky left-[760px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+              style={{ minWidth: '70px', maxWidth: '70px', width: '70px' }}
+            >
+              EST. HRS
+            </th>
+            <th
+              className={`py-2 px-4 sticky left-[830px] top-[36px] z-40 border-r w-52 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
               style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
             >
               RECOMMENDATION REASON
             </th>
             <th
-              className={`py-2 px-3 sticky left-[970px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+              className={`py-2 px-3 sticky left-[1040px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
               style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
             >
               ACTIONS
@@ -484,11 +490,15 @@ export default function SprintTasksTable({
               style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
             />
             <th
-              className={`py-1 px-4 sticky left-[760px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
+              className={`py-1 px-3 sticky left-[760px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
+              style={{ minWidth: '70px', maxWidth: '70px', width: '70px' }}
+            />
+            <th
+              className={`py-1 px-4 sticky left-[830px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
               style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
             />
             <th
-              className={`py-1 px-3 sticky left-[970px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
+              className={`py-1 px-3 sticky left-[1040px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
               style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
             />
 
@@ -568,11 +578,15 @@ export default function SprintTasksTable({
                     style={{ minWidth: '90px', maxWidth: '90px', width: '90px' }}
                   />
                   <td
-                    className={`py-3 px-4 sticky left-[760px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
+                    className={`py-3 px-3 sticky left-[760px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
+                    style={{ minWidth: '70px', maxWidth: '70px', width: '70px' }}
+                  />
+                  <td
+                    className={`py-3 px-4 sticky left-[830px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
                     style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                   />
                   <td
-                    className={`py-3 px-3 sticky left-[970px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
+                    className={`py-3 px-3 sticky left-[1040px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
                     style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                   />
 
@@ -789,9 +803,20 @@ export default function SprintTasksTable({
                         )}
                       </td>
 
+                      {/* EST. HRS */}
+                      <td
+                        className={`py-4 px-2 sticky left-[760px] ${rowZIndexClass} border-r align-middle text-center text-[10px] font-extrabold ${stickyNormalBgClass}`}
+                        style={{ minWidth: '70px', maxWidth: '70px', width: '70px' }}
+                      >
+                        {task.estimated_hours != null
+                          ? <span className={`${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>{parseFloat(task.estimated_hours)}h</span>
+                          : <span className="opacity-30">-</span>
+                        }
+                      </td>
+
                       {/* REASON */}
                       <td
-                        className={`py-4 px-2 sticky left-[760px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
+                        className={`py-4 px-2 sticky left-[830px] ${rowZIndexClass} hover:z-50 border-r align-middle text-[10px] text-left italic group ${stickyNormalBgClass}`}
                         style={{ minWidth: '210px', maxWidth: '210px', width: '210px' }}
                       >
                         <div className="relative">
@@ -808,7 +833,7 @@ export default function SprintTasksTable({
 
                       {/* ACTIONS */}
                       <td
-                        className={`py-4 px-2 sticky left-[970px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
+                        className={`py-4 px-2 sticky left-[1040px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
                         style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       >
                         <button
