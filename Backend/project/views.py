@@ -290,6 +290,52 @@ from django.utils import timezone
 from sprints.models import SprintTask
 from django.db.models import Count
 
+class ProjectAssignableMembersView(APIView):
+    """
+    GET /api/projects/<uuid:pk>/assignable-members/
+    Returns all EmployeeProfiles assignable to sprint tasks for this project:
+      - All ProjectMember entries for the project (queried directly via reverse FK)
+      - The project team_lead (who may not be a registered ProjectMember)
+    Deduplicated and sorted by name.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        # Validate the project exists
+        try:
+            project = Project.objects.select_related("team_lead").get(
+                pk=pk, is_deleted=False
+            )
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1. Query all EmployeeProfiles that are members of this project directly
+        #    via the reverse FK on ProjectMember (avoids prefetch traversal issues)
+        member_profiles = EmployeeProfile.objects.filter(
+            project_memberships__project_id=pk
+        ).select_related("user").prefetch_related(
+            "employee_skill_relations__skill"
+        ).distinct()
+
+        # Build a map keyed by profile id for deduplication
+        profiles_map = {p.id: p for p in member_profiles}
+
+        # 2. Include the team lead's EmployeeProfile if not already in the map
+        if project.team_lead:
+            try:
+                lead_profile = EmployeeProfile.objects.select_related("user").prefetch_related(
+                    "employee_skill_relations__skill"
+                ).get(user=project.team_lead)
+                profiles_map[lead_profile.id] = lead_profile
+            except EmployeeProfile.DoesNotExist:
+                pass  # Team lead has no profile — skip
+
+        profiles = sorted(profiles_map.values(), key=lambda p: p.user.full_name)
+        serializer = EmployeeProfileSerializer(profiles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
 class DashboardView(APIView):
     """
     API View to retrieve dashboard metrics including Backlog task status distribution

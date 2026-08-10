@@ -208,7 +208,8 @@ export default function SprintTasksTable({
   const handleAssigneeChange = (taskId, employeeId) => {
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
-        const emp = employees.find(e => e.id === employeeId) || null;
+        // e.target.value is always a string; use String() on both sides to guarantee match
+        const emp = employees.find(e => String(e.id) === String(employeeId)) || null;
         return { ...t, assigned_employee: emp };
       }
       return t;
@@ -687,7 +688,7 @@ export default function SprintTasksTable({
                       >
                         {isEditing && task.status !== 'CLOSED' ? (
                           <select
-                            value={task.assigned_employee?.id || ""}
+                            value={task.assigned_employee?.id != null ? String(task.assigned_employee.id) : ""}
                             onChange={(e) => handleAssigneeChange(task.id, e.target.value)}
                             className={`p-1 rounded text-[10px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${darkMode
                                 ? 'bg-slate-900 border-slate-750 text-white'
@@ -696,7 +697,7 @@ export default function SprintTasksTable({
                           >
                             <option value="">Unassigned</option>
                             {employees.map(emp => (
-                              <option key={emp.id} value={emp.id}>
+                              <option key={emp.id} value={String(emp.id)}>
                                 {emp.user?.full_name || emp.user?.email}
                               </option>
                             ))}
