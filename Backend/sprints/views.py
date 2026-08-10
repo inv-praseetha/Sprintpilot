@@ -327,39 +327,13 @@ class SprintNoteListView(APIView):
 
 class SprintTaskStatusView(APIView):
     """
-    API View to fetch and group tasks by urgency status (Overdue, Today, Tomorrow).
+    API View to fetch project-level task counts grouped by urgency status (Overdue, Today, Tomorrow).
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         try:
-            column = request.query_params.get('column')
-
-            def get_int_param(name, default):
-                val = request.query_params.get(name)
-                if val is not None:
-                    try:
-                        return int(val)
-                    except ValueError:
-                        pass
-                return default
-
-            overdue_offset = get_int_param('overdue_offset', 0)
-            overdue_limit = get_int_param('overdue_limit', 5)
-            today_offset = get_int_param('today_offset', 0)
-            today_limit = get_int_param('today_limit', 5)
-            tomorrow_offset = get_int_param('tomorrow_offset', 0)
-            tomorrow_limit = get_int_param('tomorrow_limit', 5)
-
-            result = SprintService.get_tasks_by_due_status(
-                column=column,
-                overdue_offset=overdue_offset,
-                overdue_limit=overdue_limit,
-                today_offset=today_offset,
-                today_limit=today_limit,
-                tomorrow_offset=tomorrow_offset,
-                tomorrow_limit=tomorrow_limit
-            )
+            result = SprintService.get_tasks_by_due_status()
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
