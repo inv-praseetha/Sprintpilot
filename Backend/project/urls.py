@@ -1,8 +1,10 @@
 from django.urls import path
-from project.views import ProjectCreateView, SkillListView, EmployeeProfileListView, ProjectDetailView, DashboardView
+from project.views import ProjectCreateView, SkillListView, EmployeeProfileListView, ProjectDetailView, DashboardView, ProjectAssignableMembersView
 
 urlpatterns = [
     path('projects/', ProjectCreateView.as_view(), name='project_list_create'),
+    # More-specific sub-resource paths must come BEFORE the generic <uuid:pk>/ wildcard
+    path('projects/<uuid:pk>/assignable-members/', ProjectAssignableMembersView.as_view(), name='project_assignable_members'),
     path('projects/<uuid:pk>/', ProjectDetailView.as_view(), name='project_detail'),
 
     path('projects/skills/', SkillListView.as_view(), name='skill_list'),
