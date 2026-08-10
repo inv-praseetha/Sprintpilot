@@ -4,6 +4,49 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from sprints.models import Sprint
 
+from backlog.models import BacklogCategory
+
+class BacklogCategoriesView(APIView):
+    """
+    API View to fetch and merge categories from Backlog (DB and API) with defaults.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        project_id = request.query_params.get('project_id')
+        project_key = request.query_params.get('project_key')
+        
+        dynamic_categories = []
+        
+        if project_id:
+            try:
+                db_cats = BacklogCategory.objects.filter(project_id=project_id)
+                dynamic_categories = [c.name for c in db_cats]
+            except Exception:
+                pass
+            
+        if not dynamic_categories and project_key:
+            from backlog.services.backlog_client import BacklogService
+            try:
+                service = BacklogService(project_key=project_key)
+                backlog_data = service.fetch_project_categories()
+                dynamic_categories = [c.get('name') for c in backlog_data if c.get('name')]
+            except Exception:
+                pass
+                
+        default_categories = ['UI', 'BACKEND', 'QA', 'INFRA']
+        
+        seen = set()
+        merged = []
+        for cat in default_categories + dynamic_categories:
+            if cat.upper() not in seen:
+                seen.add(cat.upper())
+                merged.append(cat)
+                
+        merged.sort(key=lambda x: x.upper())
+        
+        return Response({"categories": merged}, status=status.HTTP_200_OK)
+
 class SprintSyncBacklogView(APIView):
     """
     API View to sync sprint tasks to external Backlog API.
