@@ -38,7 +38,7 @@ const calculateAgileEndDate = (startDateStr) => {
   return `${y}-${m}-${d}`;
 };
 
-const CategoryDropdown = ({ categoryStr, onChange, darkMode }) => {
+const CategoryDropdown = ({ categoryStr, onChange, darkMode, availableCategories = ['UI', 'BACKEND', 'INFRA', 'QA'] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
   const buttonRef = React.useRef(null);
@@ -86,7 +86,7 @@ const CategoryDropdown = ({ categoryStr, onChange, darkMode }) => {
             className={`fixed z-[70] p-1.5 rounded-xl border shadow-2xl flex flex-col gap-1 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
             style={{ top: pos.top, left: pos.left, width: pos.width }}
           >
-            {['UI', 'BACKEND', 'INFRA', 'QA'].map(cat => {
+            {availableCategories.map(cat => {
               const isSelected = selectedList.includes(cat);
               return (
                 <label key={cat} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs font-bold transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`} onClick={e => e.stopPropagation()}>
@@ -141,6 +141,7 @@ export default function TaskUploadModal({
   const [jiraSprintName, setJiraSprintName] = useState('');
   const [isFetchingJira, setIsFetchingJira] = useState(false);
   const [jiraAuthRequired, setJiraAuthRequired] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState(['UI', 'BACKEND', 'INFRA', 'QA']);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -151,6 +152,20 @@ export default function TaskUploadModal({
       if (projectJiraId) {
         setJiraProjectKey(projectJiraId);
       }
+
+      // Fetch dynamic categories
+      const fetchCategories = async () => {
+        try {
+          const actualProjectId = projects && activeProject ? projects[activeProject]?.id : '';
+          const res = await apiClient.get(`categories/?project_id=${actualProjectId || ''}&project_key=${projectJiraId || ''}`);
+          if (res.data && res.data.categories) {
+            setAvailableCategories(res.data.categories);
+          }
+        } catch (e) {
+          console.error('Failed to fetch backlog categories', e);
+        }
+      };
+      fetchCategories();
     }
   }, [isOpen, projectJiraId]);
 
@@ -437,7 +452,7 @@ export default function TaskUploadModal({
           const estHoursVal = estHoursIndex !== -1 && row[estHoursIndex] !== undefined ? row[estHoursIndex] : '';
 
           const cat = catVal.toString().toUpperCase().trim();
-          const validCats = ['UI', 'BACKEND', 'INFRA', 'QA'];
+          const validCats = availableCategories.map(c => c.toUpperCase());
 
           let parsedEstHours = null;
           if (estHoursVal !== undefined && estHoursVal !== null && estHoursVal !== '') {
@@ -1049,6 +1064,7 @@ export default function TaskUploadModal({
                                   categoryStr={row.category}
                                   onChange={(newCat) => handleTaskCategoryChange(idx, newCat)}
                                   darkMode={darkMode}
+                                  availableCategories={availableCategories}
                                 />
                               </div>
                             </td>

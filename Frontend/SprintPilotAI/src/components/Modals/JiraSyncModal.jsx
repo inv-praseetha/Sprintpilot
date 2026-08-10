@@ -11,7 +11,7 @@ const categoryConfig = {
   QA: { color: '#10b981', bg: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' }
 };
 
-const CategoryDropdown = ({ categoryStr, onChange, darkMode }) => {
+const CategoryDropdown = ({ categoryStr, onChange, darkMode, availableCategories = ['UI', 'BACKEND', 'INFRA', 'QA'] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
   const buttonRef = React.useRef(null);
@@ -59,7 +59,7 @@ const CategoryDropdown = ({ categoryStr, onChange, darkMode }) => {
             className={`fixed z-[70] p-1.5 rounded-xl border shadow-2xl flex flex-col gap-1 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
             style={{ top: pos.top, left: pos.left, width: pos.width }}
           >
-            {['UI', 'BACKEND', 'INFRA', 'QA'].map(cat => {
+            {availableCategories.map(cat => {
               const isSelected = selectedList.includes(cat);
               return (
                 <label key={cat} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs font-bold transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`} onClick={e => e.stopPropagation()}>
@@ -104,6 +104,7 @@ export default function JiraSyncModal({
   const [successMsg, setSuccessMsg] = useState('');
   const [jiraAuthRequired, setJiraAuthRequired] = useState(false);
   const [searchSprintName, setSearchSprintName] = useState('');
+  const [availableCategories, setAvailableCategories] = useState(['UI', 'BACKEND', 'INFRA', 'QA']);
   const toast = useToast();
 
   useEffect(() => {
@@ -111,6 +112,20 @@ export default function JiraSyncModal({
       const defaultName = sprint.backlog_version_id || sprint.milestone || '';
       setSearchSprintName(defaultName);
       fetchNewJiraTasks(defaultName);
+      
+      const fetchCategories = async () => {
+        try {
+          const projectId = typeof sprint.project === 'string' ? sprint.project : sprint.project?.id || '';
+          const projectKey = sprint.project_custom_id || sprint.project?.project_id || '';
+          const res = await apiClient.get(`categories/?project_id=${projectId}&project_key=${projectKey}`);
+          if (res.data && res.data.categories) {
+            setAvailableCategories(res.data.categories);
+          }
+        } catch (e) {
+          console.error('Failed to fetch backlog categories', e);
+        }
+      };
+      fetchCategories();
     } else {
       setTasks([]);
       setErrorMsg('');
@@ -386,6 +401,7 @@ export default function JiraSyncModal({
                                 categoryStr={t.category}
                                 onChange={(newCat) => handleTaskCategoryChange(idx, newCat)}
                                 darkMode={darkMode}
+                                availableCategories={availableCategories}
                               />
                             </div>
                           </td>
