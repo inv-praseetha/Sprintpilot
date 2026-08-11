@@ -249,9 +249,9 @@ export default function SprintDetail() {
         setTasks(dbTasks);
         setOriginalTasks(JSON.parse(JSON.stringify(dbTasks))); // Deep clone for rollback
 
-        // 2. Fetch Project details to get project members
-        const projectRes = await apiClient.get(`projects/${sprintData.project}/`);
-        setEmployees(projectRes.data?.members || []);
+        // 2. Fetch all assignable members for this project (members + team lead, deduplicated server-side)
+        const membersRes = await apiClient.get(`projects/${sprintData.project}/assignable-members/`);
+        setEmployees(membersRes.data || []);
 
         // Generate timeline range based on Sprint boundaries
         const holidaysMap = new Map((sprintData.holidays || []).map(h => [h.date, h.description || '']));

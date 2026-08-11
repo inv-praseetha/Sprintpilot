@@ -889,15 +889,12 @@ class SprintService:
         return note
 
     @staticmethod
-    def get_tasks_by_due_status(
-        column: str = None,
-        overdue_offset: int = 0,
-        overdue_limit: int = 5,
-        today_offset: int = 0,
-        today_limit: int = 5,
-        tomorrow_offset: int = 0,
-        tomorrow_limit: int = 5
-    ) -> dict:
+    def get_tasks_by_due_status() -> dict:
+        """
+        Returns per-project task counts grouped by urgency bucket:
+        overdue (past due or no date), due today, due tomorrow.
+        Only considers non-closed/resolved tasks in non-completed projects.
+        """
         from django.utils import timezone
         from datetime import timedelta
         from project.models import Project
@@ -905,86 +902,49 @@ class SprintService:
         today = timezone.localdate()
         tomorrow = today + timedelta(days=1)
 
-        # Fetch active projects
         active_projects = Project.objects.exclude(status='COMPLETED')
 
-        # Filter active tasks in active sprints/projects
         tasks = SprintTask.objects.filter(
             sprint__project__in=active_projects,
             is_deleted=False
         ).exclude(status__in=['CLOSED', 'RESOLVED']).select_related(
-            'sprint', 'sprint__project', 'assigned_employee', 'assigned_employee__user'
+            'sprint__project'
         )
 
-        overdue_list = []
-        today_list = []
-        tomorrow_list = []
+        # project_id -> { projectId, projectName, overdue, today, tomorrow }
+        project_map = {}
 
         for t in tasks:
-            assigned_employee_data = None
-            if t.assigned_employee:
-                assigned_employee_data = {
-                    'id': str(t.assigned_employee.id),
-                    'user': {
-                        'id': str(t.assigned_employee.user.id),
-                        'email': t.assigned_employee.user.email,
-                        'full_name': t.assigned_employee.user.full_name,
-                        'role': t.assigned_employee.user.role
-                    } if t.assigned_employee.user else None,
-                    'designation': t.assigned_employee.designation
+            pid = str(t.sprint.project.id)
+            if pid not in project_map:
+                project_map[pid] = {
+                    'projectId': pid,
+                    'projectName': t.sprint.project.name,
+                    'overdue': 0,
+                    'today': 0,
+                    'tomorrow': 0,
                 }
 
-            task_data = {
-                'id': str(t.id),
-                'title': t.title,
-                'category': t.category,
-                'priority': t.priority,
-                'planned_end_date': str(t.planned_end_date) if t.planned_end_date else None,
-                'status': t.status,
-                'assigned_employee': assigned_employee_data,
-                'projectId': str(t.sprint.project.id) if t.sprint and t.sprint.project else None,
-                'projectName': t.sprint.project.name if t.sprint and t.sprint.project else None,
-                'sprintId': str(t.sprint.id) if t.sprint else None,
-                'sprintName': t.sprint.milestone if t.sprint else None,
-            }
+            if not t.planned_end_date or t.planned_end_date < today:
+                project_map[pid]['overdue'] += 1
+            elif t.planned_end_date == today:
+                project_map[pid]['today'] += 1
+            elif t.planned_end_date == tomorrow:
+                project_map[pid]['tomorrow'] += 1
 
-            if not t.planned_end_date:
-                overdue_list.append(task_data)
-            else:
-                if t.planned_end_date < today:
-                    overdue_list.append(task_data)
-                elif t.planned_end_date == today:
-                    today_list.append(task_data)
-                elif t.planned_end_date == tomorrow:
-                    tomorrow_list.append(task_data)
+        projects = list(project_map.values())
 
-        # Build response dict
-        response_data = {}
+        def bucket(key):
+            return sorted(
+                [{'projectId': p['projectId'], 'projectName': p['projectName'], 'count': p[key]}
+                 for p in projects if p[key] > 0],
+                key=lambda x: -x['count']
+            )
 
-        if not column or column.upper() == 'OVERDUE':
-            overdue_slice = overdue_list[overdue_offset:overdue_offset + overdue_limit]
-            response_data['overdue'] = {
-                'tasks': overdue_slice,
-                'has_more': len(overdue_list) > (overdue_offset + overdue_limit),
-                'total_count': len(overdue_list)
-            }
-
-        if not column or column.upper() == 'TODAY':
-            today_slice = today_list[today_offset:today_offset + today_limit]
-            response_data['today'] = {
-                'tasks': today_slice,
-                'has_more': len(today_list) > (today_offset + today_limit),
-                'total_count': len(today_list)
-            }
-
-        if not column or column.upper() == 'TOMORROW':
-            tomorrow_slice = tomorrow_list[tomorrow_offset:tomorrow_offset + tomorrow_limit]
-            response_data['tomorrow'] = {
-                'tasks': tomorrow_slice,
-                'has_more': len(tomorrow_list) > (tomorrow_offset + tomorrow_limit),
-                'total_count': len(tomorrow_list)
-            }
-
-        return response_data
+        return {
+            'overdue':   bucket('overdue'),
+            'today':     bucket('today'),
+            'tomorrow':  bucket('tomorrow'),
+        }
 
 
