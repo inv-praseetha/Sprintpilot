@@ -192,6 +192,15 @@ class BacklogSyncService:
         logger.info("Synchronization Completed")
         logger.info(f"Duration: {duration:.2f} seconds")
         
+        # Sync comments for all active/planned sprints
+        for project in projects:
+            sprints = project.sprints.filter(status__in=[Sprint.Status.ACTIVE, Sprint.Status.PLANNED])
+            for sprint in sprints:
+                try:
+                    self.sync_sprint_comments(sprint)
+                except Exception as e:
+                    logger.error(f"Failed to sync comments for Sprint #{sprint.id}: {e}")
+
         summary = {
             "status": "success",
             "fetched": total_fetched,
@@ -284,11 +293,32 @@ class BacklogSyncService:
 
         for task in tasks:
             try:
-                count = backlog_service.get_issue_comments_count(task.backlog_task_id)
+                comments_data = backlog_service.get_issue_comments(task.backlog_task_id)
+                valid_comments = [c for c in comments_data if c.get('content') and str(c.get('content')).strip()]
+                # Guarantee oldest-first ordering so our index logic works perfectly
+                valid_comments.sort(key=lambda x: x.get('created', ''))
+                count = len(valid_comments)
+                
+                first_unread_id = None
+                if task.read_comment_count < count:
+                    first_unread_id = str(valid_comments[task.read_comment_count].get('id'))
+
+                update_fields = []
                 if task.comment_count != count:
                     task.comment_count = count
-                    task.save(update_fields=['comment_count'])
-                updated_counts[str(task.id)] = count
+                    update_fields.append('comment_count')
+                    
+                if task.first_unread_comment_id != first_unread_id:
+                    task.first_unread_comment_id = first_unread_id
+                    update_fields.append('first_unread_comment_id')
+                    
+                if update_fields:
+                    task.save(update_fields=update_fields)
+
+                updated_counts[str(task.id)] = {
+                    "count": count,
+                    "first_unread_id": first_unread_id
+                }
             except Exception:
                 pass
 

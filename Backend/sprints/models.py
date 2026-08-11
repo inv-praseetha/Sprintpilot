@@ -84,6 +84,8 @@ class SprintTask(models.Model):
     planned_end_date = models.DateField(null=True, blank=True)
     backlog_task_id = models.CharField(max_length=100, null=True, blank=True)
     comment_count = models.IntegerField(default=0)
+    read_comment_count = models.IntegerField(default=0)
+    first_unread_comment_id = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     synced_at = models.DateTimeField(null=True, blank=True)

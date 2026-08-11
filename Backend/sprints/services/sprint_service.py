@@ -738,6 +738,9 @@ class SprintService:
             
         if 'priority' in data:
             task.priority = data.get('priority')
+            
+        if 'read_comment_count' in data:
+            task.read_comment_count = data.get('read_comment_count', 0)
 
         task.save()
         return task

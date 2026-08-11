@@ -160,7 +160,7 @@ class SprintSyncCommentsView(APIView):
         from backlog.services.backlog_sync_service import BacklogSyncService
         
         try:
-            sprint = Sprint.objects.get(id=sprint_id, project__workspace=request.user.workspace)
+            sprint = Sprint.objects.get(id=sprint_id)
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
 
