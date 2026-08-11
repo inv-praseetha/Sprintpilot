@@ -22,6 +22,7 @@ class Sprint(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     synced_at = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
     
     class Meta:
         db_table = 'sprints'
