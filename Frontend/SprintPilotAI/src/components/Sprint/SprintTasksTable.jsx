@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, Trash2, ExternalLink, MessageSquare } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import { useToast } from '../../context/ToastContext';
 import TaskCommentsModal from '../Modals/TaskCommentsModal';
+import apiClient from '../../api/apiClient';
 
 const categoryConfig = {
   UI: {
@@ -175,6 +176,84 @@ export default function SprintTasksTable({
   const [commentTask, setCommentTask] = useState(null);
   const [activeDatePickerId, setActiveDatePickerId] = useState(null);
   const toast = useToast();
+
+  useEffect(() => {
+    if (!sprint?.id) return;
+
+    const fetchCommentCounts = () => {
+      apiClient.post(`sprints/${sprint.id}/sync-comments/`)
+        .then(res => {
+          if (res.data && res.data.updated_counts) {
+            const counts = res.data.updated_counts;
+            if (Object.keys(counts).length > 0) {
+              setTasks(prev => prev.map(t => {
+                const update = counts[t.id];
+                if (update) {
+                  if (update.first_unread_id) {
+                    return { ...t, comment_count: update.count, first_unread_comment_id: update.first_unread_id };
+                  }
+                  return { ...t, comment_count: update.count };
+                }
+                return t;
+              }));
+            }
+          }
+        })
+        .catch(err => console.error("Failed to silently sync comment counts:", err));
+    };
+
+    // Initial fetch on mount
+    fetchCommentCounts();
+
+    // Live update polling every 30 seconds
+    const intervalId = setInterval(fetchCommentCounts, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [sprint?.id]);
+
+  const handleChatIconClick = async (task) => {
+    if (!task || task.comment_count === task.read_comment_count) return;
+    try {
+      await apiClient.put(`sprints/tasks/${task.id}/`, {
+        read_comment_count: task.comment_count
+      });
+      // Small delay to allow the <a> tag to open the new tab before we update state and hide the icon
+      setTimeout(() => {
+        setTasks(prev => prev.map(t => 
+          t.id === task.id ? { ...t, read_comment_count: task.comment_count } : t
+        ));
+      }, 500);
+    } catch (err) {
+      console.error('Failed to mark comments as read', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!sprint?.id) return;
+
+    const fetchCommentCounts = () => {
+      apiClient.post(`sprints/${sprint.id}/sync-comments/`)
+        .then(res => {
+          if (res.data && res.data.updated_counts) {
+            const counts = res.data.updated_counts;
+            if (Object.keys(counts).length > 0) {
+              setTasks(prev => prev.map(t => 
+                counts[t.id] !== undefined ? { ...t, comment_count: counts[t.id] } : t
+              ));
+            }
+          }
+        })
+        .catch(err => console.error("Failed to silently sync comment counts:", err));
+    };
+
+    // Initial fetch on mount
+    fetchCommentCounts();
+
+    // Live update polling every 30 seconds
+    const intervalId = setInterval(fetchCommentCounts, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [sprint?.id]);
 
   const toggleSelectTask = (taskId) => {
     setSelectedTaskIds(prev => {
@@ -839,14 +918,23 @@ export default function SprintTasksTable({
                         style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       >
                         <div className="flex items-center justify-center gap-1">
-                          {task.backlog_task_id && task.comment_count > 0 && (
-                            <button
-                              onClick={() => setCommentTask(task)}
-                              className={`p-1.5 rounded-lg transition-colors relative ${darkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-blue-400' : 'hover:bg-slate-100 text-slate-500 hover:text-blue-500'}`}
-                              title="View Activity & Comments"
+                          {task.backlog_task_id && task.comment_count > (task.read_comment_count || 0) && (
+                            <a
+                              href={task.first_unread_comment_id && task.backlog_task_url ? `${task.backlog_task_url}#comment-${task.first_unread_comment_id}` : (task.backlog_task_url ? `${task.backlog_task_url}#comment` : '#')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleChatIconClick(task)}
+                              className={`p-1.5 rounded-lg transition-colors relative flex items-center justify-center cursor-pointer ${darkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-blue-400' : 'hover:bg-slate-100 text-slate-500 hover:text-blue-500'}`}
+                              title={`${task.comment_count - (task.read_comment_count || 0)} new comment(s).`}
                             >
                               <MessageSquare className="w-4 h-4" />
-                            </button>
+                              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500 text-[8px] font-bold text-white items-center justify-center">
+                                  {task.comment_count - (task.read_comment_count || 0)}
+                                </span>
+                              </span>
+                            </a>
                           )}
                           <button
                             onClick={() => handleIndividualDelete(task.id)}
