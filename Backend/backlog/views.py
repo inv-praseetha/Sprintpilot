@@ -4,6 +4,49 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from sprints.models import Sprint
 
+from backlog.models import BacklogCategory
+
+class BacklogCategoriesView(APIView):
+    """
+    API View to fetch and merge categories from Backlog (DB and API) with defaults.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        project_id = request.query_params.get('project_id')
+        project_key = request.query_params.get('project_key')
+        
+        dynamic_categories = []
+        
+        if project_id:
+            try:
+                db_cats = BacklogCategory.objects.filter(project_id=project_id)
+                dynamic_categories = [c.name for c in db_cats]
+            except Exception:
+                pass
+            
+        if not dynamic_categories and project_key:
+            from backlog.services.backlog_client import BacklogService
+            try:
+                service = BacklogService(project_key=project_key)
+                backlog_data = service.fetch_project_categories()
+                dynamic_categories = [c.get('name') for c in backlog_data if c.get('name')]
+            except Exception:
+                pass
+                
+        default_categories = ['UI', 'BACKEND', 'QA', 'INFRA']
+        
+        seen = set()
+        merged = []
+        for cat in default_categories + dynamic_categories:
+            if cat.upper() not in seen:
+                seen.add(cat.upper())
+                merged.append(cat)
+                
+        merged.sort(key=lambda x: x.upper())
+        
+        return Response({"categories": merged}, status=status.HTTP_200_OK)
+
 class SprintSyncBacklogView(APIView):
     """
     API View to sync sprint tasks to external Backlog API.
@@ -36,71 +79,18 @@ class SprintSyncBacklogView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        from backlog.services.backlog_client import BacklogService
+        from backlog.services.backlog_sync_service import BacklogSyncService
         
         try:
-            backlog_service = BacklogService(project_key=sprint.project.project_id)
+            sync_service = BacklogSyncService()
+            result = sync_service.push_sprint_to_backlog(sprint, task_ids=request.data.get('task_ids', []))
         except Exception as e:
             return Response({"detail": f"Configuration error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        try:
-            project_id, _ = backlog_service._resolve_project_and_issue_type()
-            if project_id:
-                version_id = backlog_service._get_or_create_version(project_id, sprint.milestone)
-                sprint.backlog_project_id = project_id
-                sprint.backlog_version_id = version_id
-                sprint.save(update_fields=['backlog_project_id', 'backlog_version_id'])
-        except Exception as e:
-            pass # Non-critical if we fail to fetch version info
-
-        created_count = 0
-        updated_count = 0
-        up_to_date_count = 0
-        
-        task_ids = request.data.get('task_ids', [])
-        if task_ids:
-            tasks = sprint.tasks.filter(id__in=task_ids, is_deleted=False)
-        else:
-            tasks = sprint.tasks.filter(is_deleted=False)
-            
-        errors = []
-
-        from django.utils import timezone
-
-        for task in tasks:
-            # Condition 1: Create if backlog_task_id is missing
-            if not task.backlog_task_id:
-                try:
-                    issue_key = backlog_service.sync_task(task)
-                    if issue_key:
-                        task.backlog_task_id = issue_key
-                        task.save()
-                        task.synced_at = task.updated_at
-                        task.save(update_fields=['synced_at'])
-                        created_count += 1
-                except Exception as e:
-                    errors.append(f"Task '{task.title}' (Create): {str(e)}")
-            else:
-                # Condition 2: Update if updated_at > synced_at or synced_at is None
-                if task.synced_at is not None and task.updated_at <= task.synced_at:
-                    up_to_date_count += 1
-                    continue
-                    
-                try:
-                    issue_key = backlog_service.update_task(task)
-                    if issue_key:
-                        task.save()
-                        task.synced_at = task.updated_at
-                        task.save(update_fields=['synced_at'])
-                        updated_count += 1
-                except Exception as e:
-                    if str(e) == "NO_CHANGES_DETECTED":
-                        task.save()
-                        task.synced_at = task.updated_at
-                        task.save(update_fields=['synced_at'])
-                        up_to_date_count += 1
-                    else:
-                        errors.append(f"Task '{task.title}' (Update): {str(e)}")
+        created_count = result["created_count"]
+        updated_count = result["updated_count"]
+        up_to_date_count = result["up_to_date_count"]
+        errors = result["errors"]
 
         parts = []
         if created_count > 0:
@@ -130,3 +120,53 @@ class SprintSyncBacklogView(APIView):
             {"detail": message, "synced_count": total_success, "errors": errors}, 
             status=status.HTTP_200_OK
         )
+
+
+class BacklogIssueCommentsView(APIView):
+    """
+    API View to fetch and post comments to a Backlog issue.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, backlog_task_id, *args, **kwargs):
+        from backlog.services.backlog_client import BacklogService
+        try:
+            service = BacklogService()
+            comments = service.get_issue_comments(backlog_task_id)
+            return Response({"comments": comments}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def post(self, request, backlog_task_id, *args, **kwargs):
+        content = request.data.get('content')
+        if not content:
+            return Response({"detail": "Comment content is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from backlog.services.backlog_client import BacklogService
+        try:
+            service = BacklogService()
+            comment = service.post_issue_comment(backlog_task_id, content)
+            return Response({"comment": comment}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class SprintSyncCommentsView(APIView):
+    """
+    API View to silently sync comment counts for all tasks in a sprint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id, *args, **kwargs):
+        from backlog.services.backlog_sync_service import BacklogSyncService
+        
+        try:
+            sprint = Sprint.objects.get(id=sprint_id, project__workspace=request.user.workspace)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            sync_service = BacklogSyncService()
+            updated_counts = sync_service.sync_sprint_comments(sprint)
+            return Response({"updated_counts": updated_counts}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail": f"Service error: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

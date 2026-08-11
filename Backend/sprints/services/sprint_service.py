@@ -411,7 +411,7 @@ class SprintService:
         except Project.DoesNotExist:
             raise Project.DoesNotExist("Project not found.")
 
-        sprints = Sprint.objects.filter(project=project).select_related('project').prefetch_related(
+        sprints = Sprint.objects.filter(project=project, is_deleted=False).select_related('project').prefetch_related(
             Prefetch('tasks', queryset=SprintTask.objects.filter(is_deleted=False)),
             'tasks__assigned_employee__user',
             'tasks__assigned_employee__employee_skill_relations__skill',
@@ -528,7 +528,7 @@ class SprintService:
                 'tasks__assigned_employee__user',
                 'tasks__assigned_employee__employee_skill_relations__skill',
                 'tasks__recommendations'
-            ).get(id=sprint_id)
+            ).get(id=sprint_id, is_deleted=False)
             return sprint
         except Sprint.DoesNotExist:
             raise Sprint.DoesNotExist("Sprint not found.")
@@ -537,7 +537,13 @@ class SprintService:
     def delete_sprint(sprint_id: str) -> None:
         try:
             sprint = Sprint.objects.get(id=sprint_id)
-            sprint.delete()
+            # Soft delete the sprint
+            sprint.is_deleted = True
+            sprint.save(update_fields=['is_deleted'])
+            
+            # Soft delete tasks that are NOT synced to backlog
+            from django.db.models import Q
+            sprint.tasks.filter(Q(backlog_task_id__isnull=True) | Q(backlog_task_id__exact='')).update(is_deleted=True)
         except Sprint.DoesNotExist:
             raise Sprint.DoesNotExist("Sprint not found.")
 

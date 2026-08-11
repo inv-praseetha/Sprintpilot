@@ -202,3 +202,94 @@ class BacklogSyncService:
         }
         
         return summary
+
+    def push_sprint_to_backlog(self, sprint, task_ids=None):
+        from backlog.services.backlog_client import BacklogService
+        backlog_service = BacklogService(project_key=sprint.project.project_id)
+        
+        try:
+            project_id, _ = backlog_service._resolve_project_and_issue_type()
+            if project_id:
+                version_id = backlog_service._get_or_create_version(project_id, sprint.milestone)
+                sprint.backlog_project_id = project_id
+                sprint.backlog_version_id = version_id
+                sprint.save(update_fields=['backlog_project_id', 'backlog_version_id'])
+        except Exception:
+            pass
+
+        created_count = 0
+        updated_count = 0
+        up_to_date_count = 0
+        errors = []
+
+        if task_ids:
+            tasks = sprint.tasks.filter(id__in=task_ids, is_deleted=False)
+        else:
+            tasks = sprint.tasks.filter(is_deleted=False)
+
+        for task in tasks:
+            if not task.backlog_task_id:
+                try:
+                    issue_key = backlog_service.sync_task(task)
+                    if issue_key:
+                        task.backlog_task_id = issue_key
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
+                        created_count += 1
+                except Exception as e:
+                    errors.append(f"Task '{task.title}' (Create): {str(e)}")
+            else:
+                try:
+                    count = backlog_service.get_issue_comments_count(task.backlog_task_id)
+                    if task.comment_count != count:
+                        task.comment_count = count
+                        task.save(update_fields=['comment_count'])
+                except Exception:
+                    pass
+
+                if task.synced_at is not None and task.updated_at <= task.synced_at:
+                    up_to_date_count += 1
+                    continue
+                    
+                try:
+                    issue_key = backlog_service.update_task(task)
+                    if issue_key:
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
+                        updated_count += 1
+                except Exception as e:
+                    if str(e) == "NO_CHANGES_DETECTED":
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
+                        up_to_date_count += 1
+                    else:
+                        errors.append(f"Task '{task.title}' (Update): {str(e)}")
+
+        return {
+            "created_count": created_count,
+            "updated_count": updated_count,
+            "up_to_date_count": up_to_date_count,
+            "errors": errors
+        }
+
+    def sync_sprint_comments(self, sprint):
+        from backlog.services.backlog_client import BacklogService
+        backlog_service = BacklogService(project_key=sprint.project.project_id)
+        
+        tasks = sprint.tasks.exclude(backlog_task_id__isnull=True).exclude(backlog_task_id__exact='')
+        updated_counts = {}
+
+        for task in tasks:
+            try:
+                count = backlog_service.get_issue_comments_count(task.backlog_task_id)
+                if task.comment_count != count:
+                    task.comment_count = count
+                    task.save(update_fields=['comment_count'])
+                updated_counts[str(task.id)] = count
+            except Exception:
+                pass
+
+        return updated_counts

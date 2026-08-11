@@ -401,6 +401,33 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleDeleteSprint = async (e, sprintId, isSynced) => {
+    e.stopPropagation();
+
+    if (isSynced) {
+      toast.error('Cannot delete: This sprint is already synced with Backlog. If you want to remove it, please delete the tasks individually.');
+      return;
+    }
+
+    const isConfirmed = await confirm({
+      title: 'Delete Sprint',
+      message: 'Are you sure you want to delete this sprint? All tasks within it will be deleted.',
+      confirmText: 'Delete',
+      type: 'danger',
+    });
+    
+    if (!isConfirmed) return;
+    
+    try {
+      await apiClient.delete(`sprints/${sprintId}/`);
+      toast.success("Sprint deleted successfully!");
+      fetchSprints();
+    } catch (err) {
+      console.error('[ProjectDetail] Error deleting sprint:', err);
+      toast.error(err.response?.data?.detail || 'Failed to delete sprint.');
+    }
+  };
+
   // Filter out employees already inside the project for multi-select
   const availableEmployees = useMemo(() => {
     if (!employees || !project) return [];
@@ -1081,6 +1108,15 @@ export default function ProjectDetail() {
                                   title="Close Milestone"
                                 >
                                   <Lock className="w-4 h-4" />
+                                </button>
+                              )}
+                              {isProjectManager && (
+                                <button
+                                  onClick={(e) => handleDeleteSprint(e, sprint.id, !!sprint.workspaceUrl)}
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+                                  title="Delete Sprint"
+                                >
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
                               <ChevronRight className="w-5 h-5 text-slate-400 hover:text-orange-500 transition-colors" />

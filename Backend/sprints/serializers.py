@@ -102,6 +102,7 @@ class SprintTaskSerializer(serializers.ModelSerializer):
             'planned_end_date',
             'backlog_task_id',
             'backlog_task_url',
+            'comment_count',
             'synced_at',
             'created_at',
             'updated_at',
