@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, Trash2, ExternalLink } from 'lucide-react';
+import { Lock, Trash2, ExternalLink, MessageSquare } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import { useToast } from '../../context/ToastContext';
+import TaskCommentsModal from '../Modals/TaskCommentsModal';
 
 const categoryConfig = {
   UI: {
@@ -171,6 +172,7 @@ export default function SprintTasksTable({
   handleIndividualDelete
 }) {
   const [hoveredRowId, setHoveredRowId] = useState(null);
+  const [commentTask, setCommentTask] = useState(null);
   const [activeDatePickerId, setActiveDatePickerId] = useState(null);
   const toast = useToast();
 
@@ -833,21 +835,32 @@ export default function SprintTasksTable({
 
                       {/* ACTIONS */}
                       <td
-                        className={`py-4 px-2 sticky left-[1040px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
+                        className={`py-4 px-1 sticky left-[1040px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
                         style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                       >
-                        <button
-                          onClick={() => handleIndividualDelete(task.id)}
-                          disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || task.status === 'CLOSED'}
-                          className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                            darkMode 
-                              ? 'hover:bg-slate-800 text-red-400 hover:text-red-300' 
-                              : 'hover:bg-red-50 text-red-600 hover:text-red-750'
-                          }`}
-                          title={task.status === 'CLOSED' ? "Cannot delete this task as it is already closed/completed" : "Delete task"}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          {task.backlog_task_id && task.comment_count > 0 && (
+                            <button
+                              onClick={() => setCommentTask(task)}
+                              className={`p-1.5 rounded-lg transition-colors relative ${darkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-blue-400' : 'hover:bg-slate-100 text-slate-500 hover:text-blue-500'}`}
+                              title="View Activity & Comments"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleIndividualDelete(task.id)}
+                            disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || task.status === 'CLOSED'}
+                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                              darkMode 
+                                ? 'hover:bg-slate-800 text-red-400 hover:text-red-300' 
+                                : 'hover:bg-red-50 text-red-600 hover:text-red-750'
+                            }`}
+                            title={task.status === 'CLOSED' ? "Cannot delete this task as it is already closed/completed" : "Delete task"}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
 
                       {/* Timeline cells */}
@@ -911,6 +924,14 @@ export default function SprintTasksTable({
           })}
         </tbody>
       </table>
+
+      {/* Task Comments Modal */}
+      <TaskCommentsModal
+        isOpen={!!commentTask}
+        onClose={() => setCommentTask(null)}
+        darkMode={darkMode}
+        task={commentTask}
+      />
     </div>
   );
 }
