@@ -1,58 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../components/layout/MainLayouut';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowUpRight,AlertTriangle, Search, SlidersHorizontal, MoreHorizontal, Loader2, Calendar, Clock } from 'lucide-react';
 import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
-
-// Team performance data
-const initialTeamMembers = [
-  {
-    id: 'EMP-01',
-    name: 'Praseetha KU',
-    role: 'Lead Frontend',
-    roleColor: 'bg-orange-500',
-    totalTasks: 28,
-    completed: 26,
-    onTimeRate: '92%',
-    status: 'Excellent',
-    statusType: 'excellent'
-  },
-  {
-    id: 'EMP-02',
-    name: 'Abhiram S',
-    role: 'Backend Architect',
-    roleColor: 'bg-blue-500',
-    totalTasks: 24,
-    completed: 21,
-    onTimeRate: '88%',
-    status: 'High Performer',
-    statusType: 'excellent'
-  },
-  {
-    id: 'EMP-03',
-    name: 'Ananthu M',
-    role: 'QA Automation',
-    roleColor: 'bg-purple-500',
-    totalTasks: 35,
-    completed: 30,
-    onTimeRate: '85%',
-    status: 'Good',
-    statusType: 'good'
-  },
-  {
-    id: 'EMP-04',
-    name: 'Abid Muhammad',
-    role: 'DevOps Engineer',
-    roleColor: 'bg-emerald-500',
-    totalTasks: 18,
-    completed: 12,
-    onTimeRate: '66%',
-    status: 'Needs Review',
-    statusType: 'review'
-  }
-];
 
 const getInitials = (name) => {
   if (!name) return '';
@@ -61,19 +13,15 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-const getAvatarColorClass = (roleColor) => {
-  switch (roleColor) {
-    case 'bg-orange-500':
-      return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-    case 'bg-blue-500':
-      return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-    case 'bg-purple-500':
-      return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
-    case 'bg-emerald-500':
-      return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-    default:
-      return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
-  }
+const getAvatarColorClass = (index) => {
+  const colors = [
+    'bg-orange-500/10 text-orange-500 border-orange-500/20',
+    'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
+  ];
+  return colors[index % colors.length];
 };
 
 const Dashboard = () => {
@@ -84,14 +32,40 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const [projectsData, setProjectsData] = useState({});
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [hasMoreTeam, setHasMoreTeam] = useState(true);
+  const [loadingMoreTeam, setLoadingMoreTeam] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const fetchTeamPerformance = useCallback(async (offset = 0, search = '', isInitial = false) => {
+    try {
+      if (!isInitial) setLoadingMoreTeam(true);
+      const res = await apiClient.get(
+        `sprints/team-performance/?limit=6&offset=${offset}&search=${encodeURIComponent(search)}`
+      );
+      const data = res.data || {};
+      const results = Array.isArray(data) ? data : (data.results || []);
+      const hasMore = data.has_more ?? (results.length === 6);
+
+      setTeamMembers(prev => isInitial ? results : [...prev, ...results]);
+      setHasMoreTeam(hasMore);
+    } catch (err) {
+      console.error('Error fetching team performance:', err);
+    } finally {
+      setLoadingMoreTeam(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // Fetch projects list
-        const projectsResponse = await apiClient.get('projects/?page_size=100');
+        // Fetch projects list & initial team performance concurrently
+        const [projectsResponse] = await Promise.all([
+          apiClient.get('projects/?page_size=100'),
+          fetchTeamPerformance(0, searchQuery, true)
+        ]);
+
         const projectsList = (Array.isArray(projectsResponse.data) 
           ? projectsResponse.data 
           : projectsResponse.data.results || []).filter(proj => proj.status !== 'COMPLETED');
@@ -311,12 +285,24 @@ const Dashboard = () => {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const filteredMembers = useMemo(() => {
-    return initialTeamMembers.filter((m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.role.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery]);
+  // Handle backend search debounce effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTeamPerformance(0, searchQuery, true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, fetchTeamPerformance]);
+
+  const handleTableScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    if (scrollHeight - scrollTop - clientHeight < 40) {
+      if (hasMoreTeam && !loadingMoreTeam) {
+        fetchTeamPerformance(teamMembers.length, searchQuery, false);
+      }
+    }
+  };
+
+  const filteredMembers = teamMembers;
 
   const sprintBoxesData = useMemo(() => {
     const list = [];
@@ -1002,45 +988,50 @@ const Dashboard = () => {
                 }`}
               />
             </div>
-
-            {/* Filter Button */}
-            <button className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-              darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}>
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Filter</span>
-            </button>
           </div>
         </div>
 
-        {/* Table Container */}
-        <div className="overflow-x-auto">
+        {/* Table Container with Infinite Scroll */}
+        <div className="overflow-x-auto max-h-[480px] overflow-y-auto custom-scrollbar" onScroll={handleTableScroll}>
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-semibold text-left">
+                <th className="py-4 px-4 font-semibold text-slate-400">Rank</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">ID</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">Name</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">Role</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">Total Tasks</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">Completed</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">On-Time Rate</th>
-                <th className="py-4 px-4 font-semibold text-slate-400">Efficiency</th>
+                <th className="py-4 px-4 font-semibold text-slate-400">Points</th>
                 <th className="py-4 px-4 w-12 text-center font-semibold text-slate-400">More</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-left">
-              {filteredMembers.map((member) => (
+              {filteredMembers.map((member, idx) => (
                 <tr 
-                  key={member.id} 
+                  key={member.raw_id || member.id} 
                   className="text-sm font-medium transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
                 >
+                  {/* Rank */}
+                  <td className="py-4 px-4 text-left">
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-extrabold ${
+                      member.rank === 1 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30' :
+                      member.rank === 2 ? 'bg-slate-300/30 text-slate-700 dark:text-slate-300 border border-slate-400/30' :
+                      member.rank === 3 ? 'bg-amber-700/15 text-amber-700 dark:text-amber-500 border border-amber-700/30' :
+                      'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                    }`}>
+                      #{member.rank}
+                    </span>
+                  </td>
+
                   {/* ID */}
                   <td className={`py-4 px-4 font-semibold text-left ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{member.id}</td>
                   
                   {/* Name + Avatar */}
                   <td className="py-4 px-4 text-left">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border ${getAvatarColorClass(member.roleColor)}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border ${getAvatarColorClass(idx)}`}>
                         {getInitials(member.name)}
                       </div>
                       <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{member.name}</span>
@@ -1049,36 +1040,29 @@ const Dashboard = () => {
 
                   {/* Role */}
                   <td className="py-4 px-4 text-left">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${member.roleColor}`} />
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>{member.role}</span>
-                    </div>
+                    <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>{member.role}</span>
                   </td>
 
                   {/* Total Tasks */}
-                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.totalTasks} Tasks</td>
+                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.total_tasks} Tasks</td>
 
                   {/* Completed */}
-                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.completed} Tasks</td>
+                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.completed_tasks} Tasks</td>
 
                   {/* On-Time Rate */}
-                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.onTimeRate}</td>
+                  <td className={`py-4 px-4 text-left ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>{member.on_time_rate}</td>
 
-                  {/* Status Badge */}
+                  {/* Points Badge */}
                   <td className="py-4 px-4 text-left">
-                    {member.statusType === 'excellent' ? (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20">
-                        {member.status}
-                      </span>
-                    ) : member.statusType === 'good' ? (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
-                        {member.status}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20">
-                        {member.status}
-                      </span>
-                    )}
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                      member.points > 0 
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20'
+                        : member.points < 0 
+                          ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                    }`}>
+                      {member.points > 0 ? `+${member.points} pts` : `${member.points} pts`}
+                    </span>
                   </td>
 
                   {/* Actions button */}
@@ -1090,10 +1074,21 @@ const Dashboard = () => {
                 </tr>
               ))}
 
-              {filteredMembers.length === 0 && (
+              {filteredMembers.length === 0 && !loadingMoreTeam && (
                 <tr>
-                  <td colSpan="8" className="py-8 text-center text-slate-400">
+                  <td colSpan="9" className="py-8 text-center text-slate-400">
                     No team members match search query
+                  </td>
+                </tr>
+              )}
+
+              {loadingMoreTeam && (
+                <tr>
+                  <td colSpan="9" className="py-4 text-center text-slate-400">
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold">
+                      <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                      <span>Loading team members...</span>
+                    </div>
                   </td>
                 </tr>
               )}

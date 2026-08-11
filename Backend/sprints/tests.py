@@ -975,3 +975,91 @@ class SprintClosureTests(APITestCase):
             SprintService.update_task(task.id, {"estimated_hours": 22.0})
 
 
+class TeamPerformanceTest(APITestCase):
+    def setUp(self):
+        from accounts.models import Employee, EmployeeProfile
+        from project.models import Project, ProjectMember
+        from sprints.models import Sprint, SprintTask
+        from rest_framework.test import APIClient
+
+        self.client = APIClient()
+        self.user1 = Employee.objects.create(email="emp1@example.com", full_name="Employee One", is_active=True)
+        self.profile1 = EmployeeProfile.objects.create(user=self.user1, designation="Frontend Dev", experience_years=3)
+
+        self.user2 = Employee.objects.create(email="emp2@example.com", full_name="Employee Two", is_active=True)
+        self.profile2 = EmployeeProfile.objects.create(user=self.user2, designation="Backend Dev", experience_years=3)
+
+        self.project = Project.objects.create(name="Performance Proj", status="IN_PROGRESS", created_by=self.user1)
+        ProjectMember.objects.create(project=self.project, employee_profile=self.profile1)
+        ProjectMember.objects.create(project=self.project, employee_profile=self.profile2)
+
+        today = timezone.localdate()
+
+        self.sprint = Sprint.objects.create(
+            project=self.project,
+            milestone="Sprint 1",
+            start_date=datetime.date(2026, 8, 3),
+            end_date=datetime.date(2026, 8, 31),
+            status="ACTIVE"
+        )
+
+        # Employee 1 task: Completed on time (+1 point)
+        task1 = SprintTask(
+            sprint=self.sprint,
+            title="Task 1",
+            category="UI",
+            status="CLOSED",
+            assigned_employee=self.profile1,
+            planned_start_date=datetime.date(2026, 8, 3),
+            planned_end_date=datetime.date(2026, 8, 28),
+            description="Completed task"
+        )
+        task1._skip_sync_validation = True
+        task1.save()
+
+        # Employee 2 task: Overdue (-1 point)
+        task2 = SprintTask(
+            sprint=self.sprint,
+            title="Task 2",
+            category="Backend",
+            status="OPEN",
+            assigned_employee=self.profile2,
+            planned_start_date=datetime.date(2026, 8, 3),
+            planned_end_date=datetime.date(2026, 8, 7),
+            description="Overdue task"
+        )
+        task2._skip_sync_validation = True
+        task2.save()
+
+    def test_team_performance_service(self):
+        res = SprintService.get_team_performance()
+        perf = res['results']
+        self.assertEqual(len(perf), 2)
+        # First ranked should be Employee 1 with +1 point
+        self.assertEqual(perf[0]['name'], "Employee One")
+        self.assertEqual(perf[0]['points'], 1)
+        self.assertEqual(perf[0]['rank'], 1)
+
+        # Second ranked should be Employee 2 with -1 point
+        self.assertEqual(perf[1]['name'], "Employee Two")
+        self.assertEqual(perf[1]['points'], -1)
+        self.assertEqual(perf[1]['rank'], 2)
+
+        # Verify points are persisted directly in EmployeeProfile DB records
+        self.profile1.refresh_from_db()
+        self.profile2.refresh_from_db()
+        self.assertEqual(self.profile1.performance_points, 1)
+        self.assertEqual(self.profile2.performance_points, -1)
+
+    def test_team_performance_api_view(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/api/sprints/team-performance/?limit=6&offset=0')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        results = data['results']
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]['name'], "Employee One")
+        self.assertEqual(results[0]['points'], 1)
+
+
+

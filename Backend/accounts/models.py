@@ -121,6 +121,10 @@ class EmployeeProfile(models.Model):
         blank=True
     )
 
+    performance_points = models.IntegerField(
+        default=0
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
