@@ -339,3 +339,26 @@ class SprintTaskStatusView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class TeamPerformanceView(APIView):
+    """
+    API View to fetch gamified team performance scores, completion metrics, and rankings.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            limit_val = request.query_params.get('limit', 6)
+            limit = int(limit_val) if limit_val is not None and str(limit_val).isdigit() else 6
+            
+            offset_val = request.query_params.get('offset', 0)
+            offset = int(offset_val) if offset_val is not None and str(offset_val).isdigit() else 0
+            
+            search = request.query_params.get('search', '').strip()
+
+            result = SprintService.get_team_performance(limit=limit, offset=offset, search=search)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+

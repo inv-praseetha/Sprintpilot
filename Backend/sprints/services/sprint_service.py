@@ -947,4 +947,129 @@ class SprintService:
             'tomorrow':  bucket('tomorrow'),
         }
 
+    @staticmethod
+    def get_team_performance(limit: int = 6, offset: int = 0, search: str = '') -> dict:
+        """
+        Calculates gamified team performance points and rankings for all employees.
+
+        Pointing System:
+        - +1 Point: Task completed (CLOSED or RESOLVED) on or before planned_end_date (or if no planned_end_date).
+        - -1 Point: Task completed late (updated_at > planned_end_date) OR currently active (OPEN / IN_PROGRESS) past planned_end_date.
+        """
+        from django.utils import timezone
+        from project.models import Project
+        from accounts.models import EmployeeProfile
+
+        today = timezone.localdate()
+        active_projects = Project.objects.exclude(status='COMPLETED')
+
+        tasks = SprintTask.objects.filter(
+            sprint__project__in=active_projects,
+            is_deleted=False
+        ).select_related('assigned_employee', 'assigned_employee__user')
+
+        emp_stats = {}
+        emp_map = {}
+        employees = EmployeeProfile.objects.select_related('user').all()
+
+        for emp in employees:
+            if not emp.user:
+                continue
+            emp_id = str(emp.id)
+            emp_map[emp_id] = emp
+            emp_stats[emp_id] = {
+                'id': f"EMP-{str(emp.id)[:4].upper()}",
+                'raw_id': emp_id,
+                'name': emp.user.full_name or emp.user.email,
+                'role': emp.designation or emp.user.role or "Team Member",
+                'total_tasks': 0,
+                'completed_tasks': 0,
+                'on_time_tasks': 0,
+                'late_or_overdue_tasks': 0,
+                'points': 0,
+            }
+
+        for t in tasks:
+            if not t.assigned_employee:
+                continue
+            emp_id = str(t.assigned_employee.id)
+            if emp_id not in emp_stats:
+                continue
+
+            stats = emp_stats[emp_id]
+            stats['total_tasks'] += 1
+
+            is_completed = t.status in ['CLOSED', 'RESOLVED']
+            end_date = t.planned_end_date
+
+            if is_completed:
+                stats['completed_tasks'] += 1
+                completed_date = t.updated_at.date() if t.updated_at else today
+                if end_date and completed_date > end_date:
+                    stats['late_or_overdue_tasks'] += 1
+                    stats['points'] -= 1
+                else:
+                    stats['on_time_tasks'] += 1
+                    stats['points'] += 1
+            else:
+                if end_date and end_date < today:
+                    stats['late_or_overdue_tasks'] += 1
+                    stats['points'] -= 1
+
+        result_list = []
+        profiles_to_update = []
+
+        for stats in emp_stats.values():
+            emp_obj = emp_map.get(stats['raw_id'])
+            if emp_obj:
+                emp_obj.performance_points = stats['points']
+                profiles_to_update.append(emp_obj)
+
+            if stats['total_tasks'] == 0:
+                continue
+
+            total = stats['total_tasks']
+            on_time = stats['on_time_tasks']
+            rate = round((on_time / total) * 100) if total > 0 else 100
+            stats['on_time_rate'] = f"{rate}%"
+            stats['raw_rate'] = rate
+            result_list.append(stats)
+
+        # Bulk update performance points in DB for fast persistence
+        if profiles_to_update:
+            EmployeeProfile.objects.bulk_update(profiles_to_update, ['performance_points'])
+
+        # Sort by points descending, then by raw_rate descending
+        result_list.sort(key=lambda x: (x['points'], x['raw_rate']), reverse=True)
+
+        for index, item in enumerate(result_list):
+            item['rank'] = index + 1
+            del item['raw_rate']
+
+        # Apply search filter if provided
+        if search:
+            query = search.strip().lower()
+            result_list = [
+                item for item in result_list 
+                if query in item['name'].lower() or query in item['role'].lower()
+            ]
+
+        total_count = len(result_list)
+
+        # Apply limit & offset pagination
+        if limit is not None and limit > 0:
+            paginated_list = result_list[offset : offset + limit]
+        else:
+            paginated_list = result_list
+
+        has_more = (offset + len(paginated_list)) < total_count
+
+        return {
+            'results': paginated_list,
+            'count': total_count,
+            'has_more': has_more,
+            'limit': limit,
+            'offset': offset
+        }
+
 
