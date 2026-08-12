@@ -117,7 +117,7 @@ const getCategoryConfig = (category) => {
   if (c === 'BACKEND') return categoryConfig.Backend;
   if (c === 'INFRA' || c === 'SYSTEM DESIGN & INFRA') return categoryConfig.INFRA;
   if (c === 'QA') return categoryConfig.QA;
-  
+
   return {
     label: category,
     bgLight: 'bg-slate-50 text-slate-600 border-slate-200/50',
@@ -135,7 +135,7 @@ const getUniqueCategories = (tasks) => {
       categories.add('UI');
     }
   });
-  
+
   const defaultCats = ['UI', 'Backend', 'INFRA', 'QA'];
   const result = [...defaultCats];
   categories.forEach(c => {
@@ -219,7 +219,7 @@ export default function SprintTasksTable({
       });
       // Small delay to allow the <a> tag to open the new tab before we update state and hide the icon
       setTimeout(() => {
-        setTasks(prev => prev.map(t => 
+        setTasks(prev => prev.map(t =>
           t.id === task.id ? { ...t, read_comment_count: task.comment_count } : t
         ));
       }, 500);
@@ -237,7 +237,7 @@ export default function SprintTasksTable({
           if (res.data && res.data.updated_counts) {
             const counts = res.data.updated_counts;
             if (Object.keys(counts).length > 0) {
-              setTasks(prev => prev.map(t => 
+              setTasks(prev => prev.map(t =>
                 counts[t.id] !== undefined ? { ...t, comment_count: counts[t.id] } : t
               ));
             }
@@ -392,7 +392,7 @@ export default function SprintTasksTable({
     <div className="overflow-auto max-h-[600px] relative custom-scrollbar">
       <table
         className="w-full text-left border-collapse"
-        style={{ minWidth: `${880 + timelineDaysList.length * 32}px` }}
+        style={{ minWidth: `${1150 + timelineDaysList.length * 32}px` }}
       >
         <thead>
           {/* Row 1: Week headers */}
@@ -433,8 +433,8 @@ export default function SprintTasksTable({
                   key={`week-h-${i}`}
                   colSpan={h.span}
                   className={`py-2.5 px-3 border-r text-center text-[9px] sticky top-0 z-30 ${i % 2 === 0
-                      ? darkMode ? 'bg-slate-950' : 'bg-slate-100'
-                      : darkMode ? 'bg-slate-900' : 'bg-slate-550'
+                    ? darkMode ? 'bg-slate-950' : 'bg-slate-100'
+                    : darkMode ? 'bg-slate-900' : 'bg-slate-550'
                     } ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
                 >
                   {h.label}
@@ -506,7 +506,13 @@ export default function SprintTasksTable({
               RECOMMENDATION REASON
             </th>
             <th
-              className={`py-2 px-3 sticky left-[1040px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+              className={`py-2 px-3 sticky left-[1040px] top-[36px] z-40 w-12 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+              style={{ minWidth: '50px', maxWidth: '79px', width: '50px' }}
+            >
+              COMMENTS
+            </th>
+            <th
+              className={`py-2 px-3 sticky left-[1090px] top-[36px] z-40 w-16 text-center border-r ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
               style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
             >
               ACTIONS
@@ -516,11 +522,10 @@ export default function SprintTasksTable({
             {timelineDaysList.map((day, idx) => {
               let cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-550'}`;
               if (day.isWeekend || day.isHoliday) {
-                cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-not-allowed ${
-                  day.isHoliday
-                    ? darkMode ? 'border-slate-800 bg-red-955/80 text-red-200' : 'border-slate-200 bg-red-100/90 text-red-700 font-bold'
-                    : darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-550'
-                }`;
+                cellStyle = `py-2 text-center border-r w-8 shrink-0 sticky top-[36px] z-30 cursor-not-allowed ${day.isHoliday
+                  ? darkMode ? 'border-slate-800 bg-red-955/80 text-red-200' : 'border-slate-200 bg-red-100/90 text-red-700 font-bold'
+                  : darkMode ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-550'
+                  }`;
               }
               if (day.isSprintStart) {
                 cellStyle += ' border-l-2 border-l-orange-500';
@@ -529,8 +534,8 @@ export default function SprintTasksTable({
                 cellStyle += ' border-r-2 border-r-orange-500';
               }
               return (
-                <th 
-                  key={`num-${day.dayNum}-${idx}`} 
+                <th
+                  key={`num-${day.dayNum}-${idx}`}
                   className={cellStyle}
                   title={day.isWeekend ? 'Weekend' : day.isHoliday ? 'Holiday' : ''}
                 >
@@ -580,6 +585,10 @@ export default function SprintTasksTable({
             />
             <th
               className={`py-1 px-3 sticky left-[1040px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
+              style={{ minWidth: '50px', maxWidth: '50px', width: '50px' }}
+            />
+            <th
+              className={`py-1 px-3 sticky left-[1090px] top-[68px] z-40 border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
               style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
             />
 
@@ -587,11 +596,10 @@ export default function SprintTasksTable({
             {timelineDaysList.map((day, idx) => {
               let cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 transition-colors ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-500' : 'border-slate-200 bg-white text-slate-450'}`;
               if (day.isWeekend || day.isHoliday) {
-                cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-not-allowed ${
-                  day.isHoliday
-                    ? darkMode ? 'border-slate-800 bg-red-955/80 text-red-200' : 'border-slate-200 bg-red-100/90 text-red-700 font-bold'
-                    : darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
-                }`;
+                cellStyle = `py-1 text-center border-r w-8 sticky top-[68px] z-30 cursor-not-allowed ${day.isHoliday
+                  ? darkMode ? 'border-slate-800 bg-red-955/80 text-red-200' : 'border-slate-200 bg-red-100/90 text-red-700 font-bold'
+                  : darkMode ? 'border-slate-800 bg-slate-950 text-slate-600' : 'border-slate-200 bg-slate-100 text-slate-400'
+                  }`;
               }
               if (day.isSprintStart) {
                 cellStyle += ' border-l-2 border-l-orange-500';
@@ -600,8 +608,8 @@ export default function SprintTasksTable({
                 cellStyle += ' border-r-2 border-r-orange-500';
               }
               return (
-                <th 
-                  key={`name-${day.dayNum}-${idx}`} 
+                <th
+                  key={`name-${day.dayNum}-${idx}`}
                   className={cellStyle}
                   title={day.isWeekend ? 'Weekend' : day.isHoliday ? 'Holiday' : ''}
                 >
@@ -668,6 +676,10 @@ export default function SprintTasksTable({
                   />
                   <td
                     className={`py-3 px-3 sticky left-[1040px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
+                    style={{ minWidth: '50px', maxWidth: '50px', width: '50px' }}
+                  />
+                  <td
+                    className={`py-3 px-3 sticky left-[1090px] z-20 border-r ${secBgClass} ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}
                     style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
                   />
 
@@ -689,7 +701,7 @@ export default function SprintTasksTable({
                       <td key={`sec-${category}-${idx}`} className={cellStyle}>
                         {day.isHoliday && (
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-visible">
-                            <span 
+                            <span
                               className="text-[7.5px] font-black uppercase tracking-widest text-red-600 dark:text-red-300 opacity-100 whitespace-nowrap"
                               style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
                             >
@@ -730,12 +742,12 @@ export default function SprintTasksTable({
                       onMouseEnter={() => setHoveredRowId(task.id)}
                       onMouseLeave={() => setHoveredRowId(null)}
                       className={`transition-colors duration-100 ${isActiveRow ? 'relative z-30' : ''} ${isRowHovered
-                          ? darkMode
-                            ? 'bg-slate-805/40 text-white font-bold'
-                            : 'bg-slate-50/70 text-slate-900 font-bold'
-                          : darkMode
-                            ? 'bg-slate-900/10'
-                            : 'bg-white'
+                        ? darkMode
+                          ? 'bg-slate-805/40 text-white font-bold'
+                          : 'bg-slate-50/70 text-slate-900 font-bold'
+                        : darkMode
+                          ? 'bg-slate-900/10'
+                          : 'bg-white'
                         }`}
                     >
                       {/* Checkbox column */}
@@ -786,8 +798,8 @@ export default function SprintTasksTable({
                             value={task.assigned_employee?.id != null ? String(task.assigned_employee.id) : ""}
                             onChange={(e) => handleAssigneeChange(task.id, e.target.value)}
                             className={`p-1 rounded text-[10px] border w-full font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500 ${darkMode
-                                ? 'bg-slate-900 border-slate-750 text-white'
-                                : 'bg-white border-slate-250 text-slate-800'
+                              ? 'bg-slate-900 border-slate-750 text-white'
+                              : 'bg-white border-slate-250 text-slate-800'
                               }`}
                           >
                             <option value="">Unassigned</option>
@@ -817,13 +829,12 @@ export default function SprintTasksTable({
                         className={`py-4 px-2 sticky left-[470px] ${rowZIndexClass} text-center border-r align-middle font-extrabold text-[9px] ${stickyNormalBgClass}`}
                         style={{ minWidth: '110px', maxWidth: '110px', width: '110px' }}
                       >
-                        <span className={`whitespace-nowrap px-2 py-1 rounded-md uppercase tracking-wider ${
-                          task.status === 'CLOSED' || task.status === 'RESOLVED' || task.status === 'DONE' || task.status === 'COMPLETED'
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
-                            : task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'QA'
-                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
-                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
-                        }`}>
+                        <span className={`whitespace-nowrap px-2 py-1 rounded-md uppercase tracking-wider ${task.status === 'CLOSED' || task.status === 'RESOLVED' || task.status === 'DONE' || task.status === 'COMPLETED'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border border-emerald-500/20'
+                          : task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'QA'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
+                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20'
+                          }`}>
                           {task.status?.replace('_', ' ') || 'OPEN'}
                         </span>
                       </td>
@@ -912,12 +923,12 @@ export default function SprintTasksTable({
                         </div>
                       </td>
 
-                      {/* ACTIONS */}
+                      {/* CHAT */}
                       <td
                         className={`py-4 px-1 sticky left-[1040px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
-                        style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                        style={{ minWidth: '50px', maxWidth: '50px', width: '50px' }}
                       >
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center">
                           {task.backlog_task_id && task.comment_count > (task.read_comment_count || 0) && (
                             <a
                               href={task.first_unread_comment_id && task.backlog_task_url ? `${task.backlog_task_url}#comment-${task.first_unread_comment_id}` : (task.backlog_task_url ? `${task.backlog_task_url}#comment` : '#')}
@@ -936,14 +947,22 @@ export default function SprintTasksTable({
                               </span>
                             </a>
                           )}
+                        </div>
+                      </td>
+
+                      {/* ACTIONS */}
+                      <td
+                        className={`py-4 px-1 sticky left-[1090px] ${rowZIndexClass} border-r align-middle text-center ${stickyNormalBgClass}`}
+                        style={{ minWidth: '60px', maxWidth: '60px', width: '60px' }}
+                      >
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleIndividualDelete(task.id)}
                             disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || task.status === 'CLOSED'}
-                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                              darkMode 
-                                ? 'hover:bg-slate-800 text-red-400 hover:text-red-300' 
-                                : 'hover:bg-red-50 text-red-600 hover:text-red-750'
-                            }`}
+                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
+                              ? 'hover:bg-slate-800 text-red-400 hover:text-red-300'
+                              : 'hover:bg-red-50 text-red-600 hover:text-red-750'
+                              }`}
                             title={task.status === 'CLOSED' ? "Cannot delete this task as it is already closed/completed" : "Delete task"}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -977,12 +996,12 @@ export default function SprintTasksTable({
                             {isDayInTaskRange && (
                               <div
                                 className={`h-6 flex items-center justify-center transition-all ${config.bar} ${isBarStart && isBarEnd
-                                    ? 'rounded-full mx-1'
-                                    : isBarStart
-                                      ? 'rounded-l-full ml-1 mr-0'
-                                      : isBarEnd
-                                        ? 'rounded-r-full mr-1 ml-0'
-                                        : 'mx-0'
+                                  ? 'rounded-full mx-1'
+                                  : isBarStart
+                                    ? 'rounded-l-full ml-1 mr-0'
+                                    : isBarEnd
+                                      ? 'rounded-r-full mr-1 ml-0'
+                                      : 'mx-0'
                                   } ${isRowHovered ? 'shadow-lg brightness-110 scale-y-105' : 'opacity-85'}`}
                                 title={`${task.title} (Locked)`}
                               >
@@ -993,7 +1012,7 @@ export default function SprintTasksTable({
                             )}
                             {!isDayInTaskRange && day.isHoliday && (
                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-visible">
-                                <span 
+                                <span
                                   className="text-[7px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400 opacity-60 whitespace-nowrap"
                                   style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
                                 >

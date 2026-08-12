@@ -213,7 +213,6 @@ class BacklogSyncService:
         return summary
 
     def push_sprint_to_backlog(self, sprint, task_ids=None):
-        from backlog.services.backlog_client import BacklogService
         backlog_service = BacklogService(project_key=sprint.project.project_id)
         
         try:
@@ -285,7 +284,6 @@ class BacklogSyncService:
         }
 
     def sync_sprint_comments(self, sprint):
-        from backlog.services.backlog_client import BacklogService
         backlog_service = BacklogService(project_key=sprint.project.project_id)
         
         tasks = sprint.tasks.exclude(backlog_task_id__isnull=True).exclude(backlog_task_id__exact='')
