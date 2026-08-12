@@ -897,12 +897,16 @@ class SprintService:
         Returns per-project task counts grouped by urgency bucket:
         overdue (past due or no date), due today, due tomorrow.
         Only considers non-closed/resolved tasks in non-completed projects.
+        Also attaches filtered Backlog workspace URL for overdue tasks.
         """
         from django.utils import timezone
         from datetime import timedelta
+        from urllib.parse import quote
+        from decouple import config
         from project.models import Project
 
         today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
         tomorrow = today + timedelta(days=1)
 
         active_projects = Project.objects.exclude(status='COMPLETED')
@@ -911,10 +915,13 @@ class SprintService:
             sprint__project__in=active_projects,
             is_deleted=False
         ).exclude(status__in=['CLOSED', 'RESOLVED']).select_related(
-            'sprint__project'
+            'sprint', 'sprint__project'
         )
 
-        # project_id -> { projectId, projectName, overdue, today, tomorrow }
+        workspace_base = config('BACKLOG_WORKSPACE_URL', default='').rstrip('/')
+        default_project_key = config('BACKLOG_PROJECT_KEY', default='')
+
+        # project_id -> { projectId, projectName, overdue, today, tomorrow, overdue_sprint, today_sprint, tomorrow_sprint }
         project_map = {}
 
         for t in tasks:
@@ -926,23 +933,93 @@ class SprintService:
                     'overdue': 0,
                     'today': 0,
                     'tomorrow': 0,
+                    'overdue_sprint': None,
+                    'today_sprint': None,
+                    'tomorrow_sprint': None,
                 }
 
             if not t.planned_end_date or t.planned_end_date < today:
                 project_map[pid]['overdue'] += 1
+                if not project_map[pid]['overdue_sprint'] and t.sprint.backlog_version_id and t.sprint.backlog_project_id:
+                    project_map[pid]['overdue_sprint'] = t.sprint
+                elif project_map[pid]['overdue_sprint'] and t.sprint.backlog_version_id and t.sprint.backlog_project_id:
+                    if t.sprint.start_date < project_map[pid]['overdue_sprint'].start_date:
+                        project_map[pid]['overdue_sprint'] = t.sprint
             elif t.planned_end_date == today:
                 project_map[pid]['today'] += 1
+                if not project_map[pid]['today_sprint'] and t.sprint.backlog_version_id and t.sprint.backlog_project_id:
+                    project_map[pid]['today_sprint'] = t.sprint
+                elif project_map[pid]['today_sprint'] and t.sprint.backlog_version_id and t.sprint.backlog_project_id:
+                    if t.sprint.start_date < project_map[pid]['today_sprint'].start_date:
+                        project_map[pid]['today_sprint'] = t.sprint
             elif t.planned_end_date == tomorrow:
                 project_map[pid]['tomorrow'] += 1
+                if not project_map[pid]['tomorrow_sprint'] and t.sprint.backlog_version_id and t.sprint.backlog_project_id:
+                    project_map[pid]['tomorrow_sprint'] = t.sprint
+                elif project_map[pid]['tomorrow_sprint'] and t.sprint.backlog_version_id and t.sprint.backlog_project_id:
+                    if t.sprint.start_date < project_map[pid]['tomorrow_sprint'].start_date:
+                        project_map[pid]['tomorrow_sprint'] = t.sprint
 
         projects = list(project_map.values())
 
-        def bucket(key):
-            return sorted(
-                [{'projectId': p['projectId'], 'projectName': p['projectName'], 'count': p[key]}
-                 for p in projects if p[key] > 0],
-                key=lambda x: -x['count']
+        def get_workspace_url_for_bucket(p_dict, bucket_key):
+            sprint = p_dict.get(f"{bucket_key}_sprint")
+            if not sprint or not sprint.backlog_version_id or not sprint.backlog_project_id:
+                return None
+            if not workspace_base:
+                return None
+
+            proj = sprint.project
+            project_key = proj.project_id if proj and proj.project_id else default_project_key
+            if not project_key:
+                return None
+
+            if bucket_key == 'overdue':
+                s_start = min(sprint.start_date, yesterday)
+                begin_date = s_start
+                end_date = yesterday
+            elif bucket_key == 'today':
+                begin_date = today
+                end_date = today
+            elif bucket_key == 'tomorrow':
+                begin_date = tomorrow
+                end_date = tomorrow
+            else:
+                return None
+
+            begin_str = quote(begin_date.strftime('%Y/%m/%d'), safe='')
+            end_str = quote(end_date.strftime('%Y/%m/%d'), safe='')
+
+            return (
+                f"{workspace_base}/find/{project_key}"
+                f"?allOver=false"
+                f"&fixedVersionId={sprint.backlog_version_id}"
+                f"&limit=20"
+                f"&limitDateRange.begin={begin_str}"
+                f"&limitDateRange.end={end_str}"
+                f"&offset=0"
+                f"&order=false"
+                f"&projectId={sprint.backlog_project_id}"
+                f"&simpleSearch=false"
+                f"&sort=UPDATED"
+                f"&statusId=1&statusId=2"
             )
+
+        def bucket(key):
+            res = []
+            for p in projects:
+                if p[key] > 0:
+                    item = {
+                        'projectId': p['projectId'],
+                        'projectName': p['projectName'],
+                        'count': p[key]
+                    }
+                    url = get_workspace_url_for_bucket(p, key)
+                    if url:
+                        item['workspaceUrl'] = url
+                        item['workspace_url'] = url
+                    res.append(item)
+            return sorted(res, key=lambda x: -x['count'])
 
         return {
             'overdue':   bucket('overdue'),

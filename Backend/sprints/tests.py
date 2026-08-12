@@ -511,6 +511,48 @@ class SprintServiceTests(APITestCase):
         # Add profile as member of self.project
         ProjectMember.objects.create(project=self.project, employee_profile=self.profile)
 
+    @patch('decouple.config')
+    def test_get_tasks_by_due_status_overdue_workspace_url(self, mock_config):
+        def config_side_effect(key, default=''):
+            if key == 'BACKLOG_WORKSPACE_URL':
+                return 'https://sprintai.backlog.com'
+            if key == 'BACKLOG_PROJECT_KEY':
+                return 'TEST'
+            return default
+
+        mock_config.side_effect = config_side_effect
+        self.sprint.backlog_version_id = '162213'
+        self.sprint.backlog_project_id = '166137'
+        self.sprint.save()
+
+        # Create an overdue task within sprint dates
+        overdue_task = SprintTask.objects.create(
+            sprint=self.sprint,
+            title="Overdue Task Test",
+            status="OPEN",
+            category="UI",
+            planned_start_date=datetime.date(2026, 7, 20),
+            planned_end_date=datetime.date(2026, 7, 24),
+            assigned_employee=self.profile,
+            description="Overdue task description"
+        )
+
+        # Create today and tomorrow tasks within sprint dates if today falls inside sprint
+        today = timezone.localdate()
+        tomorrow = today + datetime.timedelta(days=1)
+
+        res = SprintService.get_tasks_by_due_status()
+        self.assertIn('overdue', res)
+        self.assertTrue(len(res['overdue']) > 0)
+        overdue_item = res['overdue'][0]
+        self.assertIn('workspaceUrl', overdue_item)
+        self.assertIn('limitDateRange.begin=', overdue_item['workspaceUrl'])
+        self.assertIn('limitDateRange.end=', overdue_item['workspaceUrl'])
+        self.assertIn('fixedVersionId=162213', overdue_item['workspaceUrl'])
+        self.assertIn('projectId=166137', overdue_item['workspaceUrl'])
+        self.assertIn('statusId=1&statusId=2', overdue_item['workspaceUrl'])
+        self.assertNotIn('statusId=3', overdue_item['workspaceUrl'])
+
     def test_calculate_working_days_with_holidays(self):
         # 2026-07-20 is Monday, 2026-07-24 is Friday. Total standard working days = 5.
         # Let's add holidays on 2026-07-21 (Tuesday) and 2026-07-23 (Thursday).

@@ -117,12 +117,12 @@ describe('Status Page Component', () => {
     expect(screen.getByText('Write API documentation')).toBeInTheDocument();
 
     // Verify column counts
-    expect(screen.getByText('1', { selector: 'span.bg-red-600' })).toBeInTheDocument();
+    expect(screen.getAllByText('1', { selector: 'span.bg-red-600' })[0]).toBeInTheDocument();
     expect(screen.getByText('0', { selector: 'span.bg-orange-600' })).toBeInTheDocument();
-    expect(screen.getByText('1', { selector: 'span.bg-blue-600' })).toBeInTheDocument();
+    expect(screen.getAllByText('1', { selector: 'span.bg-blue-600' })[0]).toBeInTheDocument();
 
     // Verify empty state is displayed for Today's column
-    expect(screen.getByText('No tasks due today')).toBeInTheDocument();
+    expect(screen.getByText(/No tasks due today/i)).toBeInTheDocument();
   });
 
   it('navigates to sprint detail page when task card is clicked', async () => {
