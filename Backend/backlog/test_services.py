@@ -115,6 +115,47 @@ class TestBacklogSyncService(TestCase):
         self.assertEqual(summary["skipped"], 1)
         self.assertEqual(summary["updated"], 0)
 
+    @patch('backlog.services.backlog_sync_service.BacklogService')
+    def test_sync_sprint_comments(self, MockBacklogService):
+        mock_instance = MockBacklogService.return_value
+        # 3 valid comments, 1 empty
+        mock_instance.get_issue_comments.return_value = [
+            {"id": 101, "content": "First comment", "created": "2026-08-11T10:00:00Z"},
+            {"id": 102, "content": "Second comment", "created": "2026-08-11T11:00:00Z"},
+            {"id": 103, "content": "", "created": "2026-08-11T12:00:00Z"}, # Empty content
+            {"id": 104, "content": "Third comment", "created": "2026-08-11T13:00:00Z"},
+        ]
+        
+        self.task1.read_comment_count = 1
+        self.task1.save()
+        
+        updated_counts = self.service.sync_sprint_comments(self.sprint)
+        
+        self.task1.refresh_from_db()
+        self.assertEqual(self.task1.comment_count, 3)
+        self.assertEqual(self.task1.first_unread_comment_id, "102")
+        self.assertEqual(updated_counts[str(self.task1.id)]["count"], 3)
+        self.assertEqual(updated_counts[str(self.task1.id)]["first_unread_id"], "102")
+
+    @patch('backlog.services.backlog_sync_service.BacklogService')
+    def test_sync_sprint_comments_all_read(self, MockBacklogService):
+        mock_instance = MockBacklogService.return_value
+        mock_instance.get_issue_comments.return_value = [
+            {"id": 101, "content": "First comment", "created": "2026-08-11T10:00:00Z"},
+            {"id": 102, "content": "Second comment", "created": "2026-08-11T11:00:00Z"},
+        ]
+        
+        self.task1.read_comment_count = 2
+        self.task1.save()
+        
+        updated_counts = self.service.sync_sprint_comments(self.sprint)
+        
+        self.task1.refresh_from_db()
+        self.assertEqual(self.task1.comment_count, 2)
+        self.assertIsNone(self.task1.first_unread_comment_id)
+        self.assertEqual(updated_counts[str(self.task1.id)]["count"], 2)
+        self.assertIsNone(updated_counts[str(self.task1.id)]["first_unread_id"])
+
 from backlog.services.backlog_client import BacklogService
 
 class TestBacklogClientService(TestCase):
