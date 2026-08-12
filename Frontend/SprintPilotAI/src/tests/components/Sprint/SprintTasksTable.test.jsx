@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SprintTasksTable from '../../../components/Sprint/SprintTasksTable';
+import apiClient from '../../../api/apiClient';
 
 // Mock CustomDatePicker
 vi.mock('../../../components/Common/CustomDatePicker', () => ({
@@ -17,12 +18,25 @@ vi.mock('../../../components/Common/CustomDatePicker', () => ({
   )
 }));
 
+// Mock TaskCommentsModal
+vi.mock('../../../components/Modals/TaskCommentsModal', () => ({
+  default: () => <div data-testid="mock-task-comments-modal" />
+}));
+
 // Mock ToastContext
 vi.mock('../../../context/ToastContext', () => ({
   useToast: () => ({
     error: vi.fn(),
     success: vi.fn()
   })
+}));
+
+// Mock apiClient
+vi.mock('../../../api/apiClient', () => ({
+  default: {
+    post: vi.fn(),
+    put: vi.fn()
+  }
 }));
 
 describe('SprintTasksTable Component', () => {
@@ -77,6 +91,9 @@ describe('SprintTasksTable Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    apiClient.post.mockResolvedValue({ data: { updated_counts: {} } });
+    apiClient.put.mockResolvedValue({ data: {} });
   });
 
   it('renders task table structure and categories correctly', () => {
@@ -172,6 +189,89 @@ describe('SprintTasksTable Component', () => {
 
     expect(setTasks).toHaveBeenCalled();
     expect(setModifiedTaskIds).toHaveBeenCalled();
+  });
+
+  it('renders chat icon when there are unread comments and handles click', async () => {
+    const tasksWithComments = [
+      {
+        id: 101,
+        title: 'Task A',
+        category: 'UI',
+        status: 'OPEN',
+        backlog_task_id: 'TEST-1',
+        backlog_task_url: 'http://backlog/TEST-1',
+        comment_count: 5,
+        read_comment_count: 2,
+        first_unread_comment_id: '333'
+      }
+    ];
+    
+    const setTasks = vi.fn((updateFn) => {
+      // Simulate state update
+      const updatedTasks = updateFn(tasksWithComments);
+      expect(updatedTasks[0].read_comment_count).toBe(5);
+    });
+
+    render(
+      <SprintTasksTable
+        {...defaultProps}
+        tasks={tasksWithComments}
+        setTasks={setTasks}
+      />
+    );
+
+    // Chat icon should be rendered with unread count 3
+    const chatIcon = screen.getByTitle('3 new comment(s).');
+    expect(chatIcon).toBeInTheDocument();
+    expect(chatIcon).toHaveAttribute('href', 'http://backlog/TEST-1#comment-333');
+
+    // Click chat icon
+    fireEvent.click(chatIcon);
+
+    expect(apiClient.put).toHaveBeenCalledWith('sprints/tasks/101/', {
+      read_comment_count: 5
+    });
+
+    // Wait for the setTimeout in handleChatIconClick
+    await waitFor(() => {
+      expect(setTasks).toHaveBeenCalled();
+    }, { timeout: 1000 });
+  });
+
+  it('fetches comment counts on mount and updates tasks', async () => {
+    const tasksData = [
+      {
+        id: 101,
+        title: 'Task A',
+        category: 'UI',
+        status: 'OPEN',
+        comment_count: 0
+      }
+    ];
+    
+    const setTasks = vi.fn();
+    
+    apiClient.post.mockResolvedValueOnce({
+      data: {
+        updated_counts: {
+          '101': { count: 3, first_unread_id: '123' }
+        }
+      }
+    });
+
+    render(
+      <SprintTasksTable
+        {...defaultProps}
+        tasks={tasksData}
+        setTasks={setTasks}
+      />
+    );
+
+    expect(apiClient.post).toHaveBeenCalledWith('sprints/1/sync-comments/');
+    
+    await waitFor(() => {
+      expect(setTasks).toHaveBeenCalled();
+    });
   });
 });
 
