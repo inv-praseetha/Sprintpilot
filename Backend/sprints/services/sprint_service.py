@@ -911,8 +911,26 @@ class SprintService:
 
         active_projects = Project.objects.exclude(status='COMPLETED')
 
+        # Find latest sprint for each active project
+        latest_sprint_ids = []
+        for proj in active_projects:
+            sprint = Sprint.objects.filter(
+                project=proj,
+                is_deleted=False,
+                status='ACTIVE'
+            ).order_by('-start_date', '-created_at').first()
+
+            if not sprint:
+                sprint = Sprint.objects.filter(
+                    project=proj,
+                    is_deleted=False
+                ).order_by('-start_date', '-created_at').first()
+
+            if sprint:
+                latest_sprint_ids.append(sprint.id)
+
         tasks = SprintTask.objects.filter(
-            sprint__project__in=active_projects,
+            sprint_id__in=latest_sprint_ids,
             is_deleted=False
         ).exclude(status__in=['CLOSED', 'RESOLVED']).select_related(
             'sprint', 'sprint__project'
