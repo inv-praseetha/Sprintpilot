@@ -20,9 +20,12 @@ const Status = () => {
       setLoading(true);
       const response = await apiClient.get('sprints/tasks/status/');
       const data = response.data;
-      setOverdueProjects(data.overdue || []);
-      setTodayProjects(data.today || []);
-      setTomorrowProjects(data.tomorrow || []);
+      const overdueList = Array.isArray(data.overdue) ? data.overdue : (data.overdue?.tasks || []);
+      const todayList = Array.isArray(data.today) ? data.today : (data.today?.tasks || []);
+      const tomorrowList = Array.isArray(data.tomorrow) ? data.tomorrow : (data.tomorrow?.tasks || []);
+      setOverdueProjects(overdueList);
+      setTodayProjects(todayList);
+      setTomorrowProjects(tomorrowList);
     } catch (err) {
       console.error('Error fetching task status counts:', err);
     } finally {
@@ -34,15 +37,15 @@ const Status = () => {
     fetchStatusCounts();
   }, []);
 
-  const totalOverdue = overdueProjects.reduce((sum, p) => sum + p.count, 0);
-  const totalToday = todayProjects.reduce((sum, p) => sum + p.count, 0);
-  const totalTomorrow = tomorrowProjects.reduce((sum, p) => sum + p.count, 0);
+  const totalOverdue = overdueProjects.reduce((sum, p) => sum + (p.count ?? 1), 0);
+  const totalToday = todayProjects.reduce((sum, p) => sum + (p.count ?? 1), 0);
+  const totalTomorrow = tomorrowProjects.reduce((sum, p) => sum + (p.count ?? 1), 0);
 
   if (loading) {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
         <Loader2 className="w-10 h-10 animate-spin text-orange-500 mb-4" />
-        <span className="text-sm font-semibold tracking-wider animate-pulse">Loading task urgency status...</span>
+        <span className="text-sm font-semibold tracking-wider animate-pulse">Loading task status dashboard...</span>
       </div>
     );
   }
@@ -152,10 +155,20 @@ const COLORS = {
 // Simple project card displaying project name and pending task count (Clickable to navigate to project detail)
 const ProjectSummaryCard = ({ item, darkMode, navigate, themeColor, label }) => {
   const c = COLORS[themeColor] || COLORS.orange;
+  const workspaceUrl = item.workspaceUrl || item.workspace_url;
 
   const handleClick = () => {
-    navigate(`/projects/${item.projectId}`);
+    if (workspaceUrl) {
+      window.open(workspaceUrl, '_blank', 'noopener,noreferrer');
+    } else if (item.projectId && item.sprintId) {
+      navigate(`/projects/${item.projectId}/sprints/${item.sprintId}`);
+    } else if (item.projectId) {
+      navigate(`/projects/${item.projectId}`);
+    }
   };
+
+  const displayName = item.title || item.projectName;
+  const displayCount = item.count ?? 1;
 
   return (
     <div
@@ -171,15 +184,15 @@ const ProjectSummaryCard = ({ item, darkMode, navigate, themeColor, label }) => 
           </div>
           <div className="text-left truncate">
             <h4 className={`font-extrabold text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              {item.projectName}
+              {displayName}
             </h4>
             <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {item.count} {label}
+              {displayCount} {label}
             </span>
           </div>
         </div>
         <span className={`px-3 py-1 rounded-full text-xs font-extrabold text-white flex-shrink-0 ${c.badge}`}>
-          {item.count}
+          {displayCount}
         </span>
       </div>
     </div>
