@@ -803,6 +803,11 @@ export default function SprintTasksTable({
                               }`}
                           >
                             <option value="">Unassigned</option>
+                            {task.assigned_employee?.id != null && !employees.some(e => String(e.id) === String(task.assigned_employee.id)) && (
+                              <option value={String(task.assigned_employee.id)}>
+                                {task.assigned_employee.user?.full_name || task.assigned_employee.user?.email}
+                              </option>
+                            )}
                             {employees.map(emp => (
                               <option key={emp.id} value={String(emp.id)}>
                                 {emp.user?.full_name || emp.user?.email}

@@ -317,20 +317,12 @@ class ProjectAssignableMembersView(APIView):
             "employee_skill_relations__skill"
         ).distinct()
 
-        # Build a map keyed by profile id for deduplication
-        profiles_map = {p.id: p for p in member_profiles}
-
-        # 2. Include the team lead's EmployeeProfile if not already in the map
+        # Exclude Team Lead (both project.team_lead user and users with TEAM_LEAD role)
         if project.team_lead:
-            try:
-                lead_profile = EmployeeProfile.objects.select_related("user").prefetch_related(
-                    "employee_skill_relations__skill"
-                ).get(user=project.team_lead)
-                profiles_map[lead_profile.id] = lead_profile
-            except EmployeeProfile.DoesNotExist:
-                pass  # Team lead has no profile — skip
+            member_profiles = member_profiles.exclude(user=project.team_lead)
+        member_profiles = member_profiles.exclude(user__role='TEAM_LEAD')
 
-        profiles = sorted(profiles_map.values(), key=lambda p: p.user.full_name)
+        profiles = sorted(member_profiles, key=lambda p: p.user.full_name)
         serializer = EmployeeProfileSerializer(profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
