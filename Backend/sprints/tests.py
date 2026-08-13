@@ -212,7 +212,7 @@ class SprintAPITests(APITestCase):
         url = reverse('sprint_detail', kwargs={'pk': self.sprint.id})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Sprint.objects.filter(id=self.sprint.id).exists())
+        self.assertTrue(Sprint.objects.get(id=self.sprint.id).is_deleted)
 
     # 6. Task Update Tests
     def test_task_status_update_success(self):

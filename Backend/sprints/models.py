@@ -46,22 +46,22 @@ class Sprint(models.Model):
 
 class SprintTask(models.Model):
     class Priority(models.TextChoices):
-        LOW = 'Low', 'Low'
-        NORMAL = 'Normal', 'Normal'
-        HIGH = 'High', 'High'
-        CRITICAL = 'Critical', 'Critical'
+        LOW = 'Low', 'LOW'
+        NORMAL = 'Normal', 'NORMAL'
+        HIGH = 'High', 'HIGH'
+        CRITICAL = 'Critical', 'CRITICAL'
 
     class Category(models.TextChoices):
-        UI = 'UI', 'UI'
-        BACKEND = 'Backend', 'Backend'
-        QA = 'QA', 'QA'
-        INFRA = 'INFRA', 'INFRA'
+        UI = 'UI', 'ui'
+        BACKEND = 'Backend', 'backend'
+        QA = 'QA', 'qa'
+        INFRA = 'INFRA', 'infra'
 
     class Status(models.TextChoices):
-        OPEN = 'OPEN', 'OPEN'
-        IN_PROGRESS = 'IN_PROGRESS', 'IN_PROGRESS'
-        RESOLVED='RESOLVED','RESOLVED'
-        CLOSED='CLOSED','CLOSED'
+        OPEN = 'OPEN', 'Open'
+        IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+        RESOLVED = 'RESOLVED', 'Resolved'
+        CLOSED = 'CLOSED', 'Closed'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sprint = models.ForeignKey(Sprint, on_delete=models.CASCADE, related_name='tasks')
