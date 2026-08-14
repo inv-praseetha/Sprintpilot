@@ -1004,7 +1004,7 @@ const Dashboard = () => {
                 <th className="py-4 px-4 font-semibold text-slate-400">Completed</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">On-Time Rate</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">Points</th>
-                <th className="py-4 px-4 w-12 text-center font-semibold text-slate-400">More</th>
+
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-left">
@@ -1063,13 +1063,6 @@ const Dashboard = () => {
                     }`}>
                       {member.points > 0 ? `+${member.points} pts` : `${member.points} pts`}
                     </span>
-                  </td>
-
-                  {/* Actions button */}
-                  <td className="py-4 px-4 text-center">
-                    <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
                   </td>
                 </tr>
               ))}
