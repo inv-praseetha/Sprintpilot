@@ -4,6 +4,12 @@ import { useTheme } from '../../components/layout/MainLayouut';
 import { useValidationLimits } from '../../hooks/useValidationLimits';
 import apiClient from '../../api/apiClient';
 import TaskUploadModal from '../../components/Modals/TaskUploadModal';
+import AddMembersModal from '../../components/ProjectDetail/AddMembersModal';
+import EditLeadModal from '../../components/ProjectDetail/EditLeadModal';
+import CloseSprintModal from '../../components/ProjectDetail/CloseSprintModal';
+import TeamRoster from '../../components/ProjectDetail/TeamRoster';
+import SprintsList from '../../components/ProjectDetail/SprintsList';
+import ProjectOverviewCard from '../../components/ProjectDetail/ProjectOverviewCard';
 import { getEffectiveSkills } from './projectcreation';
 import SprintServices from '../../services/SprintServices';
 import { useToast } from '../../context/ToastContext';
@@ -51,19 +57,13 @@ export default function ProjectDetail() {
   const [error, setError] = useState(null);
 
   // UI Toggle States
-  const [detailsExpanded, setDetailsExpanded] = useState(true);
-  const [rosterExpanded, setRosterExpanded] = useState(true);
-  const [sprintsExpanded, setSprintsExpanded] = useState(true);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [showUploadSprintModal, setShowUploadSprintModal] = useState(false);
   const [showEditLeadModal, setShowEditLeadModal] = useState(false);
   const limits = useValidationLimits();
 
   // Add Member State
-  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
-  const [updatingMembers, setUpdatingMembers] = useState(false);
-  const [modalError, setModalError] = useState(null);
+  // (Moved to AddMembersModal)
 
 
 
@@ -76,18 +76,6 @@ export default function ProjectDetail() {
 
   // Sprints state
   const [sprints, setSprints] = useState([]);
-
-  // Team Roster Pagination State
-  const [rosterPage, setRosterPage] = useState(1);
-  const rosterPageSize = 5;
-
-  const paginatedMembers = useMemo(() => {
-    if (!project || !project.members) return [];
-    const startIndex = (rosterPage - 1) * rosterPageSize;
-    return project.members.slice(startIndex, startIndex + rosterPageSize);
-  }, [project, rosterPage]);
-
-  const totalRosterPages = project?.members ? Math.ceil(project.members.length / rosterPageSize) : 1;
 
   // Initialize and check authentication
   useEffect(() => {
@@ -229,12 +217,9 @@ export default function ProjectDetail() {
 
     const limit = project.team_size || 0;
     if (updatedMemberIds.length > limit) {
-      setModalError(`Cannot allocate more members than the project team size of ${limit}. You have ${currentMemberIds.length} current members and selected ${selectedIds.length} new members (total ${updatedMemberIds.length}).`);
-      return;
+      throw new Error(`Cannot allocate more members than the project team size of ${limit}. You have ${currentMemberIds.length} current members and selected ${selectedIds.length} new members (total ${updatedMemberIds.length}).`);
     }
 
-    setUpdatingMembers(true);
-    setModalError(null);
     try {
       // Create member UUID list to submit
       // Note: Backend expect profile UUIDs
@@ -261,8 +246,7 @@ export default function ProjectDetail() {
     } catch (err) {
       console.error('[ProjectDetail] Error adding members:', err);
       toast.error(err.response?.data?.detail || 'Failed to add members.');
-    } finally {
-      setUpdatingMembers(false);
+      throw err;
     }
   };
 
@@ -294,13 +278,7 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleAddMembersSubmit = (e) => {
-    e.preventDefault();
-    handleAddMembers(selectedNewMembers, () => {
-      setSelectedNewMembers([]);
-      setMemberSearchQuery('');
-    });
-  };
+
 
   // Remove member from project
   const handleRemoveMember = async (memberProfileId) => {
@@ -415,9 +393,9 @@ export default function ProjectDetail() {
       confirmText: 'Delete',
       type: 'danger',
     });
-    
+
     if (!isConfirmed) return;
-    
+
     try {
       await apiClient.delete(`sprints/${sprintId}/`);
       toast.success("Sprint deleted successfully!");
@@ -428,51 +406,7 @@ export default function ProjectDetail() {
     }
   };
 
-  // Filter out employees already inside the project for multi-select
-  const availableEmployees = useMemo(() => {
-    if (!employees || !project) return [];
-    const currentMemberUserIds = project.members.map(m => m.user.id);
-    // Filter out users who are already members OR the team lead OR have TEAM_LEAD role
-    return employees.filter(emp => {
-      const isLead = project.team_lead?.id === emp.user.id;
-      const isTeamLeadRole = emp.user?.role === 'TEAM_LEAD';
-      const isMember = currentMemberUserIds.includes(emp.user.id);
-      const matchesSearch = emp.user.full_name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-        emp.designation.toLowerCase().includes(memberSearchQuery.toLowerCase());
 
-      // Only show employees with matching skills if project has required skills
-      const projectSkills = project.skills || [];
-      const hasSkills = projectSkills.length > 0;
-      const matchesSkills = !hasSkills || (emp.skills && emp.skills.some(skill =>
-        projectSkills.some(projectSkill =>
-          projectSkill.id === skill.id ||
-          projectSkill.parent === skill.id ||
-          projectSkill.id === skill.parent
-        )
-      ));
-
-      return !isLead && !isTeamLeadRole && !isMember && matchesSearch && matchesSkills;
-    });
-  }, [employees, project, memberSearchQuery]);
-
-  const toggleSelectNewMember = (profileId) => {
-    setSelectedNewMembers(prev => {
-      const isSelected = prev.includes(profileId);
-      if (isSelected) {
-        setModalError(null);
-        return prev.filter(id => id !== profileId);
-      }
-
-      const currentCount = (project.members || []).length;
-      const limit = project.team_size || 0;
-      if (currentCount + prev.length >= limit) {
-        setModalError(`Cannot select more members. Team size limit of ${limit} reached.`);
-        return prev;
-      }
-      setModalError(null);
-      return [...prev, profileId];
-    });
-  };
 
   if (loading) {
     return (
@@ -524,10 +458,10 @@ export default function ProjectDetail() {
               {project.name}
             </h1>
             <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider truncate max-w-[150px] inline-block ${project.status === 'ACTIVE'
-                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                : project.status === 'ON_HOLD'
-                  ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                  : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+              : project.status === 'ON_HOLD'
+                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
               }`}>
               {project.status.replace('_', ' ')}
             </span>
@@ -544,8 +478,8 @@ export default function ProjectDetail() {
               onClick={() => setShowAddMembersModal(true)}
               disabled={project.status === 'COMPLETED'}
               className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg min-w-0 ${project.status === 'COMPLETED'
-                  ? 'bg-slate-400 cursor-not-allowed shadow-none'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 cursor-pointer'
+                ? 'bg-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 cursor-pointer'
                 }`}
               title={project.status === 'COMPLETED' ? "Cannot add members to a completed project" : ""}
             >
@@ -556,8 +490,8 @@ export default function ProjectDetail() {
               onClick={() => setShowUploadSprintModal(true)}
               disabled={project.status === 'COMPLETED'}
               className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg min-w-0 ${project.status === 'COMPLETED'
-                  ? 'bg-slate-400 cursor-not-allowed shadow-none'
-                  : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/10 cursor-pointer'
+                ? 'bg-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/10 cursor-pointer'
                 }`}
               title={project.status === 'COMPLETED' ? "Cannot upload sprints to a completed project" : ""}
             >
@@ -569,802 +503,39 @@ export default function ProjectDetail() {
       </div>
 
       {/* 1. COLLAPSIBLE PROJECT DETAILS ACCORDION */}
-      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-        }`}>
-        <button
-          onClick={() => setDetailsExpanded(!detailsExpanded)}
-          className={`w-full p-6 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
-            }`}
-        >
-          <div className="flex items-center gap-3">
-            <Briefcase className="w-5 h-5 text-orange-500" />
-            <h3 className="font-extrabold text-base tracking-tight">Project Overview & Properties</h3>
-          </div>
-          {detailsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </button>
-
-        {detailsExpanded && (
-          <div className="p-6 border-t border-slate-100 dark:border-slate-850 text-left">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-
-              {/* Type, Timeline, Duration */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Timeline & Model</h4>
-
-                <div className="flex items-start gap-3">
-                  <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
-                  <div className="min-w-0">
-                    <span className="block text-xs text-slate-400 font-bold truncate">Project Type</span>
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider truncate max-w-[150px] ${project.type === 'AGILE'
-                        ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
-                        : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
-                      }`}>
-                      {project.type}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-4 h-4 text-slate-400 mt-0.5" />
-                  <div className="min-w-0">
-                    <span className="block text-xs text-slate-400 font-bold truncate">
-                      {project.type === 'AGILE' ? 'Agile Duration' : 'Waterfall Timeline'}
-                    </span>
-                    <span className="text-sm font-extrabold mt-0.5 block truncate max-w-[250px]">
-                      {project.type === 'AGILE'
-                        ? `${project.number_of_days} Days`
-                        : `${project.start_date || 'N/A'} to ${project.end_date || 'N/A'}`
-                      }
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stakeholders (Lead & Creator) */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Stakeholders</h4>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-500 font-black text-xs">
-                    {getInitials(project.team_lead?.full_name)}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Team Lead</span>
-                    <span className="text-sm font-extrabold block truncate max-w-[200px]">
-                      {project.team_lead?.full_name || 'Unassigned'}
-                    </span>
-                    <span className="text-[10px] text-slate-450 dark:text-slate-400 font-medium block truncate max-w-[150px]" title={project.team_lead?.email}>
-                      {project.team_lead?.email || ''}
-                    </span>
-                  </div>
-                </div>
-
-                {project.created_by && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-500 font-black text-xs">
-                      {getInitials(project.created_by.full_name)}
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Created By</span>
-                      <span className="text-sm font-extrabold block truncate max-w-[200px]">
-                        {project.created_by.full_name}
-                      </span>
-                      <span className="text-[10px] text-slate-450 dark:text-slate-400 font-medium block truncate max-w-[150px]" title={project.created_by.email}>
-                        {project.created_by.email}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Tech Stack Skills */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Required Skills</h4>
-
-                {(() => {
-                  const effectiveSkills = getEffectiveSkills(project);
-                  const uniqueCats = Array.from(new Set(effectiveSkills.map(s => s.category).filter(Boolean)));
-                  return (
-                    <div className="space-y-3">
-                      {/* Unique Categories */}
-                      {uniqueCats.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pl-7 max-h-16 overflow-y-auto pr-2 custom-scrollbar">
-                          {uniqueCats.map((cat) => (
-                            <span
-                              key={cat}
-                              className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-orange-500/10 rounded-md text-orange-500 border border-orange-500/20"
-                            >
-                              {cat}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex items-start gap-3">
-                        <Code className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                          {effectiveSkills.length > 0 ? (
-                            effectiveSkills.map((skill) => (
-                              <span
-                                key={skill.id}
-                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-orange-500/10 rounded-lg text-orange-550 border border-orange-500/20"
-                              >
-                                {skill.name}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-sm font-extrabold text-slate-400">No specific skills listed.</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Administrative metadata / limits */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 truncate">Properties & Allocation</h4>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="min-w-0">
-                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Created On</span>
-                    <span className="text-xs font-extrabold block mt-0.5">
-                      {project.created_at ? new Date(project.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Last Updated</span>
-                    <span className="text-xs font-extrabold block mt-0.5">
-                      {project.updated_at ? new Date(project.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Allocation Capacity</span>
-                  <span className="inline-block text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 mt-1 truncate max-w-[150px]">
-                    {project.members?.length || 0} / {project.team_size || 0} Members
-                  </span>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-      </div>
+      <ProjectOverviewCard project={project} darkMode={darkMode} />
 
       {/* 2. TEAM MEMBERS ACTIVE ROSTER */}
-      <div className={`rounded-3xl border overflow-hidden mb-8 transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-        }`}>
-        <button
-          onClick={() => setRosterExpanded(!rosterExpanded)}
-          className={`w-full p-6 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
-            }`}
-        >
-          <div className="flex items-center gap-3">
-            <Users className="w-5 h-5 text-orange-500" />
-            <h3 className="font-extrabold text-base tracking-tight">Active Team Roster</h3>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 font-bold hidden sm:inline">
-              {(project.team_lead ? 1 : 0) + (project.members?.length || 0)} Member(s) assigned
-            </span>
-            {rosterExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-          </div>
-        </button>
-
-        {rosterExpanded && (
-          <div className="p-6 border-t border-slate-100 dark:border-slate-850">
-            {(project.team_lead || (project.members && project.members.length > 0)) ? (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-xs">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'} uppercase font-black tracking-wider text-[10px]`}>
-                        <th className="py-4 px-4 font-bold">Member</th>
-                        <th className="py-4 px-4 font-bold">Role</th>
-                        <th className="py-4 px-4 font-bold">Status</th>
-                        <th className="py-4 px-4 font-bold">Matching Skills</th>
-                        {isProjectManager && project.status !== 'COMPLETED' && <th className="py-4 px-4 text-right font-bold">Actions</th>}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${darkMode ? 'divide-slate-850' : 'divide-slate-50'}`}>
-                      {/* Team Lead Row */}
-                      {project.team_lead && (
-                        <tr className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
-                                {getInitials(project.team_lead.full_name)}
-                              </div>
-                              <div>
-                                <span className={`block font-extrabold text-sm truncate max-w-[150px] ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                                  {project.team_lead.full_name}
-                                </span>
-                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[150px]">
-                                  {project.team_lead.email}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20 truncate max-w-[100px] inline-block">
-                              Team Lead
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            {(() => {
-                              const leadProfile = employees.find(emp => emp.user.id === project.team_lead?.id);
-                              const leadStatus = leadProfile?.status || 'ACTIVE';
-                              return (
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider truncate max-w-[100px] inline-block ${leadStatus === 'BUSY'
-                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                                    : leadStatus === 'ACTIVE'
-                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                      : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                                  }`}>
-                                  {leadStatus}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className="text-slate-400 font-bold">—</span>
-                          </td>
-                          {isProjectManager && project.status !== 'COMPLETED' && (
-                            <td className="py-4 px-4 text-right">
-                              <button
-                                onClick={() => setShowEditLeadModal(true)}
-                                className="p-2 rounded-xl text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
-                                title="Edit Team Lead"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      )}
-
-                      {/* Members Rows */}
-                      {paginatedMembers && paginatedMembers.map((member) => (
-                        <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
-                                {getInitials(member.user.full_name)}
-                              </div>
-                              <div>
-                                <span className={`block font-extrabold text-sm truncate max-w-[150px] ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                                  {member.user.full_name}
-                                </span>
-                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[150px]">
-                                  {member.user.email}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350 truncate max-w-[150px] inline-block">
-                              {member.designation || 'Team Member'}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${member.status === 'BUSY'
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                                : member.status === 'ACTIVE'
-                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                  : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                              }`}>
-                              {member.status || 'ACTIVE'}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            {project.skills && project.skills.length > 0 && member.skills && member.skills.some(s => project.skills.some(ps => ps.id === s.id)) ? (
-                              <div className="flex flex-wrap gap-1">
-                                {member.skills
-                                  .filter((s) => project.skills.some((ps) => ps.id === s.id))
-                                  .map((s) => (
-                                    <span
-                                      key={s.id}
-                                      className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
-                                    >
-                                      {s.name}
-                                    </span>
-                                  ))}
-                              </div>
-                            ) : (
-                              <span className="text-xs font-bold text-slate-400">—</span>
-                            )}
-                          </td>
-                          {isProjectManager && project.status !== 'COMPLETED' && (
-                            <td className="py-4 px-4 text-right">
-                              <button
-                                onClick={() => handleRemoveMember(member.id)}
-                                className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                                title="Remove Member"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination Controls */}
-                {project.members && project.members.length > rosterPageSize && (
-                  <div className={`px-6 py-4 flex items-center justify-between border-t transition-colors ${darkMode ? 'border-slate-850 bg-slate-900/60' : 'border-slate-100 bg-slate-50/30'
-                    }`}>
-                    <div className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Showing page <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{rosterPage}</span> of <span className={`font-extrabold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{totalRosterPages}</span> ({project.members.length} members)
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setRosterPage(p => Math.max(1, p - 1))}
-                        disabled={rosterPage === 1}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${rosterPage > 1
-                            ? darkMode
-                              ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
-                              : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-705 cursor-pointer shadow-sm shadow-slate-100/50'
-                            : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                          }`}
-                      >
-                        Previous
-                      </button>
-
-                      {/* Dynamic Page Numbers */}
-                      {Array.from({ length: totalRosterPages }, (_, i) => i + 1).map((p) => {
-                        const isSelected = p === rosterPage;
-                        return (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => setRosterPage(p)}
-                            className={`w-8 h-8 rounded-xl border text-xs font-extrabold flex items-center justify-center transition-all cursor-pointer ${isSelected
-                                ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/15'
-                                : darkMode
-                                  ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-900'
-                                  : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-700 hover:bg-slate-50 shadow-sm shadow-slate-100/50'
-                              }`}
-                          >
-                            {p}
-                          </button>
-                        );
-                      })}
-
-                      <button
-                        type="button"
-                        onClick={() => setRosterPage(p => Math.min(totalRosterPages, p + 1))}
-                        disabled={rosterPage === totalRosterPages}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-black tracking-wide flex items-center gap-1 transition-all ${rosterPage < totalRosterPages
-                            ? darkMode
-                              ? 'border-slate-800 hover:border-slate-700 bg-slate-950 text-white cursor-pointer hover:bg-slate-900'
-                              : 'border-slate-200 hover:bg-slate-100 bg-white text-slate-750 cursor-pointer shadow-sm shadow-slate-100/50'
-                            : 'border-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                          }`}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="py-12 flex flex-col items-center justify-center text-center">
-                <Users className="w-12 h-12 text-slate-300 dark:text-slate-750 mb-3" />
-                <h5 className="font-extrabold text-slate-400 text-sm">No Members Added Yet</h5>
-                <p className="text-xs text-slate-400 mt-1 mb-4">Add members to start collaborating on this project.</p>
-                {isProjectManager && (
-                  <button
-                    onClick={() => setShowAddMembersModal(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Add First Member
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <TeamRoster
+        project={project}
+        darkMode={darkMode}
+        employees={employees}
+        isProjectManager={isProjectManager}
+        setShowAddMembersModal={setShowAddMembersModal}
+        setShowEditLeadModal={setShowEditLeadModal}
+        handleRemoveMember={handleRemoveMember}
+      />
 
       {/* 3. SPRINTS LIST VIEW */}
-      <div className={`mt-8 rounded-3xl border overflow-hidden transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-xl shadow-slate-100/40'
-        }`}>
-        <button
-          onClick={() => setSprintsExpanded(!sprintsExpanded)}
-          className={`w-full p-6 flex justify-between items-center transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-850/30' : 'hover:bg-slate-50/50'
-            }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-              <FolderKanban className="w-5 h-5 text-orange-500" />
-            </div>
-            <div className="text-left">
-              <h2 className="font-extrabold text-lg leading-tight text-left">Project Sprints & Milestones</h2>
-              <p className="text-xs text-slate-400 mt-0.5 text-left">Browse active sprints and click to view detailed task distributions</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-slate-400 hidden sm:inline">
-              {sprintListDetails.length} Sprints Loaded
-            </span>
-            {sprintsExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-          </div>
-        </button>
-
-        {sprintsExpanded && (
-          <div className="p-6 border-t border-slate-100 dark:border-slate-850">
-            {/* SPRINTS LIST VIEW TABLE */}
-            {sprintListDetails.length > 0 ? (
-              <div className={`border rounded-3xl overflow-hidden ${darkMode ? 'border-slate-800' : 'border-slate-100'
-                }`}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[600px]">
-                    <thead>
-                      <tr className={`text-[10px] font-black tracking-wider uppercase border-b ${darkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
-                        }`}>
-                        <th className="py-4 px-5">Sprint / Milestone Name</th>
-                        <th className="py-4 px-5 w-32 text-center">Total Tasks</th>
-                        <th className="py-4 px-5 w-40">Start Date</th>
-                        <th className="py-4 px-5 w-40">End Date</th>
-                        <th className="py-4 px-5 w-40 text-center">Progress</th>
-                        <th className="py-4 px-5 w-32">Status</th>
-                        <th className="py-4 px-5 w-24"></th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y text-xs text-left ${darkMode ? 'divide-slate-800/60' : 'divide-slate-100'
-                      }`}>
-                      {sprintListDetails.map((sprint, idx) => (
-                        <tr
-                          key={idx}
-                          onClick={() => navigate(`/projects/${projectId}/sprints/${sprint.id}`)}
-                          className={`transition-all duration-150 cursor-pointer ${darkMode ? 'bg-slate-900/40 hover:bg-slate-850/60 text-slate-330' : 'bg-white hover:bg-slate-50 text-slate-700'
-                            }`}
-                        >
-                          {/* Name */}
-                          <td className={`py-4 px-5 font-extrabold text-sm ${darkMode ? 'text-white' : 'text-slate-800'
-                            }`}>
-                            <div className="flex items-center gap-2">
-                              <span className="truncate max-w-[200px] inline-block">{sprint.milestone || sprint.name}</span>
-                              {sprint.workspaceUrl && (
-                                <a
-                                  href={sprint.workspaceUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-blue-400' : 'bg-slate-100 hover:bg-slate-200 text-blue-600'}`}
-                                  title="View Milestone Issues in Backlog"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Total Tasks */}
-                          <td className="py-4 px-5 text-center font-bold">
-                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold ${darkMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'
-                              }`}>
-                              {sprint.totalTasks}
-                            </span>
-                          </td>
-
-                          {/* Start Date */}
-                          <td className="py-4 px-5 font-semibold text-slate-400">
-                            {sprint.startDate}
-                          </td>
-
-                          {/* End Date */}
-                          <td className="py-4 px-5 font-semibold text-slate-400">
-                            {sprint.endDate}
-                          </td>
-
-                          {/* Progress */}
-                          <td className="py-4 px-5 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-16 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full rounded-full ${
-                                    sprint.progressPercentage === 100 ? 'bg-emerald-500' :
-                                    sprint.progressPercentage > 0 ? 'bg-blue-500' : 'bg-slate-400'
-                                  }`} 
-                                  style={{ width: `${sprint.progressPercentage}%` }}
-                                ></div>
-                              </div>
-                              <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                {sprint.progressPercentage}%
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-4 px-5">
-                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
-                              sprint.status === 'CLOSED'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                : sprint.status === 'IN PROGRESS'
-                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
-                                  : sprint.status === 'NO TASKS'
-                                    ? 'bg-slate-500/10 text-slate-600 dark:text-slate-455 border border-slate-500/20'
-                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                            }`}>
-                              {sprint.status || 'OPEN'}
-                            </span>
-                          </td>
-
-                          {/* Chevron Link indicator */}
-                          <td className="py-4 px-5 text-right">
-                            <div className="flex justify-end items-center gap-2">
-                              {isProjectManager && sprint.status !== 'CLOSED' && sprint.status !== 'COMPLETED' && (
-                                <button
-                                  onClick={(e) => handleOpenCloseModal(e, sprint.id)}
-                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-slate-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'}`}
-                                  title="Close Milestone"
-                                >
-                                  <Lock className="w-4 h-4" />
-                                </button>
-                              )}
-                              {isProjectManager && (
-                                <button
-                                  onClick={(e) => handleDeleteSprint(e, sprint.id, !!sprint.workspaceUrl)}
-                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
-                                  title="Delete Sprint"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                              <ChevronRight className="w-5 h-5 text-slate-400 hover:text-orange-500 transition-colors" />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="py-16 flex flex-col items-center justify-center text-center">
-                <Layers className="w-12 h-12 text-slate-350 dark:text-slate-750 mb-3 animate-pulse" />
-                <h5 className="font-extrabold text-slate-400 text-sm">No Sprints Uploaded Yet</h5>
-                <p className="text-xs text-slate-400 mt-1 mb-4">Click "Upload Sprint" at the top to import tasks from an Excel template.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <SprintsList
+        darkMode={darkMode}
+        sprintListDetails={sprintListDetails}
+        projectId={projectId}
+        isProjectManager={isProjectManager}
+        handleOpenCloseModal={handleOpenCloseModal}
+        handleDeleteSprint={handleDeleteSprint}
+      />
 
       {/* 3. MODAL: ADD MEMBERS */}
-      {showAddMembersModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-            }`}>
-            {/* Header */}
-            <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
-              <div className="text-left">
-                <h3 className="font-extrabold text-base tracking-tight">Add Team Members</h3>
-                <p className="text-xs text-slate-400">Select employees to allocate to this project</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAddMembersModal(false);
-                  setSelectedNewMembers([]);
-                  setMemberSearchQuery('');
-                  setModalError(null);
-                }}
-                className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-                  }`}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Content & List */}
-            <form onSubmit={handleAddMembersSubmit}>
-              <div className="p-6 space-y-4 max-h-[350px] overflow-y-auto">
-                {/* Search Bar */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search by name or role..."
-                    value={memberSearchQuery}
-                    onChange={(e) => setMemberSearchQuery(e.target.value)}
-                    maxLength={limits.general.search.maxLength}
-                    className={`w-full pl-3 pr-3 py-2.5 rounded-xl border text-sm font-semibold outline-none focus:border-indigo-500 transition-colors ${darkMode
-                        ? 'bg-slate-950 border-slate-800 text-white'
-                        : 'bg-white border-slate-200 text-slate-800'
-                      }`}
-                  />
-                </div>
-
-                {/* Selected Members Chips */}
-                {selectedNewMembers.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-3 rounded-2xl border border-dashed border-orange-500/30 bg-orange-500/[0.02] text-left">
-                    {selectedNewMembers.map(id => {
-                      const emp = employees.find(e => e.id === id);
-                      if (!emp) return null;
-                      return (
-                        <div
-                          key={id}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20 text-[10px] font-black"
-                        >
-                          <span>{emp.user.full_name}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedNewMembers(prev => prev.filter(mid => mid !== id));
-                              setModalError(null);
-                            }}
-                            className="hover:text-orange-700 dark:hover:text-orange-300 transition-colors bg-transparent border-none outline-none cursor-pointer"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Error Banner */}
-                {modalError && (
-                  <div className="p-3.5 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold text-left flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                    <span>{modalError}</span>
-                  </div>
-                )}
-
-                {/* Select All Toggle */}
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    Available Candidates ({availableEmployees.length})
-                  </span>
-                  {availableEmployees.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allIds = availableEmployees.map(e => e.id);
-                        const allSelected = allIds.every(id => selectedNewMembers.includes(id));
-                        if (allSelected) {
-                          setSelectedNewMembers(prev => prev.filter(id => !allIds.includes(id)));
-                          setModalError(null);
-                        } else {
-                          const currentCount = (project.members || []).length;
-                          const limit = project.team_size || 0;
-                          const remaining = limit - currentCount;
-                          if (remaining <= 0) {
-                            setModalError(`Cannot select more members. Team size limit of ${limit} reached.`);
-                            return;
-                          }
-                          const toSelect = allIds.filter(id => !selectedNewMembers.includes(id)).slice(0, remaining);
-                          if (toSelect.length < allIds.filter(id => !selectedNewMembers.includes(id)).length) {
-                            setModalError(`Selected only ${toSelect.length} member(s) to match the team size limit of ${limit}.`);
-                          } else {
-                            setModalError(null);
-                          }
-                          setSelectedNewMembers(prev => [...prev, ...toSelect]);
-                        }
-                      }}
-                      className="text-[10px] font-bold text-orange-500 dark:text-orange-400 hover:underline cursor-pointer bg-transparent border-none outline-none"
-                    >
-                      {availableEmployees.every(e => selectedNewMembers.includes(e.id)) ? 'Deselect All' : 'Select All'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Employees List */}
-                <div className="space-y-2">
-                  {availableEmployees.length > 0 ? (
-                    availableEmployees.map((emp) => {
-                      const isSelected = selectedNewMembers.includes(emp.id);
-                      return (
-                        <div
-                          key={emp.id}
-                          onClick={() => toggleSelectNewMember(emp.id)}
-                          className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isSelected
-                              ? 'border-orange-500 bg-orange-500/5'
-                              : darkMode
-                                ? 'border-slate-800 bg-slate-950 hover:border-slate-700'
-                                : 'border-slate-100 bg-slate-50 hover:bg-slate-100/50'
-                            }`}
-                        >
-                          <div className="flex items-center gap-3 text-left">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${darkMode ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-800'
-                              }`}>
-                              {getInitials(emp.user.full_name)}
-                            </div>
-                            <div>
-                              <span className={`block text-xs font-black ${darkMode ? 'text-white' : 'text-slate-800'
-                                }`}>
-                                {emp.user.full_name}
-                              </span>
-                              <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                  {emp.designation}
-                                </span>
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${emp.status === 'BUSY'
-                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                                    : emp.status === 'ACTIVE'
-                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                      : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                                  }`}>
-                                  {emp.status || 'ACTIVE'}
-                                </span>
-                                {project.skills && project.skills.length > 0 && emp.skills && (
-                                  <div className="flex flex-wrap gap-1">
-                                    {emp.skills
-                                      .filter((s) => project.skills.some(ps => ps.id === s.id))
-                                      .map((s) => (
-                                        <span
-                                          key={s.id}
-                                          className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20"
-                                        >
-                                          {s.name}
-                                        </span>
-                                      ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Selected Check Indicator */}
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${isSelected
-                              ? 'bg-orange-500 border-orange-500 text-white'
-                              : 'border-slate-300 dark:border-slate-700'
-                            }`}>
-                            {isSelected && <Check className="w-3 h-3" />}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="py-8 text-center text-slate-400 text-xs font-bold">
-                      No other eligible employees found.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddMembersModal(false);
-                    setSelectedNewMembers([]);
-                    setMemberSearchQuery('');
-                    setModalError(null);
-                  }}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingMembers || selectedNewMembers.length === 0}
-                  className="px-5 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-orange-500/10"
-                >
-                  {updatingMembers ? (
-                    <div className="flex items-center gap-1">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    `Add ${selectedNewMembers.length} member(s)`
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AddMembersModal
+        isOpen={showAddMembersModal}
+        onClose={() => setShowAddMembersModal(false)}
+        darkMode={darkMode}
+        project={project}
+        employees={employees}
+        onAddMembers={handleAddMembers}
+        limits={limits}
+      />
 
 
 
@@ -1389,164 +560,25 @@ export default function ProjectDetail() {
       )}
 
       {/* 4. MODAL: EDIT TEAM LEAD */}
-      {showEditLeadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className={`w-full max-w-md rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-            }`}>
-            {/* Header */}
-            <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
-              <div className="text-left">
-                <h3 className="font-extrabold text-base tracking-tight">Edit Project Team Lead</h3>
-                <p className="text-xs text-slate-400">Select a new team lead for this project</p>
-              </div>
-              <button
-                onClick={() => setShowEditLeadModal(false)}
-                className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-                  }`}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              <div className="space-y-2 text-left">
-                <label className="text-xs font-bold text-slate-455 uppercase tracking-wider">Select Team Lead *</label>
-                <select
-                  value={project.team_lead?.id || ''}
-                  onChange={(e) => {
-                    const newLeadId = e.target.value;
-                    if (newLeadId) {
-                      handleChangeTeamLead(newLeadId);
-                    }
-                  }}
-                  className={`w-full px-4.5 py-3.5 rounded-2xl border text-sm font-medium transition-all outline-none ${darkMode
-                      ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-orange-500'
-                      : 'bg-slate-50 border-slate-150 text-slate-800 focus:border-orange-500 focus:bg-white'
-                    }`}
-                >
-                  <option value="">Select Team Lead...</option>
-                  {teamLeads.map((lead) => (
-                    <option key={lead.user?.id} value={lead.user?.id}>
-                      {lead.user?.full_name} ({lead.user?.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end bg-slate-50/50 dark:bg-slate-100/30">
-              <button
-                onClick={() => setShowEditLeadModal(false)}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EditLeadModal
+        isOpen={showEditLeadModal}
+        onClose={() => setShowEditLeadModal(false)}
+        darkMode={darkMode}
+        project={project}
+        teamLeads={teamLeads}
+        onChangeTeamLead={handleChangeTeamLead}
+      />
 
       {/* 5. MODAL: CLOSE SPRINT */}
-      {showCloseSprintModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className={`w-full max-w-lg rounded-3xl shadow-2xl border overflow-hidden transform transition-all ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-            }`}>
-            {/* Header */}
-            <div className="p-6 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center">
-              <div className="text-left">
-                <h3 className="font-extrabold text-lg tracking-tight text-rose-500 flex items-center gap-2">
-                  <Lock className="w-5 h-5" /> Close Milestone
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">Review tasks before finalizing closure</p>
-              </div>
-              <button
-                onClick={() => setShowCloseSprintModal(false)}
-                className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-5">
-              <div className={`p-4 rounded-2xl border ${darkMode ? 'bg-rose-500/10 border-rose-500/20 text-rose-200' : 'bg-rose-50 border-rose-100 text-rose-800'}`}>
-                <p className="text-sm font-semibold text-left">
-                  Are you sure you want to close this milestone?
-                </p>
-                <p className="text-xs opacity-80 mt-1.5 text-left leading-relaxed">
-                  Closing this milestone will mark all its tasks as CLOSED and synchronize this status directly to the Backlog platform. This action is permanent.
-                </p>
-              </div>
-
-              {closureError && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold text-left flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span>{closureError}</span>
-                </div>
-              )}
-
-              {closingSprintSummary ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className={`p-3 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'} text-center`}>
-                    <span className="block text-[10px] font-black uppercase text-slate-400 mb-1">Total Tasks</span>
-                    <span className="text-lg font-black">{closingSprintSummary.total_tasks}</span>
-                  </div>
-                  <div className={`p-3 rounded-2xl border ${darkMode ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'} text-center`}>
-                    <span className="block text-[10px] font-black uppercase text-blue-500 mb-1">Open</span>
-                    <span className="text-lg font-black text-blue-600 dark:text-blue-400">{closingSprintSummary.open_tasks}</span>
-                  </div>
-                  <div className={`p-3 rounded-2xl border ${darkMode ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-100'} text-center`}>
-                    <span className="block text-[10px] font-black uppercase text-amber-500 mb-1">In Progress</span>
-                    <span className="text-lg font-black text-amber-600 dark:text-amber-400">{closingSprintSummary.in_progress_tasks}</span>
-                  </div>
-                  <div className={`p-3 rounded-2xl border ${darkMode ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'} text-center`}>
-                    <span className="block text-[10px] font-black uppercase text-emerald-500 mb-1">Resolved</span>
-                    <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{closingSprintSummary.resolved_tasks}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex justify-center p-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 border-t border-slate-100 dark:border-slate-850 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/30">
-              <button
-                type="button"
-                onClick={() => setShowCloseSprintModal(false)}
-                disabled={isClosingSprint}
-                className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmCloseSprint}
-                disabled={isClosingSprint || !closingSprintSummary}
-                className="px-5 py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-rose-500/20 flex items-center gap-2 cursor-pointer"
-              >
-                {isClosingSprint ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Closing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4" />
-                    <span>Confirm Close</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CloseSprintModal
+        isOpen={showCloseSprintModal}
+        onClose={() => setShowCloseSprintModal(false)}
+        darkMode={darkMode}
+        closureError={closureError}
+        closingSprintSummary={closingSprintSummary}
+        isClosingSprint={isClosingSprint}
+        onConfirmClose={handleConfirmCloseSprint}
+      />
     </div>
   );
 }
