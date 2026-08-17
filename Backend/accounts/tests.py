@@ -300,3 +300,58 @@ class GoogleAuthTests(APITestCase):
         response = self.client.post(self.url, {"token": "valid_token_string"})
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
         self.assertEqual(response.data["error"], "throttled")
+
+
+from unittest.mock import MagicMock
+from accounts.permissions import IsPMOrReadOnly, IsProjectManagerOrTeamLead
+
+class PermissionTests(APITestCase):
+
+    def setUp(self):
+        self.pm_user = Employee.objects.create(
+            email="pm@example.com",
+            full_name="PM User",
+            role=Employee.Role.PROJECT_MANAGER,
+            is_active=True
+        )
+        self.lead_user = Employee.objects.create(
+            email="lead@example.com",
+            full_name="Team Lead User",
+            role=Employee.Role.TEAM_LEAD,
+            is_active=True
+        )
+
+    def test_is_pm_or_read_only_safe_methods(self):
+        perm = IsPMOrReadOnly()
+        request = MagicMock()
+        request.user = self.lead_user
+
+        for method in ['GET', 'HEAD', 'OPTIONS']:
+            request.method = method
+            self.assertTrue(perm.has_permission(request, None))
+
+    def test_is_pm_or_read_only_unsafe_methods(self):
+        perm = IsPMOrReadOnly()
+        request = MagicMock()
+
+        for method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            request.method = method
+            
+            # Team lead should be denied
+            request.user = self.lead_user
+            self.assertFalse(perm.has_permission(request, None))
+
+            # PM user should be allowed
+            request.user = self.pm_user
+            self.assertTrue(perm.has_permission(request, None))
+
+    def test_is_project_manager_or_team_lead(self):
+        perm = IsProjectManagerOrTeamLead()
+        request = MagicMock()
+
+        request.user = self.lead_user
+        self.assertTrue(perm.has_permission(request, None))
+
+        request.user = self.pm_user
+        self.assertTrue(perm.has_permission(request, None))
+

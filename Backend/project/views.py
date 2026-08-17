@@ -42,6 +42,11 @@ class ProjectCreateView(APIView):
             "members__employee_profile__employee_skill_relations__skill",
             "project_stack__skill"
         )
+        if request.user.is_authenticated and request.user.role == 'TEAM_LEAD':
+            from django.db.models import Q
+            projects = projects.filter(
+                Q(team_lead=request.user) | Q(members__employee_profile__user=request.user)
+            ).distinct()
         # Apply filters based on query parameters
         name = request.query_params.get('name')
         if name:
@@ -167,6 +172,12 @@ class ProjectDetailView(APIView):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.is_authenticated and request.user.role == 'TEAM_LEAD':
+            is_assigned = (project.team_lead == request.user) or project.members.filter(employee_profile__user=request.user).exists()
+            if not is_assigned:
+                return Response({"detail": "You do not have permission to view this project."}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = ProjectDetailSerializer(project)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -382,7 +393,12 @@ class DashboardView(APIView):
         tasks = SprintTask.objects.filter(is_deleted=False)
         
         user = request.user
-        if user.role != 'PROJECT_MANAGER':
+        if user.role == 'TEAM_LEAD':
+            from django.db.models import Q
+            tasks = tasks.filter(
+                Q(sprint__project__team_lead=user) | Q(sprint__project__members__employee_profile__user=user)
+            ).distinct()
+        elif user.role != 'PROJECT_MANAGER':
             tasks = tasks.filter(sprint__project__members__employee_profile__user=user)
 
         # Status distribution
