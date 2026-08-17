@@ -32,7 +32,6 @@ export default function AddMembersModal({
     const currentMemberUserIds = project.members?.map(m => m.user.id) || [];
     // Filter out users who are already members OR the team lead OR have TEAM_LEAD role
     return employees.filter(emp => {
-      stopPropagation
       const isLead = project.team_lead?.id === emp.user.id;
       const isTeamLeadRole = emp.user?.role === 'TEAM_LEAD';
       const isMember = currentMemberUserIds.includes(emp.user.id);
@@ -48,7 +47,7 @@ export default function AddMembersModal({
           projectSkill.parent === skill.id ||
           projectSkill.id === skill.parent
         )
-      )); stopPropagationstopPropagationstopPropagation
+      ));
 
       return !isLead && !isTeamLeadRole && !isMember && matchesSearch && matchesSkills;
     });
