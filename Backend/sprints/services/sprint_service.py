@@ -911,26 +911,9 @@ class SprintService:
 
         active_projects = Project.objects.exclude(status='COMPLETED')
 
-        # Find latest sprint for each active project
-        latest_sprint_ids = []
-        for proj in active_projects:
-            sprint = Sprint.objects.filter(
-                project=proj,
-                is_deleted=False,
-                status='ACTIVE'
-            ).order_by('-start_date', '-created_at').first()
-
-            if not sprint:
-                sprint = Sprint.objects.filter(
-                    project=proj,
-                    is_deleted=False
-                ).order_by('-start_date', '-created_at').first()
-
-            if sprint:
-                latest_sprint_ids.append(sprint.id)
-
         tasks = SprintTask.objects.filter(
-            sprint_id__in=latest_sprint_ids,
+            sprint__project__in=active_projects,
+            sprint__is_deleted=False,
             is_deleted=False
         ).exclude(status__in=['CLOSED', 'RESOLVED']).select_related(
             'sprint', 'sprint__project'
@@ -1011,7 +994,7 @@ class SprintService:
             return (
                 f"{workspace_base}/find/{project_key}"
                 f"?allOver=false"
-                f"&fixedVersionId={sprint.backlog_version_id}"
+                f"{f'&fixedVersionId={sprint.backlog_version_id}' if sprint.backlog_version_id else ''}"
                 f"&limit=20"
                 f"&limitDateRange.begin={begin_str}"
                 f"&limitDateRange.end={end_str}"
@@ -1059,10 +1042,9 @@ class SprintService:
         from accounts.models import EmployeeProfile
 
         today = timezone.localdate()
-        active_projects = Project.objects.exclude(status='COMPLETED')
 
         tasks = SprintTask.objects.filter(
-            sprint__project__in=active_projects,
+            sprint__is_deleted=False,
             is_deleted=False
         ).select_related('assigned_employee', 'assigned_employee__user')
 

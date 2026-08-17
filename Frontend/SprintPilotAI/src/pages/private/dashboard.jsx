@@ -41,11 +41,11 @@ const Dashboard = () => {
     try {
       if (!isInitial) setLoadingMoreTeam(true);
       const res = await apiClient.get(
-        `sprints/team-performance/?limit=6&offset=${offset}&search=${encodeURIComponent(search)}`
+        `sprints/team-performance/?limit=5&offset=${offset}&search=${encodeURIComponent(search)}`
       );
       const data = res.data || {};
       const results = Array.isArray(data) ? data : (data.results || []);
-      const hasMore = data.has_more ?? (results.length === 6);
+      const hasMore = data.has_more ?? (results.length === 5);
 
       setTeamMembers(prev => isInitial ? results : [...prev, ...results]);
       setHasMoreTeam(hasMore);
@@ -295,7 +295,7 @@ const Dashboard = () => {
 
   const handleTableScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.target;
-    if (scrollHeight - scrollTop - clientHeight < 40) {
+    if (scrollHeight - scrollTop - clientHeight < 60) {
       if (hasMoreTeam && !loadingMoreTeam) {
         fetchTeamPerformance(teamMembers.length, searchQuery, false);
       }
@@ -992,7 +992,7 @@ const Dashboard = () => {
         </div>
 
         {/* Table Container with Infinite Scroll */}
-        <div className="overflow-x-auto max-h-[480px] overflow-y-auto custom-scrollbar" onScroll={handleTableScroll}>
+        <div className="overflow-x-auto max-h-[300px] overflow-y-auto custom-scrollbar" onScroll={handleTableScroll}>
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-semibold text-left">
@@ -1004,7 +1004,7 @@ const Dashboard = () => {
                 <th className="py-4 px-4 font-semibold text-slate-400">Completed</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">On-Time Rate</th>
                 <th className="py-4 px-4 font-semibold text-slate-400">Points</th>
-                <th className="py-4 px-4 w-12 text-center font-semibold text-slate-400">More</th>
+
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-left">
@@ -1063,13 +1063,6 @@ const Dashboard = () => {
                     }`}>
                       {member.points > 0 ? `+${member.points} pts` : `${member.points} pts`}
                     </span>
-                  </td>
-
-                  {/* Actions button */}
-                  <td className="py-4 px-4 text-center">
-                    <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
                   </td>
                 </tr>
               ))}
