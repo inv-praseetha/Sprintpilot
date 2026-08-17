@@ -1059,10 +1059,9 @@ class SprintService:
         from accounts.models import EmployeeProfile
 
         today = timezone.localdate()
-        active_projects = Project.objects.exclude(status='COMPLETED')
 
         tasks = SprintTask.objects.filter(
-            sprint__project__in=active_projects,
+            sprint__is_deleted=False,
             is_deleted=False
         ).select_related('assigned_employee', 'assigned_employee__user')
 
