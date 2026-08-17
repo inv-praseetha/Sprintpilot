@@ -41,11 +41,11 @@ const Dashboard = () => {
     try {
       if (!isInitial) setLoadingMoreTeam(true);
       const res = await apiClient.get(
-        `sprints/team-performance/?limit=6&offset=${offset}&search=${encodeURIComponent(search)}`
+        `sprints/team-performance/?limit=5&offset=${offset}&search=${encodeURIComponent(search)}`
       );
       const data = res.data || {};
       const results = Array.isArray(data) ? data : (data.results || []);
-      const hasMore = data.has_more ?? (results.length === 6);
+      const hasMore = data.has_more ?? (results.length === 5);
 
       setTeamMembers(prev => isInitial ? results : [...prev, ...results]);
       setHasMoreTeam(hasMore);
@@ -295,7 +295,7 @@ const Dashboard = () => {
 
   const handleTableScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.target;
-    if (scrollHeight - scrollTop - clientHeight < 40) {
+    if (scrollHeight - scrollTop - clientHeight < 60) {
       if (hasMoreTeam && !loadingMoreTeam) {
         fetchTeamPerformance(teamMembers.length, searchQuery, false);
       }
@@ -992,7 +992,7 @@ const Dashboard = () => {
         </div>
 
         {/* Table Container with Infinite Scroll */}
-        <div className="overflow-x-auto max-h-[480px] overflow-y-auto custom-scrollbar" onScroll={handleTableScroll}>
+        <div className="overflow-x-auto max-h-[300px] overflow-y-auto custom-scrollbar" onScroll={handleTableScroll}>
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-semibold text-left">

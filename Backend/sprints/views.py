@@ -347,8 +347,8 @@ class TeamPerformanceView(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            limit_val = request.query_params.get('limit', 6)
-            limit = int(limit_val) if limit_val is not None and str(limit_val).isdigit() else 6
+            limit_val = request.query_params.get('limit', 5)
+            limit = int(limit_val) if limit_val is not None and str(limit_val).isdigit() else 5
             
             offset_val = request.query_params.get('offset', 0)
             offset = int(offset_val) if offset_val is not None and str(offset_val).isdigit() else 0
