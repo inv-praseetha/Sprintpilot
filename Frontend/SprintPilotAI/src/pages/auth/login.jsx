@@ -15,6 +15,18 @@ export default function Login() {
   const [googleReady, setGoogleReady] = useState(false);
   const btnContainerRef = useRef(null);
 
+  // Auto-hide error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 5000);
+      
+      // Cleanup function to clear the timer if the component unmounts
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (token) {
