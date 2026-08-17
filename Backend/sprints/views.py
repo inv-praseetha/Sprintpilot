@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from accounts.permissions import IsPMOrReadOnly, IsProjectManager
 
 from sprints.models import Sprint, SprintTask
 from sprints.serializers import SprintSerializer, SprintTaskSerializer, SprintNoteSerializer
@@ -63,11 +64,20 @@ class SprintListCreateView(APIView):
     """
     API View to handle listing sprints for a project and creating a sprint with tasks.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPMOrReadOnly]
 
     def get(self, request, project_id, *args, **kwargs):
         from project.models import Project
         try:
+            if request.user.is_authenticated and request.user.role == 'TEAM_LEAD':
+                from django.db.models import Q
+                project_obj = Project.objects.filter(
+                    Q(id=project_id),
+                    Q(team_lead=request.user) | Q(members__employee_profile__user=request.user)
+                ).distinct().first()
+                if not project_obj:
+                    return Response({"detail": "You do not have permission to view sprints for this project."}, status=status.HTTP_403_FORBIDDEN)
+
             sprints = SprintService.list_sprints(project_id)
             serializer = SprintSerializer(sprints, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -92,11 +102,17 @@ class SprintDetailView(APIView):
     """
     API View to retrieve or delete a specific sprint.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPMOrReadOnly]
 
     def get(self, request, pk, *args, **kwargs):
         try:
             sprint = SprintService.get_sprint_detail(pk)
+            if request.user.is_authenticated and request.user.role == 'TEAM_LEAD':
+                project = sprint.project
+                is_assigned = (project.team_lead == request.user) or project.members.filter(employee_profile__user=request.user).exists()
+                if not is_assigned:
+                    return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
+
             serializer = SprintSerializer(sprint)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Sprint.DoesNotExist:
@@ -133,7 +149,7 @@ class SprintCloseView(APIView):
     """
     API View to manually close a sprint and update Backlog.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectManager]
 
     def post(self, request, pk, *args, **kwargs):
         try:
@@ -154,7 +170,7 @@ class SprintTaskUpdateView(APIView):
     """
     API View to update single fields of a sprint task.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPMOrReadOnly]
 
     def put(self, request, pk, *args, **kwargs):
         try:
@@ -187,7 +203,7 @@ class SprintTaskBulkDeleteView(APIView):
     """
     API View to bulk delete sprint tasks.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectManager]
 
     def post(self, request, *args, **kwargs):
         task_ids = request.data.get('task_ids', [])
@@ -202,7 +218,7 @@ class SprintAISuggestScheduleView(APIView):
     """
     API View to generate suggestions for task scheduling using AI.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectManager]
 
     def post(self, request, sprint_id, *args, **kwargs):
         from decouple import config
@@ -232,7 +248,7 @@ class SprintImportScheduleView(APIView):
     """
     API View to save imported schedule suggestions.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectManager]
 
     def post(self, request, sprint_id, *args, **kwargs):
         try:
@@ -250,7 +266,7 @@ class SprintTaskCreateView(APIView):
     """
     API View to create a new task in a sprint.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectManager]
 
     def post(self, request, sprint_id, *args, **kwargs):
         try:
@@ -333,7 +349,7 @@ class SprintTaskStatusView(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            result = SprintService.get_tasks_by_due_status()
+            result = SprintService.get_tasks_by_due_status(user=request.user)
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)

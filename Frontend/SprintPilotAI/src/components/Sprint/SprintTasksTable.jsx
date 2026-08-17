@@ -170,6 +170,7 @@ export default function SprintTasksTable({
   sprint,
   isEditing,
   isSyncing,
+  isPM = true,
   handleIndividualDelete
 }) {
   const [hoveredRowId, setHoveredRowId] = useState(null);
@@ -963,12 +964,12 @@ export default function SprintTasksTable({
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleIndividualDelete(task.id)}
-                            disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || task.status === 'CLOSED'}
+                            disabled={!isPM || isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || task.status === 'CLOSED'}
                             className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
                               ? 'hover:bg-slate-800 text-red-400 hover:text-red-300'
                               : 'hover:bg-red-50 text-red-600 hover:text-red-750'
                               }`}
-                            title={task.status === 'CLOSED' ? "Cannot delete this task as it is already closed/completed" : "Delete task"}
+                            title={!isPM ? "Only Project Managers can delete tasks" : (task.status === 'CLOSED' ? "Cannot delete this task as it is already closed/completed" : "Delete task")}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

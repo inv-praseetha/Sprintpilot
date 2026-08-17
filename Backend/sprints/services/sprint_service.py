@@ -892,7 +892,7 @@ class SprintService:
         return note
 
     @staticmethod
-    def get_tasks_by_due_status() -> dict:
+    def get_tasks_by_due_status(user=None) -> dict:
         """
         Returns per-project task counts grouped by urgency bucket:
         overdue (past due or no date), due today, due tomorrow.
@@ -910,6 +910,11 @@ class SprintService:
         tomorrow = today + timedelta(days=1)
 
         active_projects = Project.objects.exclude(status='COMPLETED')
+        if user and getattr(user, 'role', None) == 'TEAM_LEAD':
+            from django.db.models import Q
+            active_projects = active_projects.filter(
+                Q(team_lead=user) | Q(members__employee_profile__user=user)
+            ).distinct()
 
         tasks = SprintTask.objects.filter(
             sprint__project__in=active_projects,

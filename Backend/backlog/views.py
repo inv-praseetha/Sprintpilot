@@ -48,11 +48,13 @@ class BacklogCategoriesView(APIView):
         
         return Response({"categories": merged}, status=status.HTTP_200_OK)
 
+from accounts.permissions import IsProjectManagerOrTeamLead
+
 class SprintSyncBacklogView(APIView):
     """
     API View to sync sprint tasks to external Backlog API.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectManagerOrTeamLead]
 
     def post(self, request, sprint_id, *args, **kwargs):
         try:
