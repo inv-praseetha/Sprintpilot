@@ -258,7 +258,7 @@ class BacklogSyncService:
 
                 if task.synced_at is not None and task.updated_at <= task.synced_at:
                     up_to_date_count += 1
-                    continue
+                    continueup_to_date_count
                     
                 try:
                     issue_key = backlog_service.update_task(task)

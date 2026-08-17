@@ -328,6 +328,49 @@ class ProjectAssignableMembersView(APIView):
 
 
 
+from django.db import transaction
+from project.permissions import IsProjectManager
+from project.models import ProjectMember
+
+class ProjectReassignAndRemoveMemberView(APIView):
+    """
+    POST /api/projects/<uuid:pk>/reassign-and-remove/
+    Reassigns all active tasks from old_member to new_member and removes old_member from the project.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsProjectManager()]
+
+    def post(self, request, pk, *args, **kwargs):
+        try:
+            project = Project.objects.get(pk=pk, is_deleted=False)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to modify this project."}, status=status.HTTP_403_FORBIDDEN)
+
+        old_member_id = request.data.get("old_member_id")
+        new_member_id = request.data.get("new_member_id")
+
+        if not old_member_id or not new_member_id:
+            return Response({"detail": "old_member_id and new_member_id are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Ensure the new assignee is actually a member of the project
+            ProjectMember.objects.get_or_create(project=project, employee_profile_id=new_member_id)
+
+            SprintTask.objects.filter(
+                sprint__project=project,
+                assigned_employee_id=old_member_id,
+                is_deleted=False
+            ).exclude(status='CLOSED').update(assigned_employee_id=new_member_id)
+
+            ProjectMember.objects.filter(project=project, employee_profile_id=old_member_id).delete()
+
+        return Response({"detail": "Tasks reassigned and member removed successfully."}, status=status.HTTP_200_OK)
+
 class DashboardView(APIView):
     """
     API View to retrieve dashboard metrics including Backlog task status distribution

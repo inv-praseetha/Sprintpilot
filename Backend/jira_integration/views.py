@@ -25,7 +25,7 @@ def extract_text_from_adf(node):
         text += node.get("text", "")
     
     if "content" in node and isinstance(node["content"], list):
-        for child in node["content"]:
+        for child in node["co=ntent"]:
             text += extract_text_from_adf(child)
             if child.get("type") in ["paragraph", "bulletList", "orderedList"]:
                 text += "\n"
