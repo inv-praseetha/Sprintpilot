@@ -62,7 +62,7 @@ export default function ReassignTasksModal({
           <div>
             <h3 className={`font-extrabold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>Reassign Active Tasks</h3>
             <p className="text-xs text-slate-400 mt-1">
-              {oldMember?.user?.full_name} has active tasks. Reassign them before removing.
+              <span className="font-bold text-orange-500">{oldMember?.user?.full_name}</span> has <span className="font-black text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-md mx-0.5">{oldMember?.active_task_count || 0}</span> active tasks. Reassign them before removing.
             </p>
           </div>
           <button onClick={onClose} disabled={isSubmitting} className={`p-2 rounded-xl ${darkMode ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-700'}`}>
@@ -86,7 +86,9 @@ export default function ReassignTasksModal({
             >
               <option value="" disabled>-- Select a project member --</option>
               {eligibleMembers.map(m => (
-                <option key={`internal-${m.id}`} value={m.id}>{m.user.full_name} ({m.designation || 'Member'})</option>
+                <option key={`internal-${m.id}`} value={m.id}>
+                  {m.user.full_name} ({m.designation || 'Member'}) - {m.active_task_count || 0} active tasks
+                </option>
               ))}
             </select>
           </div>
@@ -107,7 +109,9 @@ export default function ReassignTasksModal({
               >
                 <option value="" disabled>-- Select an external employee --</option>
                 {externalEligibleMembers.map(m => (
-                  <option key={`external-${m.id}`} value={m.id}>{m.user.full_name} ({m.designation || 'Employee'})</option>
+                  <option key={`external-${m.id}`} value={m.id}>
+                    {m.user.full_name} ({m.designation || 'Employee'}) - {m.active_task_count || 0} active tasks
+                  </option>
                 ))}
               </select>
             </div>
