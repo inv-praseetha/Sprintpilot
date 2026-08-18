@@ -3,7 +3,7 @@ from accounts.models import Employee, EmployeeProfile
 from project.models import Project, ProjectMember, ProjectStack, Skill
 from django.utils import timezone
 from project.exceptions import ProjectValidationException
-
+from sprints.models import SprintTask
 class ProjectService:
     """
     Service layer containing the business logic for Project lifecycle management.
@@ -133,6 +133,19 @@ class ProjectService:
         # Capture previous state
         previous_team_lead = project.team_lead
         previous_member_ids = list(project.members.values_list('employee_profile_id', flat=True))
+
+        # Check if REMOVED project members have tasks during updating/deleting time
+        if has_members:
+            removed_member_ids = set(previous_member_ids) - set(member_ids)
+            if removed_member_ids:
+                tasks = SprintTask.objects.filter(
+                    sprint__project=project,
+                    assigned_employee_id__in=removed_member_ids,
+                    is_deleted=False
+                ).exclude(status="CLOSED").exists()
+                
+                if tasks:
+                    raise ProjectValidationException("Cannot remove member! They still have active tasks that are not CLOSED.")
 
         # Update Project fields
         if has_team_lead and team_lead:

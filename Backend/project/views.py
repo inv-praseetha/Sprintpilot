@@ -42,6 +42,11 @@ class ProjectCreateView(APIView):
             "members__employee_profile__employee_skill_relations__skill",
             "project_stack__skill"
         )
+        if request.user.is_authenticated and request.user.role == 'TEAM_LEAD':
+            from django.db.models import Q
+            projects = projects.filter(
+                Q(team_lead=request.user) | Q(members__employee_profile__user=request.user)
+            ).distinct()
         # Apply filters based on query parameters
         name = request.query_params.get('name')
         if name:
@@ -167,6 +172,12 @@ class ProjectDetailView(APIView):
         project = self.get_object(pk)
         if not project:
             return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.is_authenticated and request.user.role == 'TEAM_LEAD':
+            is_assigned = (project.team_lead == request.user) or project.members.filter(employee_profile__user=request.user).exists()
+            if not is_assigned:
+                return Response({"detail": "You do not have permission to view this project."}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = ProjectDetailSerializer(project)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -328,6 +339,49 @@ class ProjectAssignableMembersView(APIView):
 
 
 
+from django.db import transaction
+from project.permissions import IsProjectManager
+from project.models import ProjectMember
+
+class ProjectReassignAndRemoveMemberView(APIView):
+    """
+    POST /api/projects/<uuid:pk>/reassign-and-remove/
+    Reassigns all active tasks from old_member to new_member and removes old_member from the project.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsProjectManager()]
+
+    def post(self, request, pk, *args, **kwargs):
+        try:
+            project = Project.objects.get(pk=pk, is_deleted=False)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == 'PROJECT_MANAGER' and project.created_by != request.user:
+            return Response({"detail": "You do not have permission to modify this project."}, status=status.HTTP_403_FORBIDDEN)
+
+        old_member_id = request.data.get("old_member_id")
+        new_member_id = request.data.get("new_member_id")
+
+        if not old_member_id or not new_member_id:
+            return Response({"detail": "old_member_id and new_member_id are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Ensure the new assignee is actually a member of the project
+            ProjectMember.objects.get_or_create(project=project, employee_profile_id=new_member_id)
+
+            SprintTask.objects.filter(
+                sprint__project=project,
+                assigned_employee_id=old_member_id,
+                is_deleted=False
+            ).exclude(status='CLOSED').update(assigned_employee_id=new_member_id)
+
+            ProjectMember.objects.filter(project=project, employee_profile_id=old_member_id).delete()
+
+        return Response({"detail": "Tasks reassigned and member removed successfully."}, status=status.HTTP_200_OK)
+
 class DashboardView(APIView):
     """
     API View to retrieve dashboard metrics including Backlog task status distribution
@@ -339,7 +393,12 @@ class DashboardView(APIView):
         tasks = SprintTask.objects.filter(is_deleted=False)
         
         user = request.user
-        if user.role != 'PROJECT_MANAGER':
+        if user.role == 'TEAM_LEAD':
+            from django.db.models import Q
+            tasks = tasks.filter(
+                Q(sprint__project__team_lead=user) | Q(sprint__project__members__employee_profile__user=user)
+            ).distinct()
+        elif user.role != 'PROJECT_MANAGER':
             tasks = tasks.filter(sprint__project__members__employee_profile__user=user)
 
         # Status distribution

@@ -169,3 +169,42 @@ class ProjectViewsTests(APITestCase):
         self.client.force_authenticate(user=self.member)
         res_member = self.client.get("/api/dashboard/")
         self.assertEqual(res_member.status_code, status.HTTP_200_OK)
+
+    def test_team_lead_sees_only_assigned_projects(self):
+        # Create Project 1 assigned to self.lead
+        res1 = self.client.post("/api/projects/", self.project_data, format="json")
+        p1_id = res1.data["id"]
+
+        # Create Project 2 NOT assigned to self.lead
+        unassigned_lead = Employee.objects.create(
+            email="unassigned_lead@example.com",
+            full_name="Unassigned Lead",
+            role="TEAM_LEAD",
+            is_active=True
+        )
+        p2_data = self.project_data.copy()
+        p2_data["project_id"] = "PRJ-V2"
+        p2_data["name"] = "Unassigned Project"
+        p2_data["team_lead"] = unassigned_lead.id
+        p2_data["members"] = []
+        res2 = self.client.post("/api/projects/", p2_data, format="json")
+        p2_id = res2.data["id"]
+
+        # Authenticate as self.lead
+        self.client.force_authenticate(user=self.lead)
+
+        # Team Lead listing projects should only see p1
+        list_res = self.client.get("/api/projects/")
+        self.assertEqual(list_res.status_code, status.HTTP_200_OK)
+        project_ids = [p["id"] for p in list_res.data["results"]]
+        self.assertIn(p1_id, project_ids)
+        self.assertNotIn(p2_id, project_ids)
+
+        # Team Lead accessing assigned project details
+        detail1_res = self.client.get(f"/api/projects/{p1_id}/")
+        self.assertEqual(detail1_res.status_code, status.HTTP_200_OK)
+
+        # Team Lead accessing unassigned project details should be forbidden (403)
+        detail2_res = self.client.get(f"/api/projects/{p2_id}/")
+        self.assertEqual(detail2_res.status_code, status.HTTP_403_FORBIDDEN)
+

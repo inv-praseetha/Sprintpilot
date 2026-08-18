@@ -10,6 +10,7 @@ import CloseSprintModal from '../../components/ProjectDetail/CloseSprintModal';
 import TeamRoster from '../../components/ProjectDetail/TeamRoster';
 import SprintsList from '../../components/ProjectDetail/SprintsList';
 import ProjectOverviewCard from '../../components/ProjectDetail/ProjectOverviewCard';
+import ReassignTasksModal from '../../components/ProjectDetail/ReassignTasksModal';
 import { getEffectiveSkills } from './projectcreation';
 import SprintServices from '../../services/SprintServices';
 import { useToast } from '../../context/ToastContext';
@@ -76,6 +77,10 @@ export default function ProjectDetail() {
 
   // Sprints state
   const [sprints, setSprints] = useState([]);
+
+  // Reassign Task Modal State
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [memberToReassign, setMemberToReassign] = useState(null);
 
   // Initialize and check authentication
   useEffect(() => {
@@ -316,7 +321,31 @@ export default function ProjectDetail() {
       await fetchEmployees();
     } catch (err) {
       console.error('[ProjectDetail] Error removing member:', err);
-      toast.error(err.response?.data?.detail || 'Failed to remove member.');
+      const errorMsg = err.response?.data?.detail || err.response?.data?.[0] || '';
+      
+      if (typeof errorMsg === 'string' && errorMsg.includes('active tasks')) {
+        setMemberToReassign(memberProfileId);
+        setShowReassignModal(true);
+      } else {
+        toast.error(errorMsg || 'Failed to remove member.');
+      }
+    }
+  };
+
+  const handleConfirmReassign = async (oldId, newId) => {
+    try {
+      await apiClient.post(`projects/${projectId}/reassign-and-remove/`, {
+        old_member_id: oldId,
+        new_member_id: newId
+      });
+      toast.success('Tasks reassigned and member removed successfully!');
+      setShowReassignModal(false);
+      setMemberToReassign(null);
+      await fetchProjectData();
+      await fetchSprints();
+    } catch (err) {
+      console.error('[ProjectDetail] Error reassigning tasks:', err);
+      toast.error(err.response?.data?.detail || 'Failed to reassign tasks.');
     }
   };
 
@@ -578,6 +607,17 @@ export default function ProjectDetail() {
         closingSprintSummary={closingSprintSummary}
         isClosingSprint={isClosingSprint}
         onConfirmClose={handleConfirmCloseSprint}
+      />
+
+      <ReassignTasksModal
+        isOpen={showReassignModal}
+        onClose={() => setShowReassignModal(false)}
+        darkMode={darkMode}
+        members={project?.members || []}
+        oldMemberId={memberToReassign}
+        onConfirmReassign={handleConfirmReassign}
+        allEmployees={employees}
+        projectSkills={project?.skills || []}
       />
     </div>
   );

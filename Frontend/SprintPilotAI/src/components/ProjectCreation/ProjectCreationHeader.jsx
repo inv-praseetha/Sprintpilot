@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Shield } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 export default function ProjectCreationHeader({ isProjectManager, onCreateClick }) {
   return (
@@ -12,7 +12,7 @@ export default function ProjectCreationHeader({ isProjectManager, onCreateClick 
       </div>
 
       <div>
-        {isProjectManager ? (
+        {isProjectManager && (
           <button
             onClick={onCreateClick}
             className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-lg shadow-orange-500/25 hover:scale-[1.02] cursor-pointer"
@@ -20,11 +20,6 @@ export default function ProjectCreationHeader({ isProjectManager, onCreateClick 
             <Plus className="w-5 h-5 stroke-[2.5]" />
             <span>Create Project</span>
           </button>
-        ) : (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-slate-400 text-sm font-bold border border-slate-200 dark:border-slate-700">
-            <Shield className="w-4 h-4 text-slate-400" />
-            <span>Read-Only Mode</span>
-          </div>
         )}
       </div>
     </section>
