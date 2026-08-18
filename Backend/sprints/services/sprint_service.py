@@ -1033,23 +1033,33 @@ class SprintService:
         }
 
     @staticmethod
-    def get_team_performance(limit: int = 6, offset: int = 0, search: str = '') -> dict:
+    def get_team_performance(limit: int = 6, offset: int = 0, search: str = '', month: int = None, year: int = None) -> dict:
         """
-        Calculates gamified team performance points and rankings for all employees.
+        Calculates gamified team performance points and rankings for all employees on a monthly basis.
 
-        Pointing System:
+        Pointing System (Monthly Scope):
         - +1 Point: Task completed (CLOSED or RESOLVED) on or before planned_end_date (or if no planned_end_date).
         - -1 Point: Task completed late (updated_at > planned_end_date) OR currently active (OPEN / IN_PROGRESS) past planned_end_date.
         """
         from django.utils import timezone
+        from django.db.models import Q
+        import calendar
         from project.models import Project
         from accounts.models import EmployeeProfile
 
         today = timezone.localdate()
+        target_month = month if (month and 1 <= month <= 12) else today.month
+        target_year = year if (year and year >= 2000) else today.year
+        period_name = f"{calendar.month_name[target_month]} {target_year}"
 
+        # Filter tasks relevant to the target month/year
         tasks = SprintTask.objects.filter(
             sprint__is_deleted=False,
             is_deleted=False
+        ).filter(
+            Q(planned_end_date__year=target_year, planned_end_date__month=target_month) |
+            Q(planned_start_date__year=target_year, planned_start_date__month=target_month) |
+            Q(planned_end_date__isnull=True, created_at__year=target_year, created_at__month=target_month)
         ).select_related('assigned_employee', 'assigned_employee__user')
 
         emp_stats = {}
@@ -1153,7 +1163,10 @@ class SprintService:
             'count': total_count,
             'has_more': has_more,
             'limit': limit,
-            'offset': offset
+            'offset': offset,
+            'month': target_month,
+            'year': target_year,
+            'period': period_name
         }
 
 

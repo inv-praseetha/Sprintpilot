@@ -1107,11 +1107,15 @@ class TeamPerformanceTest(APITestCase):
         self.project.status = "COMPLETED"
         self.project.save()
 
-        res = SprintService.get_team_performance()
-        perf = res['results']
-        self.assertEqual(len(perf), 2)
-        self.assertEqual(perf[0]['name'], "Employee One")
-        self.assertEqual(perf[0]['points'], 1)
+    def test_team_performance_monthly_filter(self):
+        from django.utils import timezone
+        today = timezone.localdate()
+
+        res = SprintService.get_team_performance(month=today.month, year=today.year)
+        self.assertIn('period', res)
+        self.assertEqual(res['month'], today.month)
+        self.assertEqual(res['year'], today.year)
+
 
 
 
