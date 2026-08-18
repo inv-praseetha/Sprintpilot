@@ -1087,11 +1087,13 @@ class TeamPerformanceTest(APITestCase):
         self.assertEqual(perf[1]['points'], -1)
         self.assertEqual(perf[1]['rank'], 2)
 
-        # Verify points are persisted directly in EmployeeProfile DB records
-        self.profile1.refresh_from_db()
-        self.profile2.refresh_from_db()
-        self.assertEqual(self.profile1.performance_points, 1)
-        self.assertEqual(self.profile2.performance_points, -1)
+        # Verify points are persisted directly in EmployeeMonthlyPerformance DB records
+        from sprints.models import EmployeeMonthlyPerformance
+        today = timezone.localdate()
+        m1 = EmployeeMonthlyPerformance.objects.get(employee=self.profile1, month=today.month, year=today.year)
+        m2 = EmployeeMonthlyPerformance.objects.get(employee=self.profile2, month=today.month, year=today.year)
+        self.assertEqual(m1.points, 1)
+        self.assertEqual(m2.points, -1)
 
     def test_team_performance_api_view(self):
         self.client.force_authenticate(user=self.user1)

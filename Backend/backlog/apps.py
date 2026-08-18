@@ -23,7 +23,7 @@ class BacklogConfig(AppConfig):
             # Runs twice a day: Early Morning (8:00 AM) and Afternoon (3:00 PM)
             scheduler.add_job(
                 sync_backlog_data_daily,
-                trigger=CronTrigger(hour='8,14', minute=39),
+                trigger=CronTrigger(hour='8,16', minute=28),
                 id='daily_backlog_sync',
                 max_instances=1,
                 replace_existing=True,

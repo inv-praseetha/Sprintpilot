@@ -999,6 +999,7 @@ class SprintService:
             return (
                 f"{workspace_base}/find/{project_key}"
                 f"?allOver=false"
+                f"{f'&fixedVersionId={sprint.backlog_version_id}' if sprint.backlog_version_id else ''}"
                 f"&limit=20"
                 f"&limitDateRange.begin={begin_str}"
                 f"&limitDateRange.end={end_str}"
@@ -1033,26 +1034,21 @@ class SprintService:
         }
 
     @staticmethod
-    def get_team_performance(limit: int = 6, offset: int = 0, search: str = '', month: int = None, year: int = None) -> dict:
+    def recalculate_monthly_performance(month: int = None, year: int = None):
         """
-        Calculates gamified team performance points and rankings for all employees on a monthly basis.
-
-        Pointing System (Monthly Scope):
-        - +1 Point: Task completed (CLOSED or RESOLVED) on or before planned_end_date (or if no planned_end_date).
-        - -1 Point: Task completed late (updated_at > planned_end_date) OR currently active (OPEN / IN_PROGRESS) past planned_end_date.
+        Recalculates monthly team performance stats and persists them in the
+        EmployeeMonthlyPerformance table. Can be triggered on-demand, via signals,
+        or after batch sync operations.
         """
         from django.utils import timezone
         from django.db.models import Q
-        import calendar
-        from project.models import Project
         from accounts.models import EmployeeProfile
+        from sprints.models import EmployeeMonthlyPerformance
 
         today = timezone.localdate()
         target_month = month if (month and 1 <= month <= 12) else today.month
         target_year = year if (year and year >= 2000) else today.year
-        period_name = f"{calendar.month_name[target_month]} {target_year}"
 
-        # Filter tasks relevant to the target month/year
         tasks = SprintTask.objects.filter(
             sprint__is_deleted=False,
             is_deleted=False
@@ -1063,19 +1059,13 @@ class SprintService:
         ).select_related('assigned_employee', 'assigned_employee__user')
 
         emp_stats = {}
-        emp_map = {}
         employees = EmployeeProfile.objects.select_related('user').all()
 
         for emp in employees:
             if not emp.user:
                 continue
-            emp_id = str(emp.id)
-            emp_map[emp_id] = emp
-            emp_stats[emp_id] = {
-                'id': f"EMP-{str(emp.id)[:4].upper()}",
-                'raw_id': emp_id,
-                'name': emp.user.full_name or emp.user.email,
-                'role': emp.designation or emp.user.role or "Team Member",
+            emp_stats[str(emp.id)] = {
+                'emp_obj': emp,
                 'total_tasks': 0,
                 'completed_tasks': 0,
                 'on_time_tasks': 0,
@@ -1110,52 +1100,93 @@ class SprintService:
                     stats['late_or_overdue_tasks'] += 1
                     stats['points'] -= 1
 
-        result_list = []
-        profiles_to_update = []
-
+        calc_list = []
         for stats in emp_stats.values():
-            emp_obj = emp_map.get(stats['raw_id'])
-            if emp_obj:
-                emp_obj.performance_points = stats['points']
-                profiles_to_update.append(emp_obj)
-
-            if stats['total_tasks'] == 0:
-                continue
-
             total = stats['total_tasks']
             on_time = stats['on_time_tasks']
             rate = round((on_time / total) * 100) if total > 0 else 100
-            stats['on_time_rate'] = f"{rate}%"
             stats['raw_rate'] = rate
-            result_list.append(stats)
+            stats['on_time_rate'] = f"{rate}%"
+            calc_list.append(stats)
 
-        # Bulk update performance points in DB for fast persistence
-        if profiles_to_update:
-            EmployeeProfile.objects.bulk_update(profiles_to_update, ['performance_points'])
+        calc_list.sort(key=lambda x: (x['points'], x['raw_rate']), reverse=True)
 
-        # Sort by points descending, then by raw_rate descending
-        result_list.sort(key=lambda x: (x['points'], x['raw_rate']), reverse=True)
+        for rank, stats in enumerate(calc_list, start=1):
+            emp_obj = stats['emp_obj']
 
-        for index, item in enumerate(result_list):
-            item['rank'] = index + 1
-            del item['raw_rate']
+            EmployeeMonthlyPerformance.objects.update_or_create(
+                employee=emp_obj,
+                year=target_year,
+                month=target_month,
+                defaults={
+                    'total_tasks': stats['total_tasks'],
+                    'completed_tasks': stats['completed_tasks'],
+                    'on_time_tasks': stats['on_time_tasks'],
+                    'late_or_overdue_tasks': stats['late_or_overdue_tasks'],
+                    'points': stats['points'],
+                    'on_time_rate': stats['on_time_rate'],
+                    'rank': rank
+                }
+            )
 
-        # Apply search filter if provided
+    @staticmethod
+    def get_team_performance(limit: int = 6, offset: int = 0, search: str = '', month: int = None, year: int = None) -> dict:
+        """
+        Retrieves pre-calculated gamified team performance points and rankings directly
+        from the EmployeeMonthlyPerformance database table.
+        """
+        from django.utils import timezone
+        import calendar
+        from sprints.models import EmployeeMonthlyPerformance
+
+        today = timezone.localdate()
+        target_month = month if (month and 1 <= month <= 12) else today.month
+        target_year = year if (year and year >= 2000) else today.year
+        period_name = f"{calendar.month_name[target_month]} {target_year}"
+
+        # Ensure performance stats exist for target month
+        records = EmployeeMonthlyPerformance.objects.filter(
+            year=target_year,
+            month=target_month
+        ).select_related('employee', 'employee__user').order_by('rank', '-points')
+
+        if not records.exists():
+            SprintService.recalculate_monthly_performance(month=target_month, year=target_year)
+            records = EmployeeMonthlyPerformance.objects.filter(
+                year=target_year,
+                month=target_month
+            ).select_related('employee', 'employee__user').order_by('rank', '-points')
+
+        result_list = []
+        for r in records:
+            if r.total_tasks == 0:
+                continue
+            emp = r.employee
+            if not emp.user:
+               continue
+            result_list.append({
+                'id': f"EMP-{str(emp.id)[:4].upper()}",
+                'raw_id': str(emp.id),
+                'name': emp.user.full_name or emp.user.email,
+                'role': emp.designation or emp.user.role or "Team Member",
+                'total_tasks': r.total_tasks,
+                'completed_tasks': r.completed_tasks,
+                'on_time_tasks': r.on_time_tasks,
+                'late_or_overdue_tasks': r.late_or_overdue_tasks,
+                'points': r.points,
+                'on_time_rate': r.on_time_rate,
+                'rank': r.rank
+            })
+
         if search:
             query = search.strip().lower()
             result_list = [
-                item for item in result_list 
+                item for item in result_list
                 if query in item['name'].lower() or query in item['role'].lower()
             ]
 
         total_count = len(result_list)
-
-        # Apply limit & offset pagination
-        if limit is not None and limit > 0:
-            paginated_list = result_list[offset : offset + limit]
-        else:
-            paginated_list = result_list
-
+        paginated_list = result_list[offset : offset + limit] if (limit and limit > 0) else result_list
         has_more = (offset + len(paginated_list)) < total_count
 
         return {
