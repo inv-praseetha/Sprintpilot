@@ -994,7 +994,6 @@ class SprintService:
             return (
                 f"{workspace_base}/find/{project_key}"
                 f"?allOver=false"
-                f"{f'&fixedVersionId={sprint.backlog_version_id}' if sprint.backlog_version_id else ''}"
                 f"&limit=20"
                 f"&limitDateRange.begin={begin_str}"
                 f"&limitDateRange.end={end_str}"
