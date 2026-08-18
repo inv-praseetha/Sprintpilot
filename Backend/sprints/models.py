@@ -99,8 +99,10 @@ class SprintTask(models.Model):
         from django.core.exceptions import ValidationError
         from datetime import datetime, date, timedelta
 
+        skip_validation = getattr(self, '_skip_sync_validation', False)
+
         # 0. Disable updates to schedule/deletion for CLOSED tasks
-        if self.pk:
+        if self.pk and not skip_validation:
             try:
                 original = SprintTask.objects.get(pk=self.pk)
                 if original.status == 'CLOSED':
@@ -245,5 +247,29 @@ class SprintNote(models.Model):
 
     def __str__(self):
         return f"{self.sprint.milestone} Note - {self.date}"
+
+
+class EmployeeMonthlyPerformance(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employee = models.ForeignKey(EmployeeProfile, on_delete=models.CASCADE, related_name='monthly_performances')
+    year = models.IntegerField()
+    month = models.IntegerField()
+    total_tasks = models.IntegerField(default=0)
+    completed_tasks = models.IntegerField(default=0)
+    on_time_tasks = models.IntegerField(default=0)
+    late_or_overdue_tasks = models.IntegerField(default=0)
+    points = models.IntegerField(default=0)
+    on_time_rate = models.CharField(max_length=10, default="100%")
+    rank = models.IntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'employee_monthly_performance'
+        unique_together = ('employee', 'year', 'month')
+        ordering = ['rank', '-points']
+
+    def __str__(self):
+        return f"{self.employee} - {self.month}/{self.year} ({self.points} pts)"
+
 
 

@@ -98,11 +98,10 @@ class BacklogSyncService:
             logger.info(f"Fetched {len(issues)} updated issues from Backlog for project {project.project_id}")
 
             from django.db import transaction
-            try:
-                with transaction.atomic():
-                    for issue in issues:
-                        issue_key = issue.get("issueKey")
-                        
+            for issue in issues:
+                issue_key = issue.get("issueKey")
+                try:
+                    with transaction.atomic():
                         # Find matching SprintTask, restricting to the current project
                         task = SprintTask.objects.filter(backlog_task_id=issue_key, sprint__project=project).first()
                         if not task:
@@ -170,11 +169,9 @@ class BacklogSyncService:
                         
                         logger.info(f"Updated SprintTask #{task.id} (Backlog Key: {issue_key})")
                         updated_count += 1
-                    
-            except Exception as e:
-                logger.error(f"Database/Validation failure for project {project.project_id}. Rolling back updates. Error: {e}")
-                # The transaction.atomic() block will automatically roll back all DB saves for this project
-                failed_count += len(issues) # Consider all issues for this project failed due to rollback
+                except Exception as e:
+                    logger.error(f"Database/Validation failure for Backlog Issue {issue_key}. Error: {e}")
+                    failed_count += 1
 
         # Auto-close sprints if all tasks are CLOSED
         from sprints.models import Sprint
@@ -258,7 +255,7 @@ class BacklogSyncService:
 
                 if task.synced_at is not None and task.updated_at <= task.synced_at:
                     up_to_date_count += 1
-                    continueup_to_date_count
+                    continue
                     
                 try:
                     issue_key = backlog_service.update_task(task)

@@ -357,7 +357,7 @@ class SprintTaskStatusView(APIView):
 
 class TeamPerformanceView(APIView):
     """
-    API View to fetch gamified team performance scores, completion metrics, and rankings.
+    API View to fetch gamified team performance scores, completion metrics, and rankings on a monthly basis.
     """
     permission_classes = [IsAuthenticated]
 
@@ -371,7 +371,18 @@ class TeamPerformanceView(APIView):
             
             search = request.query_params.get('search', '').strip()
 
-            result = SprintService.get_team_performance(limit=limit, offset=offset, search=search)
+            month_val = request.query_params.get('month')
+            year_val = request.query_params.get('year')
+            month = int(month_val) if month_val and str(month_val).isdigit() else None
+            year = int(year_val) if year_val and str(year_val).isdigit() else None
+
+            result = SprintService.get_team_performance(
+                limit=limit,
+                offset=offset,
+                search=search,
+                month=month,
+                year=year
+            )
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)

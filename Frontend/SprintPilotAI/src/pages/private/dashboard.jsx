@@ -969,8 +969,13 @@ const Dashboard = () => {
         {/* Section Header Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="text-left">
-            <h3 className="font-bold text-lg">Team Performance</h3>
-            <span className="text-xs text-slate-400">Track task completions and efficiency metrics for team members</span>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-lg">Team Performance</h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-500 border border-orange-500/20 uppercase tracking-wider">
+                Monthly Leaderboard
+              </span>
+            </div>
+            <span className="text-xs text-slate-400">Monthly task completions and efficiency metrics (resets every month)</span>
           </div>
           <div className="flex items-center gap-3">
             {/* Search bar inside section */}
