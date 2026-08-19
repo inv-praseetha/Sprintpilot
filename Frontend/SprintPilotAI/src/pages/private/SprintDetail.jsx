@@ -184,7 +184,7 @@ export default function SprintDetail() {
     if (!isConfirmed) return;
     try {
       setPageLoading(true);
-      await apiClient.delete(`sprints/tasks/${taskId}/`);
+      await SprintServices.deleteSprintTask(taskId);
       toast.success("Task deleted successfully.");
       await refreshSprint();
     } catch (err) {

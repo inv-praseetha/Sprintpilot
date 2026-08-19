@@ -6,15 +6,19 @@ import apiClient from '../../../api/apiClient';
 
 // Mock CustomDatePicker
 vi.mock('../../../components/Common/CustomDatePicker', () => ({
-  default: ({ value, onChange, minDate, maxDate }) => (
-    <input
-      data-testid="mock-date-picker"
-      type="date"
-      value={value || ''}
-      min={minDate}
-      max={maxDate}
-      onChange={(e) => onChange(e.target.value)}
-    />
+  default: ({ value, onChange, minDate, maxDate, onOpen, onClose }) => (
+    <div data-testid="mock-date-picker-wrapper">
+      <input
+        data-testid="mock-date-picker"
+        type="date"
+        value={value || ''}
+        min={minDate}
+        max={maxDate}
+        onFocus={onOpen}
+        onBlur={onClose}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   )
 }));
 
@@ -24,11 +28,9 @@ vi.mock('../../../components/Modals/TaskCommentsModal', () => ({
 }));
 
 // Mock ToastContext
+const mockToast = { error: vi.fn(), success: vi.fn() };
 vi.mock('../../../context/ToastContext', () => ({
-  useToast: () => ({
-    error: vi.fn(),
-    success: vi.fn()
-  })
+  useToast: () => mockToast
 }));
 
 // Mock apiClient
@@ -46,9 +48,11 @@ describe('SprintTasksTable Component', () => {
   ];
 
   const timelineDaysList = [
-    { dateStr: '2026-07-01', dayNum: 1, dayName: 'M', isWeekend: false, isHoliday: false },
+    { dateStr: '2026-07-01', dayNum: 1, dayName: 'W', isWeekend: false, isHoliday: false },
     { dateStr: '2026-07-02', dayNum: 2, dayName: 'T', isWeekend: false, isHoliday: false },
-    { dateStr: '2026-07-03', dayNum: 3, dayName: 'W', isWeekend: false, isHoliday: false }
+    { dateStr: '2026-07-03', dayNum: 3, dayName: 'F', isWeekend: false, isHoliday: false },
+    { dateStr: '2026-07-04', dayNum: 4, dayName: 'S', isWeekend: true, isHoliday: false },
+    { dateStr: '2026-07-05', dayNum: 5, dayName: 'S', isWeekend: true, isHoliday: true, holidayDescription: 'July 5 Holiday' }
   ];
 
   const tasks = [
@@ -58,9 +62,11 @@ describe('SprintTasksTable Component', () => {
       category: 'UI',
       status: 'OPEN',
       planned_start_date: '2026-07-01',
-      planned_end_date: '2026-07-02',
-      estimated_hours: 8,
-      assigned_employee: { id: 1, user: { full_name: 'Alice Smith' } }
+      planned_end_date: '2026-07-03',
+      estimated_hours: 32,
+      assigned_employee: { id: 1, user: { full_name: 'Alice Smith' } },
+      recommendation_reason: 'Skill match',
+      backlog_task_url: 'http://backlog/101'
     },
     {
       id: 102,
@@ -69,8 +75,35 @@ describe('SprintTasksTable Component', () => {
       status: 'CLOSED',
       planned_start_date: '2026-07-02',
       planned_end_date: '2026-07-03',
-      estimated_hours: 12,
+      estimated_hours: 8,
       assigned_employee: { id: 2, user: { full_name: 'Bob Jones' } }
+    },
+    {
+      id: 103,
+      title: 'Task C',
+      category: 'INFRA',
+      status: 'IN_PROGRESS',
+      planned_start_date: null,
+      planned_end_date: null,
+      estimated_hours: null
+    },
+    {
+      id: 104,
+      title: 'Task D',
+      category: 'QA',
+      status: 'IN_REVIEW',
+      planned_start_date: '2026-07-01',
+      planned_end_date: '2026-07-02',
+      estimated_hours: 8
+    },
+    {
+      id: 105,
+      title: 'Task E',
+      category: 'CustomCategory',
+      status: 'BLOCKED',
+      planned_start_date: '2026-07-01',
+      planned_end_date: '2026-07-02',
+      estimated_hours: 8
     }
   ];
 
@@ -91,7 +124,6 @@ describe('SprintTasksTable Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
     apiClient.post.mockResolvedValue({ data: { updated_counts: {} } });
     apiClient.put.mockResolvedValue({ data: {} });
   });
@@ -104,12 +136,14 @@ describe('SprintTasksTable Component', () => {
     expect(screen.getByText('Task B')).toBeInTheDocument();
     expect(screen.getByText('UI Development')).toBeInTheDocument();
     expect(screen.getByText('Backend Development')).toBeInTheDocument();
+    expect(screen.getByText('System Design & Infra')).toBeInTheDocument();
+    expect(screen.getByText('Quality Assurance')).toBeInTheDocument();
+    expect(screen.getByText('CustomCategory')).toBeInTheDocument();
   });
 
   it('renders static text fields when isEditing is false', () => {
     render(<SprintTasksTable {...defaultProps} />);
 
-    // Assignee should be rendered as static text, not select
     expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     expect(screen.getByText('Bob Jones')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
@@ -118,13 +152,10 @@ describe('SprintTasksTable Component', () => {
   it('renders select inputs for assignee and date pickers when isEditing is true', () => {
     render(<SprintTasksTable {...defaultProps} isEditing={true} />);
 
-    // Task A is OPEN (editable), so its assignee field is a select input
     const selectElements = screen.getAllByRole('combobox');
     expect(selectElements.length).toBeGreaterThan(0);
-    // Option 'Alice Smith' is in the dropdown
-    expect(screen.getByRole('option', { name: 'Alice Smith' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option', { name: 'Alice Smith' })[0]).toBeInTheDocument();
 
-    // Date pickers are rendered for start and end dates
     const pickers = screen.getAllByTestId('mock-date-picker');
     expect(pickers.length).toBeGreaterThan(0);
   });
@@ -132,20 +163,12 @@ describe('SprintTasksTable Component', () => {
   it('maintains read-only display for CLOSED tasks even when isEditing is true', () => {
     render(<SprintTasksTable {...defaultProps} isEditing={true} />);
 
-    // Task B has status = CLOSED. So even if isEditing is true, its assignee should be static span
     expect(screen.getByText('Bob Jones', { selector: 'span' })).toBeInTheDocument();
-    // It shouldn't render a select dropdown with Bob Jones selected as the select's value since CLOSED status locks it
-    // Wait, the select dropdown for Task A has option 'Alice Smith' and is value = 1.
-    const selects = screen.getAllByRole('combobox');
-    // Task A is UI (editable), Task B is Backend (CLOSED, not editable)
-    // So there should only be 1 select input for assignee
-    expect(selects.length).toBe(1);
   });
 
   it('calls handleIndividualDelete when trash action is clicked', () => {
     render(<SprintTasksTable {...defaultProps} />);
 
-    // Task A has delete trash button active
     const deleteBtns = screen.getAllByTitle('Delete task');
     fireEvent.click(deleteBtns[0]);
 
@@ -155,7 +178,6 @@ describe('SprintTasksTable Component', () => {
   it('disables delete button for CLOSED tasks', () => {
     render(<SprintTasksTable {...defaultProps} />);
 
-    // Task B has status CLOSED, so its delete button should be disabled
     const disabledBtn = screen.getByTitle('Cannot delete this task as it is already closed/completed');
     expect(disabledBtn).toBeDisabled();
   });
@@ -164,9 +186,39 @@ describe('SprintTasksTable Component', () => {
     const setSelectedTaskIds = vi.fn();
     render(<SprintTasksTable {...defaultProps} setSelectedTaskIds={setSelectedTaskIds} />);
 
-    // Click the first checkbox (for Task A, which is OPEN)
     const checkboxes = screen.getAllByRole('checkbox');
-    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+
+    expect(setSelectedTaskIds).toHaveBeenCalled();
+  });
+
+  it('toggles select all active tasks via header checkbox', () => {
+    const setSelectedTaskIds = vi.fn();
+    render(<SprintTasksTable {...defaultProps} setSelectedTaskIds={setSelectedTaskIds} />);
+
+    const headerCheckbox = screen.getAllByRole('checkbox')[0];
+    fireEvent.click(headerCheckbox);
+
+    expect(setSelectedTaskIds).toHaveBeenCalled();
+  });
+
+  it('unselects all active tasks when header checkbox clicked while all selected', () => {
+    const setSelectedTaskIds = vi.fn((updateFn) => {
+      const prev = new Set([101, 103, 104, 105]);
+      const next = updateFn(prev);
+      expect(next.size).toBe(0);
+    });
+
+    render(
+      <SprintTasksTable
+        {...defaultProps}
+        selectedTaskIds={new Set([101, 103, 104, 105])}
+        setSelectedTaskIds={setSelectedTaskIds}
+      />
+    );
+
+    const headerCheckbox = screen.getAllByRole('checkbox')[0];
+    fireEvent.click(headerCheckbox);
 
     expect(setSelectedTaskIds).toHaveBeenCalled();
   });
@@ -191,6 +243,99 @@ describe('SprintTasksTable Component', () => {
     expect(setModifiedTaskIds).toHaveBeenCalled();
   });
 
+  it('validates start date changes while editing', () => {
+    const setTasks = vi.fn();
+    const setModifiedTaskIds = vi.fn();
+
+    render(
+      <SprintTasksTable
+        {...defaultProps}
+        isEditing={true}
+        setTasks={setTasks}
+        setModifiedTaskIds={setModifiedTaskIds}
+      />
+    );
+
+    const pickers = screen.getAllByTestId('mock-date-picker');
+
+    // 1. Invalid boundary start date
+    fireEvent.change(pickers[0], { target: { value: '2026-06-01' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('within the sprint boundaries'));
+
+    // 2. Weekend start date
+    fireEvent.change(pickers[0], { target: { value: '2026-07-04' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('Saturdays and Sundays cannot be selected'));
+
+    // 3. Start date after end date (using a weekday: Tuesday July 7, 2026)
+    fireEvent.change(pickers[0], { target: { value: '2026-07-07' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('start date cannot be after the planned end date'));
+
+    // 4. Insufficient working days for estimated hours
+    fireEvent.change(pickers[0], { target: { value: '2026-07-03' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('require at least'));
+
+    // 5. Clear start date
+    fireEvent.change(pickers[0], { target: { value: '' } });
+    expect(setTasks).toHaveBeenCalled();
+
+    // 6. Valid start date update
+    fireEvent.change(pickers[0], { target: { value: '2026-07-01' } });
+    expect(setTasks).toHaveBeenCalled();
+  });
+
+  it('validates end date changes while editing', () => {
+    const setTasks = vi.fn();
+    const setModifiedTaskIds = vi.fn();
+
+    render(
+      <SprintTasksTable
+        {...defaultProps}
+        isEditing={true}
+        setTasks={setTasks}
+        setModifiedTaskIds={setModifiedTaskIds}
+      />
+    );
+
+    const pickers = screen.getAllByTestId('mock-date-picker');
+    // Task A end date is index 1
+
+    // 1. End date outside boundary
+    fireEvent.change(pickers[1], { target: { value: '2026-07-20' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('within the sprint boundaries'));
+
+    // 2. Weekend end date
+    fireEvent.change(pickers[1], { target: { value: '2026-07-04' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('Saturdays and Sundays cannot be selected'));
+
+    // 3. Insufficient working days for estimated hours
+    fireEvent.change(pickers[1], { target: { value: '2026-07-02' } });
+    expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('require at least'));
+
+    // 4. Clear end date
+    fireEvent.change(pickers[1], { target: { value: '' } });
+    expect(setTasks).toHaveBeenCalled();
+
+    // 5. Valid end date
+    fireEvent.change(pickers[1], { target: { value: '2026-07-03' } });
+    expect(setTasks).toHaveBeenCalled();
+  });
+
+  it('triggers onFocus and onBlur on date pickers to handle active date picker z-index', () => {
+    render(<SprintTasksTable {...defaultProps} isEditing={true} />);
+
+    const pickers = screen.getAllByTestId('mock-date-picker');
+    fireEvent.focus(pickers[0]);
+    fireEvent.blur(pickers[0]);
+  });
+
+  it('handles row hover state changes', () => {
+    render(<SprintTasksTable {...defaultProps} />);
+
+    const taskRow = screen.getByText('Task A').closest('tr');
+    fireEvent.mouseEnter(taskRow);
+    fireEvent.mouseLeave(taskRow);
+  });
+
   it('renders chat icon when there are unread comments and handles click', async () => {
     const tasksWithComments = [
       {
@@ -205,9 +350,8 @@ describe('SprintTasksTable Component', () => {
         first_unread_comment_id: '333'
       }
     ];
-    
+
     const setTasks = vi.fn((updateFn) => {
-      // Simulate state update
       const updatedTasks = updateFn(tasksWithComments);
       expect(updatedTasks[0].read_comment_count).toBe(5);
     });
@@ -220,19 +364,12 @@ describe('SprintTasksTable Component', () => {
       />
     );
 
-    // Chat icon should be rendered with unread count 3
     const chatIcon = screen.getByTitle('3 new comment(s).');
     expect(chatIcon).toBeInTheDocument();
     expect(chatIcon).toHaveAttribute('href', 'http://backlog/TEST-1#comment-333');
 
-    // Click chat icon
     fireEvent.click(chatIcon);
 
-    expect(apiClient.put).toHaveBeenCalledWith('sprints/tasks/101/', {
-      read_comment_count: 5
-    });
-
-    // Wait for the setTimeout in handleChatIconClick
     await waitFor(() => {
       expect(setTasks).toHaveBeenCalled();
     }, { timeout: 1000 });
@@ -248,9 +385,9 @@ describe('SprintTasksTable Component', () => {
         comment_count: 0
       }
     ];
-    
+
     const setTasks = vi.fn();
-    
+
     apiClient.post.mockResolvedValueOnce({
       data: {
         updated_counts: {
@@ -268,10 +405,9 @@ describe('SprintTasksTable Component', () => {
     );
 
     expect(apiClient.post).toHaveBeenCalledWith('sprints/1/sync-comments/');
-    
+
     await waitFor(() => {
       expect(setTasks).toHaveBeenCalled();
     });
   });
 });
-

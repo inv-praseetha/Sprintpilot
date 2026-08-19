@@ -3,6 +3,7 @@ import { Lock, Trash2, ExternalLink, MessageSquare } from 'lucide-react';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import { useToast } from '../../context/ToastContext';
 import TaskCommentsModal from '../Modals/TaskCommentsModal';
+import SprintServices from '../../services/SprintServices';
 import apiClient from '../../api/apiClient';
 
 const categoryConfig = {
@@ -215,7 +216,7 @@ export default function SprintTasksTable({
   const handleChatIconClick = async (task) => {
     if (!task || task.comment_count === task.read_comment_count) return;
     try {
-      await apiClient.put(`sprints/tasks/${task.id}/`, {
+      await SprintServices.updateSprintTask(task.id, {
         read_comment_count: task.comment_count
       });
       // Small delay to allow the <a> tag to open the new tab before we update state and hide the icon

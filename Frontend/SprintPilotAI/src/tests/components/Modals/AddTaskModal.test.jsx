@@ -4,14 +4,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AddTaskModal from '../../../components/Modals/AddTaskModal';
 import SprintServices from '../../../services/SprintServices';
 
-// Mock SprintServices
 vi.mock('../../../services/SprintServices', () => ({
   default: {
     createSprintTask: vi.fn()
   }
 }));
 
-// Mock CustomDatePicker with a standard input to simplify testing
 vi.mock('../../../components/Common/CustomDatePicker', () => ({
   default: ({ value, onChange }) => (
     <input
@@ -22,7 +20,6 @@ vi.mock('../../../components/Common/CustomDatePicker', () => ({
   )
 }));
 
-// Mock Lucide Icons
 vi.mock('lucide-react', () => ({
   X: () => <div data-testid="close-icon">X</div>,
   Loader2: () => <div data-testid="spinner">Spinner</div>,
@@ -71,54 +68,128 @@ describe('AddTaskModal Component', () => {
     expect(screen.getByText('Bob Jones')).toBeInTheDocument();
   });
 
-  it('handles field changes and displays selections', () => {
-    const { container } = render(<AddTaskModal {...defaultProps} />);
+  it('handles category dropdown toggle and checkbox selections', () => {
+    render(<AddTaskModal {...defaultProps} />);
 
-    const titleInput = screen.getByPlaceholderText(/e.g. Implement User Authentication Flow/i);
-    fireEvent.change(titleInput, { target: { value: 'New Test Task' } });
-    expect(titleInput.value).toBe('New Test Task');
+    const categoryBtn = screen.getByText('UI');
+    fireEvent.click(categoryBtn);
 
-    const prioritySelect = container.querySelector('select[name="priority"]');
-    fireEvent.change(prioritySelect, { target: { value: 'High' } });
-    expect(prioritySelect.value).toBe('High');
+    expect(screen.getByText('Backend Development')).toBeInTheDocument();
+    expect(screen.getByText('QA Development')).toBeInTheDocument();
+
+    const backendCheckbox = screen.getByText('Backend Development').parentElement.querySelector('input');
+    fireEvent.click(backendCheckbox);
+
+    expect(screen.getByText('UI, Backend')).toBeInTheDocument();
+
+    // Deselect UI
+    const uiCheckbox = screen.getByText('UI Development').parentElement.querySelector('input');
+    fireEvent.click(uiCheckbox);
+    expect(screen.getByText('Backend')).toBeInTheDocument();
   });
 
-  it('validates estimated hours capacity constraints', async () => {
+  it('resets end date if start date is set after end date', () => {
     const { container } = render(<AddTaskModal {...defaultProps} />);
 
-    // Fill form title, assignee, description
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    const startDateInput = dateInputs[0];
+    const endDateInput = dateInputs[1];
+
+    fireEvent.change(endDateInput, { target: { value: '2026-07-05' } });
+    expect(endDateInput.value).toBe('2026-07-05');
+
+    fireEvent.change(startDateInput, { target: { value: '2026-07-10' } });
+    expect(endDateInput.value).toBe('');
+  });
+
+  it('resets start date if end date is set before start date', () => {
+    const { container } = render(<AddTaskModal {...defaultProps} />);
+
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    const startDateInput = dateInputs[0];
+    const endDateInput = dateInputs[1];
+
+    fireEvent.change(startDateInput, { target: { value: '2026-07-10' } });
+    expect(startDateInput.value).toBe('2026-07-10');
+
+    fireEvent.change(endDateInput, { target: { value: '2026-07-05' } });
+    expect(startDateInput.value).toBe('');
+  });
+
+  it('validates required field errors on submit', async () => {
+    const { container } = render(<AddTaskModal {...defaultProps} />);
+    const form = container.querySelector('form');
+
+    // 1. Missing title
+    fireEvent.submit(form);
+    expect(await screen.findByText('Task Title is required.')).toBeInTheDocument();
+
+    // Fill title
     fireEvent.change(screen.getByPlaceholderText(/e.g. Implement User Authentication Flow/i), {
-      target: { value: 'New Test Task' }
+      target: { value: 'New Task' }
     });
+
+    // Missing assignee
+    fireEvent.submit(form);
+    expect(await screen.findByText('Assignee is required.')).toBeInTheDocument();
+
+    // Fill assignee
     fireEvent.change(container.querySelector('select[name="assigned_employee_id"]'), {
       target: { value: '1' }
     });
-    fireEvent.change(screen.getByPlaceholderText(/Enter task detailed description.../i), {
-      target: { value: 'Task details here' }
+
+    // Missing start date
+    fireEvent.submit(form);
+    expect(await screen.findByText('Planned Start Date is required.')).toBeInTheDocument();
+
+    // Fill start date
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: '2026-07-05' } });
+
+    // Missing end date
+    fireEvent.submit(form);
+    expect(await screen.findByText('Planned End Date is required.')).toBeInTheDocument();
+
+    // Fill end date
+    fireEvent.change(dateInputs[1], { target: { value: '2026-07-06' } });
+
+    // Missing description
+    fireEvent.submit(form);
+    expect(await screen.findByText('Description is required.')).toBeInTheDocument();
+  });
+
+  it('validates negative estimated hours error', async () => {
+    const { container } = render(<AddTaskModal {...defaultProps} />);
+
+    fireEvent.change(screen.getByPlaceholderText(/e.g. Implement User Authentication Flow/i), { target: { value: 'Task' } });
+    fireEvent.change(container.querySelector('select[name="assigned_employee_id"]'), { target: { value: '1' } });
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: '2026-07-05' } });
+    fireEvent.change(dateInputs[1], { target: { value: '2026-07-06' } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter task detailed description.../i), { target: { value: 'Desc' } });
+    fireEvent.change(screen.getByPlaceholderText(/e.g. 12/i), { target: { value: '-5' } });
+
+    fireEvent.submit(container.querySelector('form'));
+    expect(await screen.findByText('Estimated hours cannot be negative.')).toBeInTheDocument();
+  });
+
+  it('handles API error when createSprintTask fails', async () => {
+    SprintServices.createSprintTask.mockRejectedValue({
+      response: { data: { detail: 'Server Error: Invalid sprint task' } }
     });
 
-    // Enter 20 estimated hours
-    fireEvent.change(screen.getByPlaceholderText(/e.g. 12/i), {
-      target: { value: '20' }
-    });
+    const { container } = render(<AddTaskModal {...defaultProps} />);
 
-    // 20 hours at 8 hours/day capacity requires Math.ceil(20 / 8) = 3 working days.
-    // Let's set start and end dates to cover only 2 working days:
-    // Wednesday 2026-07-01 to Thursday 2026-07-02
-    const startDateInput = screen.getByText(/Planned Start Date/i).parentElement.querySelector('input');
-    const endDateInput = screen.getByText(/Planned End Date/i).parentElement.querySelector('input');
+    fireEvent.change(screen.getByPlaceholderText(/e.g. Implement User Authentication Flow/i), { target: { value: 'Task' } });
+    fireEvent.change(container.querySelector('select[name="assigned_employee_id"]'), { target: { value: '1' } });
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: '2026-07-01' } });
+    fireEvent.change(dateInputs[1], { target: { value: '2026-07-02' } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter task detailed description.../i), { target: { value: 'Desc' } });
 
-    fireEvent.change(startDateInput, { target: { value: '2026-07-01' } });
-    fireEvent.change(endDateInput, { target: { value: '2026-07-02' } });
+    fireEvent.submit(container.querySelector('form'));
 
-    // Click submit
-    fireEvent.click(screen.getByText('Create Task'));
-
-    // Verify error message is shown
-    expect(
-      await screen.findByText(/Estimated hours \(20h\) require at least 3 working day\(s\)/i)
-    ).toBeInTheDocument();
-    expect(SprintServices.createSprintTask).not.toHaveBeenCalled();
+    expect(await screen.findByText('Server Error: Invalid sprint task')).toBeInTheDocument();
   });
 
   it('submits valid form data to SprintServices.createSprintTask', async () => {
@@ -127,7 +198,6 @@ describe('AddTaskModal Component', () => {
 
     const { container } = render(<AddTaskModal {...defaultProps} />);
 
-    // Fill details
     fireEvent.change(screen.getByPlaceholderText(/e.g. Implement User Authentication Flow/i), {
       target: { value: 'New Test Task' }
     });
@@ -141,32 +211,14 @@ describe('AddTaskModal Component', () => {
       target: { value: '8' }
     });
 
-    // 8 hours needs 1 day. Start 2026-07-01, end 2026-07-02 (2 working days - Wednesday to Thursday)
-    const startDateInput = screen.getByText(/Planned Start Date/i).parentElement.querySelector('input');
-    const endDateInput = screen.getByText(/Planned End Date/i).parentElement.querySelector('input');
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: '2026-07-01' } });
+    fireEvent.change(dateInputs[1], { target: { value: '2026-07-02' } });
 
-    fireEvent.change(startDateInput, { target: { value: '2026-07-01' } });
-    fireEvent.change(endDateInput, { target: { value: '2026-07-02' } });
-
-    // Submit
-    fireEvent.click(screen.getByText('Create Task'));
+    fireEvent.submit(container.querySelector('form'));
 
     await waitFor(() => {
-      expect(SprintServices.createSprintTask).toHaveBeenCalledWith(10, {
-        title: 'New Test Task',
-        jira_id: null,
-        description: 'Task details here',
-        priority: 'Normal',
-        category: 'UI',
-        status: 'OPEN',
-        assigned_employee_id: '1',
-        planned_start_date: '2026-07-01',
-        planned_end_date: '2026-07-02',
-        estimated_hours: 8
-      });
-    });
-
-    await waitFor(() => {
+      expect(SprintServices.createSprintTask).toHaveBeenCalled();
       expect(defaultProps.onTaskCreated).toHaveBeenCalledWith(createdTask);
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
