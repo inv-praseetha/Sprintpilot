@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity, ChevronDown } from 'lucide-react';
+import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity, ChevronDown, Sparkles } from 'lucide-react';
 import ProjectService from '../../services/ProjectService';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import apiClient from '../../api/apiClient';
@@ -451,8 +451,12 @@ export default function TaskUploadModal({
           const jiraVal = jiraIndex !== -1 && row[jiraIndex] !== undefined ? row[jiraIndex] : '';
           const estHoursVal = estHoursIndex !== -1 && row[estHoursIndex] !== undefined ? row[estHoursIndex] : '';
 
-          const cat = catVal.toString().toUpperCase().trim();
-          const validCats = availableCategories.map(c => c.toUpperCase());
+          const rawCatStr = catVal.toString().trim();
+          let finalCategory = 'UI';
+          if (rawCatStr) {
+            const matched = availableCategories.find(c => c.toUpperCase() === rawCatStr.toUpperCase());
+            finalCategory = matched || rawCatStr;
+          }
 
           let parsedEstHours = null;
           if (estHoursVal !== undefined && estHoursVal !== null && estHoursVal !== '') {
@@ -465,7 +469,7 @@ export default function TaskUploadModal({
           parsedRows.push({
             title: cleanTitle,
             desc: (descVal || 'No description provided.').toString().trim(),
-            category: validCats.includes(cat) ? cat : 'UI',
+            category: finalCategory,
             status: 'OPEN',
             jiraId: jiraVal.toString().trim(),
             estimated_hours: parsedEstHours
@@ -476,6 +480,18 @@ export default function TaskUploadModal({
           setErrorMsg('No task rows found in the Excel sheet.');
         } else {
           setExcelData(parsedRows.map(t => ({ ...t, selected: true, initialJiraId: t.jiraId || '' })));
+          
+          // Dynamically append any newly discovered categories from Excel to availableCategories
+          const fileCats = parsedRows.map(r => r.category).filter(Boolean);
+          setAvailableCategories(prev => {
+            const updated = [...prev];
+            fileCats.forEach(fc => {
+              if (!updated.some(u => u.toUpperCase() === fc.toUpperCase())) {
+                updated.push(fc);
+              }
+            });
+            return updated;
+          });
         }
       } catch (err) {
         console.error(err);
@@ -966,6 +982,23 @@ export default function TaskUploadModal({
 
               {/* Data Preview with Selection */}
               <div>
+                {(() => {
+                  const defaultSet = new Set(['UI', 'BACKEND', 'INFRA', 'QA']);
+                  const extraCats = availableCategories.filter(c => !defaultSet.has(c.toUpperCase().trim()));
+                  if (extraCats.length > 0) {
+                    return (
+                      <div className="mb-4 p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold flex items-center gap-3 text-left">
+                        <Sparkles className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        <span>
+                          <span className="font-extrabold uppercase mr-1">New Categories Available:</span>
+                          Custom categories (<span className="font-bold text-blue-700 dark:text-blue-300">{extraCats.join(', ')}</span>) are available for this project. You can edit category assignments in the table below.
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {importMode === 'JIRA' && (
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase">Task Selection</h4>
@@ -1004,15 +1037,15 @@ export default function TaskUploadModal({
                           <tr key={idx} className={darkMode ? 'bg-slate-900/40 text-slate-300' : 'bg-white text-slate-700'}>
                             <td className="py-2 px-3 font-semibold truncate max-w-[150px]">{row.title}</td>
                             <td className="py-2 px-3 text-slate-500 truncate max-w-[180px]" title={row.desc}>{row.desc}</td>
-                            <td className="py-2 px-3 flex flex-wrap gap-1">
-                              {row.category ? row.category.split(',').map((cat) => {
-                                const cleanCat = cat.trim();
-                                return (
-                                  <span key={cleanCat} className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${categoryConfig[cleanCat]?.bg || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                    {cleanCat}
-                                  </span>
-                                );
-                              }) : null}
+                            <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                              <div className="w-[120px]">
+                                <CategoryDropdown
+                                  categoryStr={row.category}
+                                  onChange={(newCat) => handleTaskCategoryChange(idx, newCat)}
+                                  darkMode={darkMode}
+                                  availableCategories={availableCategories}
+                                />
+                              </div>
                             </td>
                             <td className="py-2 px-3 text-slate-400 font-semibold">{row.estimated_hours !== null && row.estimated_hours !== undefined ? `${row.estimated_hours}h` : 'N/A'}</td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || 'N/A'}</td>

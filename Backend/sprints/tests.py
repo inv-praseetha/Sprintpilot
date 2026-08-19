@@ -548,7 +548,7 @@ class SprintServiceTests(APITestCase):
         self.assertIn('workspaceUrl', overdue_item)
         self.assertIn('limitDateRange.begin=', overdue_item['workspaceUrl'])
         self.assertIn('limitDateRange.end=', overdue_item['workspaceUrl'])
-        self.assertIn('fixedVersionId=162213', overdue_item['workspaceUrl'])
+        self.assertNotIn('fixedVersionId', overdue_item['workspaceUrl'])
         self.assertIn('projectId=166137', overdue_item['workspaceUrl'])
         self.assertIn('statusId=1&statusId=2', overdue_item['workspaceUrl'])
         self.assertNotIn('statusId=3', overdue_item['workspaceUrl'])
