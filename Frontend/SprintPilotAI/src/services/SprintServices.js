@@ -21,8 +21,8 @@ export const SprintServices = {
     return response.data;
   },
 
-  deleteSprint: async (sprintId) => {
-    const response = await apiClient.delete(`sprints/${sprintId}/`);
+  deleteSprintTask: async (taskId) => {
+    const response = await apiClient.delete(`sprints/tasks/${taskId}/`);
     return response.data;
   },
 
