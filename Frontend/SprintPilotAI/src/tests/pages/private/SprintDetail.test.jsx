@@ -8,13 +8,19 @@ import SprintServices from '../../../services/SprintServices';
 import { useToast } from '../../../context/ToastContext';
 import { useConfirm } from '../../../context/ConfirmContext';
 import { useTheme } from '../../../components/layout/MainLayouut';
+import { useAuth } from '../../../context/AuthContext';
 
 // Mock subcomponents
 vi.mock('../../../components/Sprint/SprintTasksTable', () => ({
-  default: ({ isEditing, handleIndividualDelete }) => (
+  default: ({ isEditing, handleIndividualDelete, setSelectedTaskIds, setModifiedTaskIds, setTasks }) => (
     <div data-testid="mock-tasks-table">
       <span>Editing Mode: {isEditing ? 'Yes' : 'No'}</span>
       <button onClick={() => handleIndividualDelete(101)}>Delete Task 101</button>
+      <button onClick={() => setSelectedTaskIds(new Set([101]))}>Select Task 101</button>
+      <button onClick={() => {
+        setTasks(prev => prev.map(t => t.id === 101 ? { ...t, planned_start_date: '2026-07-03' } : t));
+        setModifiedTaskIds(new Set([101]));
+      }}>Modify Task 101</button>
     </div>
   )
 }));
@@ -53,7 +59,9 @@ vi.mock('../../../services/SprintServices', () => ({
   default: {
     getSprintDetails: vi.fn(),
     getSprintNotes: vi.fn(),
-    getAISuggestedSchedule: vi.fn()
+    getAISuggestedSchedule: vi.fn(),
+    deleteSprintTask: vi.fn(),
+    importSchedule: vi.fn()
   }
 }));
 
@@ -71,6 +79,11 @@ vi.mock('../../../components/layout/MainLayouut', () => ({
   useTheme: vi.fn()
 }));
 
+// Mock Auth Context
+vi.mock('../../../context/AuthContext', () => ({
+  useAuth: vi.fn()
+}));
+
 describe('SprintDetail Page Component', () => {
   const toastMock = { success: vi.fn(), error: vi.fn() };
   const confirmMock = vi.fn();
@@ -78,10 +91,13 @@ describe('SprintDetail Page Component', () => {
   const mockSprintData = {
     id: 42,
     project: 1,
+    project_name: 'SprintPilot AI',
     milestone: 'Sprint 2026-A',
     status: 'ACTIVE',
+    project_status: 'ACTIVE',
     start_date: '2026-07-01',
     end_date: '2026-07-15',
+    holidays: [{ date: '2026-07-04', description: 'Independence Day' }],
     tasks: [
       {
         id: 101,
@@ -90,7 +106,9 @@ describe('SprintDetail Page Component', () => {
         status: 'OPEN',
         planned_start_date: '2026-07-01',
         planned_end_date: '2026-07-05',
-        estimated_hours: 8
+        estimated_hours: 8,
+        synced_at: null,
+        updated_at: '2026-07-02T10:00:00Z'
       }
     ]
   };
@@ -104,13 +122,14 @@ describe('SprintDetail Page Component', () => {
     useToast.mockReturnValue(toastMock);
     useConfirm.mockReturnValue(confirmMock);
     useTheme.mockReturnValue({ darkMode: false });
+    useAuth.mockReturnValue({ user: { role: 'PROJECT_MANAGER' } });
 
     SprintServices.getSprintDetails.mockResolvedValue(mockSprintData);
-    apiClient.get.mockResolvedValue({ data: { members: mockEmployees } });
+    apiClient.get.mockResolvedValue({ data: mockEmployees });
     SprintServices.getSprintNotes.mockResolvedValue([]);
   });
 
-  it('loads and renders sprint detail fields and mocked subcomponents', async () => {
+  const renderComponent = () =>
     render(
       <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
         <Routes>
@@ -119,11 +138,13 @@ describe('SprintDetail Page Component', () => {
       </MemoryRouter>
     );
 
-    // Initial page loading indicator
-    expect(screen.getByText(/Loading sprint/i)).toBeInTheDocument();
+  it('loads and renders sprint detail fields and mocked subcomponents', async () => {
+    renderComponent();
+
+    expect(screen.getByText(/Loading Sprint Details.../i)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.queryByText(/Loading sprint/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Loading Sprint Details.../i)).not.toBeInTheDocument();
     });
 
     expect(screen.getByText('Sprint 2026-A')).toBeInTheDocument();
@@ -131,14 +152,20 @@ describe('SprintDetail Page Component', () => {
     expect(screen.getByTestId('mock-notes-section')).toBeInTheDocument();
   });
 
-  it('triggers manual edit mode when Update is clicked', async () => {
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
+  it('renders fallback when sprint data returns null', async () => {
+    SprintServices.getSprintDetails.mockResolvedValue(null);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Sprint details could not be found.')).toBeInTheDocument();
+    });
+  });
+
+  it('triggers manual edit mode, modifies task, and saves to backend', async () => {
+    SprintServices.importSchedule.mockResolvedValue({});
+
+    renderComponent();
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
@@ -151,60 +178,118 @@ describe('SprintDetail Page Component', () => {
     fireEvent.click(editBtn);
 
     expect(screen.getByText('Editing Mode: Yes')).toBeInTheDocument();
+
+    // Modify task via mocked table button
+    fireEvent.click(screen.getByText('Modify Task 101'));
+
+    // Click Save
+    const saveBtn = screen.getByRole('button', { name: /Save/i });
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
+
+    expect(SprintServices.importSchedule).toHaveBeenCalledWith('42', [
+      expect.objectContaining({ task_id: 101, planned_start_date: '2026-07-03' })
+    ]);
   });
 
   it('calls delete API and triggers toast when deleting a task', async () => {
     confirmMock.mockResolvedValue(true);
-    apiClient.delete.mockResolvedValue({});
+    SprintServices.deleteSprintTask.mockResolvedValue({});
 
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderComponent();
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
     });
 
-    // Click mock delete button inside tasks table
     const deleteBtn = screen.getByText('Delete Task 101');
     await act(async () => {
       fireEvent.click(deleteBtn);
     });
 
     expect(confirmMock).toHaveBeenCalled();
-    expect(apiClient.delete).toHaveBeenCalledWith('sprints/tasks/101/');
+    expect(SprintServices.deleteSprintTask).toHaveBeenCalledWith(101);
     expect(toastMock.success).toHaveBeenCalledWith('Task deleted successfully.');
   });
 
-  it('opens Add Task and Jira Sync modals on button clicks', async () => {
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
+  it('handles bulk delete tasks flow', async () => {
+    confirmMock.mockResolvedValue(true);
+    apiClient.post.mockResolvedValue({});
+
+    renderComponent();
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
     });
 
-    // Modals are not open initially
+    // Select task via mock table callback
+    fireEvent.click(screen.getByText('Select Task 101'));
+
+    const bulkDeleteBtn = screen.getByRole('button', { name: /Delete Selected/i });
+    await act(async () => {
+      fireEvent.click(bulkDeleteBtn);
+    });
+
+    expect(confirmMock).toHaveBeenCalled();
+    expect(apiClient.post).toHaveBeenCalledWith('sprints/tasks/bulk-delete/', { task_ids: [101] });
+    expect(toastMock.success).toHaveBeenCalledWith('Selected tasks deleted successfully.');
+  });
+
+  it('handles error when bulk delete fails', async () => {
+    confirmMock.mockResolvedValue(true);
+    apiClient.post.mockRejectedValue(new Error('Bulk delete failed'));
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Select Task 101'));
+
+    const bulkDeleteBtn = screen.getByRole('button', { name: /Delete Selected/i });
+    await act(async () => {
+      fireEvent.click(bulkDeleteBtn);
+    });
+
+    expect(toastMock.error).toHaveBeenCalledWith('Delete failed: Bulk delete failed');
+  });
+
+  it('handles error when deleting individual task fails', async () => {
+    confirmMock.mockResolvedValue(true);
+    SprintServices.deleteSprintTask.mockRejectedValue(new Error('Delete error'));
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    });
+
+    const deleteBtn = screen.getByText('Delete Task 101');
+    await act(async () => {
+      fireEvent.click(deleteBtn);
+    });
+
+    expect(toastMock.error).toHaveBeenCalledWith('Delete failed: Delete error');
+  });
+
+  it('opens Add Task and Jira Sync modals on button clicks', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    });
+
     expect(screen.queryByTestId('mock-add-task-modal')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mock-jira-sync-modal')).not.toBeInTheDocument();
 
-    // Click Add Task button
     const addTaskBtn = screen.getByRole('button', { name: /Add Task/i });
     await act(async () => {
       fireEvent.click(addTaskBtn);
     });
     expect(screen.getByTestId('mock-add-task-modal')).toBeInTheDocument();
 
-    // Click Fetch from Jira button
     const jiraBtn = screen.getByRole('button', { name: /Fetch from Jira/i });
     await act(async () => {
       fireEvent.click(jiraBtn);
@@ -212,50 +297,24 @@ describe('SprintDetail Page Component', () => {
     expect(screen.getByTestId('mock-jira-sync-modal')).toBeInTheDocument();
   });
 
-  it('renders "Sprint Completed" badge when sprint status is COMPLETED', async () => {
+  it('renders "Sprint Completed" and "Project Completed" badges', async () => {
     SprintServices.getSprintDetails.mockResolvedValue({
       ...mockSprintData,
-      status: 'COMPLETED'
+      status: 'COMPLETED',
+      project_status: 'COMPLETED'
     });
 
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderComponent();
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
     });
 
     expect(screen.getByText('Sprint Completed')).toBeInTheDocument();
-  });
-
-  it('renders "Project Completed" badge when project_status is COMPLETED', async () => {
-    SprintServices.getSprintDetails.mockResolvedValue({
-      ...mockSprintData,
-      project_status: 'COMPLETED',
-      status: 'ACTIVE'
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading sprint/i)).not.toBeInTheDocument();
-    }, { timeout: 3000 });
-
     expect(screen.getByText('Project Completed')).toBeInTheDocument();
   });
 
-  it('shows AI scheduling panel when sprint has no scheduled tasks', async () => {
+  it('shows AI scheduling panel when sprint has no scheduled tasks and generates schedule', async () => {
     SprintServices.getSprintDetails.mockResolvedValue({
       ...mockSprintData,
       tasks: [
@@ -271,37 +330,92 @@ describe('SprintDetail Page Component', () => {
       ]
     });
 
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    SprintServices.getAISuggestedSchedule.mockResolvedValue([
+      {
+        task_id: 101,
+        planned_start_date: '2026-07-02',
+        planned_end_date: '2026-07-04',
+        assigned_employee: { id: 9 },
+        reason: 'Optimal workload'
+      }
+    ]);
+
+    renderComponent();
 
     await waitFor(() => {
-      expect(screen.queryByText(/Loading sprint/i)).not.toBeInTheDocument();
-    }, { timeout: 3000 });
+      expect(screen.queryByText(/Loading Sprint Details.../i)).not.toBeInTheDocument();
+    });
 
     expect(screen.getByText('AI Scheduling Suggestions')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Generate AI Schedule/i })).toBeInTheDocument();
+
+    const genBtn = screen.getByRole('button', { name: /Generate AI Schedule/i });
+    await act(async () => {
+      fireEvent.click(genBtn);
+    });
+
+    expect(SprintServices.getAISuggestedSchedule).toHaveBeenCalledWith('42', []);
   });
 
-  it('renders Back to Project Details button', async () => {
+  it('handles sync to backlog modal confirmation and success', async () => {
+    apiClient.post.mockResolvedValue({ data: { detail: 'Synced 1 tasks' } });
 
-    render(
-      <MemoryRouter initialEntries={['/projects/1/sprints/42']}>
-        <Routes>
-          <Route path="/projects/:projectId/sprints/:sprintId" element={<SprintDetail />} />
-        </Routes>
-      </MemoryRouter>
-    );
+    renderComponent();
 
     await waitFor(() => {
-      expect(screen.queryByText(/Loading sprint/i)).not.toBeInTheDocument();
-    }, { timeout: 3000 });
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    });
 
-    const backBtn = screen.getByRole('button', { name: /Back to Project Details/i });
-    expect(backBtn).toBeInTheDocument();
+    const syncBtn = screen.getByRole('button', { name: /Sync to Backlog/i });
+    fireEvent.click(syncBtn);
+
+    expect(screen.getByText('Confirm Sync to Backlog')).toBeInTheDocument();
+
+    const confirmSyncBtn = screen.getByRole('button', { name: /Confirm Sync/i });
+    await act(async () => {
+      fireEvent.click(confirmSyncBtn);
+    });
+
+    expect(apiClient.post).toHaveBeenCalledWith('sprints/42/sync-backlog/', {});
+    expect(toastMock.success).toHaveBeenCalledWith('Success: Synced 1 tasks');
+  });
+
+  it('handles schedule excel download and error handling', async () => {
+    apiClient.get.mockImplementation((url) => {
+      if (url.includes('download-schedule')) {
+        return Promise.reject(new Error('Network download error'));
+      }
+      return Promise.resolve({ data: mockEmployees });
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    });
+
+    const downloadBtn = screen.getByRole('button', { name: /Download/i });
+    await act(async () => {
+      fireEvent.click(downloadBtn);
+    });
+
+    expect(toastMock.error).toHaveBeenCalledWith('Failed to download schedule. Please try again.');
+  });
+
+  it('collapses and expands the Gantt schedule header', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+    });
+
+    const toggleBtn = screen.getByText('AI Optimised Gantt Schedule').closest('button');
+    fireEvent.click(toggleBtn);
+
+    // Section controls hidden
+    expect(screen.queryByRole('button', { name: /Download/i })).not.toBeInTheDocument();
+
+    // Click again to expand
+    fireEvent.click(toggleBtn);
+    expect(screen.getByRole('button', { name: /Download/i })).toBeInTheDocument();
   });
 });
