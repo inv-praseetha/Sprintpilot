@@ -146,6 +146,7 @@ class ProjectService:
                 
                 if tasks:
                     raise ProjectValidationException("Cannot remove member! They still have active tasks that are not CLOSED.")
+                
 
         # Update Project fields
         if has_team_lead and team_lead:
