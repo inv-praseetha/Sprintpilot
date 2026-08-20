@@ -232,67 +232,46 @@ class BacklogSyncService:
         else:
             tasks = sprint.tasks.filter(is_deleted=False)
 
-        import concurrent.futures
-        from django.db import connection
-
-        def process_task(task):
-            res = {"created_count": 0, "updated_count": 0, "up_to_date_count": 0, "error": None}
-            try:
-                if not task.backlog_task_id:
-                    try:
-                        issue_key = backlog_service.sync_task(task)
-                        if issue_key:
-                            task.backlog_task_id = issue_key
-                            task.save()
-                            task.synced_at = task.updated_at
-                            task.save(update_fields=['synced_at'])
-                            res["created_count"] = 1
-                    except Exception as e:
-                        res["error"] = f"Task '{task.title}' (Create): {str(e)}"
-                else:
-                    try:
-                        count = backlog_service.get_issue_comments_count(task.backlog_task_id)
-                        if task.comment_count != count:
-                            task.comment_count = count
-                            task.save(update_fields=['comment_count'])
-                    except Exception:
-                        pass
-
-                    if task.synced_at is not None and task.updated_at <= task.synced_at:
-                        res["up_to_date_count"] = 1
-                        return res
-                        
-                    try:
-                        issue_key = backlog_service.update_task(task)
-                        if issue_key:
-                            task.save()
-                            task.synced_at = task.updated_at
-                            task.save(update_fields=['synced_at'])
-                            res["updated_count"] = 1
-                    except Exception as e:
-                        if str(e) == "NO_CHANGES_DETECTED":
-                            task.save()
-                            task.synced_at = task.updated_at
-                            task.save(update_fields=['synced_at'])
-                            res["up_to_date_count"] = 1
-                        else:
-                            res["error"] = f"Task '{task.title}' (Update): {str(e)}"
-            finally:
-                connection.close()
-            return res
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(process_task, task): task for task in tasks}
-            for future in concurrent.futures.as_completed(futures):
+        for task in tasks:
+            if not task.backlog_task_id:
                 try:
-                    res = future.result()
-                    created_count += res["created_count"]
-                    updated_count += res["updated_count"]
-                    up_to_date_count += res["up_to_date_count"]
-                    if res["error"]:
-                        errors.append(res["error"])
+                    issue_key = backlog_service.sync_task(task)
+                    if issue_key:
+                        task.backlog_task_id = issue_key
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
+                        created_count += 1
                 except Exception as e:
-                    errors.append(f"Thread error: {str(e)}")
+                    errors.append(f"Task '{task.title}' (Create): {str(e)}")
+            else:
+                try:
+                    count = backlog_service.get_issue_comments_count(task.backlog_task_id)
+                    if task.comment_count != count:
+                        task.comment_count = count
+                        task.save(update_fields=['comment_count'])
+                except Exception:
+                    pass
+
+                if task.synced_at is not None and task.updated_at <= task.synced_at:
+                    up_to_date_count += 1
+                    continue
+                    
+                try:
+                    issue_key = backlog_service.update_task(task)
+                    if issue_key:
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
+                        updated_count += 1
+                except Exception as e:
+                    if str(e) == "NO_CHANGES_DETECTED":
+                        task.save()
+                        task.synced_at = task.updated_at
+                        task.save(update_fields=['synced_at'])
+                        up_to_date_count += 1
+                    else:
+                        errors.append(f"Task '{task.title}' (Update): {str(e)}")
 
         return {
             "created_count": created_count,

@@ -18,20 +18,20 @@ export default function ReassignTasksModal({
   // Filter external members based on skills (Must be before early return to follow Rules of Hooks)
   const externalEligibleMembers = useMemo(() => {
     if (!allEmployees || !members) return [];
-    
+
     const currentMemberIds = members.map(m => m.id);
-    
+
     return allEmployees.filter(emp => {
       // Must not be already in the project
       if (currentMemberIds.includes(emp.id)) return false;
       if (emp.id === oldMemberId) return false;
       if (emp.user?.role === 'TEAM_LEAD') return false;
-      
+
       // Must match at least one project skill if project has skills
       const hasSkills = projectSkills && projectSkills.length > 0;
       if (!hasSkills) return true;
-      
-      return emp.skills && emp.skills.some(skill => 
+
+      return emp.skills && emp.skills.some(skill =>
         projectSkills.some(ps => ps.id === skill.id || ps.parent === skill.id || ps.id === skill.parent)
       );
     });
