@@ -322,7 +322,7 @@ export default function ProjectDetail() {
     } catch (err) {
       console.error('[ProjectDetail] Error removing member:', err);
       const errorMsg = err.response?.data?.detail || err.response?.data?.[0] || '';
-      
+
       if (typeof errorMsg === 'string' && errorMsg.includes('active tasks')) {
         setMemberToReassign(memberProfileId);
         setShowReassignModal(true);
