@@ -201,9 +201,44 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_members(self, obj):
-        # Map through prefetched project_members relations (related name is now 'members')
+        from django.utils import timezone
+        from sprints.models import SprintTask
+
+        today = timezone.localdate()
         profiles = [m.employee_profile for m in obj.members.all()]
-        return EmployeeProfileSerializer(profiles, many=True).data
+
+        tasks = SprintTask.objects.filter(
+            sprint__project=obj,
+            sprint__is_deleted=False,
+            is_deleted=False
+        ).values('assigned_employee_id', 'status', 'planned_end_date')
+
+        stats_map = {}
+        for t in tasks:
+            emp_id = t['assigned_employee_id']
+            if not emp_id:
+                continue
+            emp_str = str(emp_id)
+            if emp_str not in stats_map:
+                stats_map[emp_str] = {'pending_tasks': 0, 'on_track_tasks': 0}
+
+            is_closed = t['status'] in ['CLOSED', 'RESOLVED', 'COMPLETED', 'DONE']
+            end_date = t['planned_end_date']
+            is_overdue = (end_date < today) if end_date else False
+
+            if not is_closed and is_overdue:
+                stats_map[emp_str]['pending_tasks'] += 1
+            else:
+                stats_map[emp_str]['on_track_tasks'] += 1
+
+        data = EmployeeProfileSerializer(profiles, many=True).data
+        for member_data in data:
+            emp_str = str(member_data['id'])
+            emp_stats = stats_map.get(emp_str, {'pending_tasks': 0, 'on_track_tasks': 0})
+            member_data['pending_tasks'] = emp_stats['pending_tasks']
+            member_data['on_track_tasks'] = emp_stats['on_track_tasks']
+
+        return data
 
     def get_skills(self, obj):
         # Map through prefetched project_stack relations

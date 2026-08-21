@@ -66,6 +66,8 @@ export default function TeamRoster({
                       <th className="py-4 px-4 font-bold">Role</th>
                       <th className="py-4 px-4 font-bold">Status</th>
                       <th className="py-4 px-4 font-bold">Matching Skills</th>
+                      <th className="py-4 px-4 font-bold text-center">Pending Tasks</th>
+                      <th className="py-4 px-4 font-bold text-center">On Track Tasks</th>
                       {isProjectManager && project?.status !== 'COMPLETED' && <th className="py-4 px-4 text-right font-bold">Actions</th>}
                     </tr>
                   </thead>
@@ -112,6 +114,12 @@ export default function TeamRoster({
                         <td className="py-4 px-4">
                           <span className="text-slate-400 font-bold">—</span>
                         </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="text-slate-400 font-bold">—</span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="text-slate-400 font-bold">—</span>
+                        </td>
                         {isProjectManager && project?.status !== 'COMPLETED' && (
                           <td className="py-4 px-4 text-right">
                             <button
@@ -127,69 +135,81 @@ export default function TeamRoster({
                     )}
 
                     {/* Members Rows */}
-                    {paginatedMembers && paginatedMembers.map((member) => (
-                      <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
-                              {getInitials(member.user.full_name)}
+                    {paginatedMembers && paginatedMembers.map((member) => {
+                      return (
+                        <tr key={member.id} className={`transition-all ${darkMode ? 'hover:bg-slate-850/20' : 'hover:bg-slate-50/40'}`}>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-black text-xs shrink-0">
+                                {getInitials(member.user.full_name)}
+                              </div>
+                              <div>
+                                <span className={`block font-extrabold text-sm truncate max-w-[150px] ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                  {member.user.full_name}
+                                </span>
+                                <span className="block text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[150px]">
+                                  {member.user.email}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <span className={`block font-extrabold text-sm truncate max-w-[150px] ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                                {member.user.full_name}
-                              </span>
-                              <span className="block text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[150px]">
-                                {member.user.email}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350 truncate max-w-[150px] inline-block">
-                            {member.designation || 'Team Member'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${member.status === 'BUSY'
-                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
-                              : member.status === 'ACTIVE'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                                : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                            }`}>
-                            {member.status || 'ACTIVE'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          {project?.skills && project.skills.length > 0 && member.skills && member.skills.some(s => project.skills.some(ps => ps.id === s.id)) ? (
-                            <div className="flex flex-wrap gap-1">
-                              {member.skills
-                                .filter((s) => project.skills.some((ps) => ps.id === s.id))
-                                .map((s) => (
-                                  <span
-                                    key={s.id}
-                                    className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
-                                  >
-                                    {s.name}
-                                  </span>
-                                ))}
-                            </div>
-                          ) : (
-                            <span className="text-xs font-bold text-slate-400">—</span>
-                          )}
-                        </td>
-                        {isProjectManager && project?.status !== 'COMPLETED' && (
-                          <td className="py-4 px-4 text-right">
-                            <button
-                              onClick={() => handleRemoveMember(member.id)}
-                              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              title="Remove Member"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </td>
-                        )}
-                      </tr>
-                    ))}
+                          <td className="py-4 px-4">
+                            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-350 truncate max-w-[150px] inline-block">
+                              {member.designation || 'Team Member'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${member.status === 'BUSY'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                                : member.status === 'ACTIVE'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                              }`}>
+                              {member.status || 'ACTIVE'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            {project?.skills && project.skills.length > 0 && member.skills && member.skills.some(s => project.skills.some(ps => ps.id === s.id)) ? (
+                              <div className="flex flex-wrap gap-1">
+                                {member.skills
+                                  .filter((s) => project.skills.some((ps) => ps.id === s.id))
+                                  .map((s) => (
+                                    <span
+                                      key={s.id}
+                                      className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-500/10 text-orange-655 dark:text-orange-400 border border-orange-500/20"
+                                    >
+                                      {s.name}
+                                    </span>
+                                  ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-black bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/20 inline-block">
+                              {member.pending_tasks ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 inline-block">
+                              {member.on_track_tasks ?? 0}
+                            </span>
+                          </td>
+                          {isProjectManager && project?.status !== 'COMPLETED' && (
+                            <td className="py-4 px-4 text-right">
+                              <button
+                                onClick={() => handleRemoveMember(member.id)}
+                                className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title="Remove Member"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
