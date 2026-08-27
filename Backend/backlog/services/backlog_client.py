@@ -194,13 +194,19 @@ class BacklogService:
             "priorityId": priority_id
         }
 
-        # Add milestone if sprint is available
+        # Add milestone if sprint is available (Now Mandatory)
         if hasattr(task, 'sprint') and task.sprint:
             milestone_name = getattr(task.sprint, 'milestone', getattr(task.sprint, 'name', None))
             if milestone_name:
                 version_id = self._get_or_create_version(project_id, milestone_name)
                 if version_id:
                     payload["milestoneId[]"] = version_id
+                else:
+                    raise ValueError(f"Milestone '{milestone_name}' could not be found or created in Backlog.")
+            else:
+                raise ValueError("The Sprint does not have a valid milestone name.")
+        else:
+            raise ValueError("Task is not assigned to a Sprint. A milestone is required to sync to Backlog.")
 
         # Map Assignee
         if task.assigned_employee and task.assigned_employee.user:
@@ -307,14 +313,23 @@ class BacklogService:
             "statusId": status_map.get(task_status, 1)
         }
 
-        # Add milestone if sprint is available
+        # Add milestone if sprint is available (Now Mandatory)
         if hasattr(task, 'sprint') and task.sprint:
             project_id, _ = self._resolve_project_and_issue_type()
+            if not project_id:
+                raise ValueError("Could not resolve Project ID from Backlog API to set milestone.")
+                
             milestone_name = getattr(task.sprint, 'milestone', getattr(task.sprint, 'name', None))
-            if project_id and milestone_name:
+            if milestone_name:
                 version_id = self._get_or_create_version(project_id, milestone_name)
                 if version_id:
                     payload["milestoneId[]"] = version_id
+                else:
+                    raise ValueError(f"Milestone '{milestone_name}' could not be found or created in Backlog.")
+            else:
+                raise ValueError("The Sprint does not have a valid milestone name.")
+        else:
+            raise ValueError("Task is not assigned to a Sprint. A milestone is required to sync to Backlog.")
         
         # Map Assignee
         if task.assigned_employee and task.assigned_employee.user:
