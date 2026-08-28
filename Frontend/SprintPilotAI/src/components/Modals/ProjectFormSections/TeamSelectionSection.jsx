@@ -87,9 +87,7 @@ export default function TeamSelectionSection({
       </div>
 
       {/* Tech Stack / Skills Category Selector & Multi-Select */}
-      {!editingProjectId && (
-        <>
-          <div className="space-y-3.5 text-left">
+      <div className="space-y-3.5 text-left">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Code className="w-4.5 h-4.5 text-slate-400" /> Technical Stack Required
@@ -355,8 +353,6 @@ export default function TeamSelectionSection({
               </span>
             )}
           </div>
-        </>
-      )}
     </>
   );
 }

@@ -200,10 +200,14 @@ class ProjectService:
 
     @staticmethod
     @transaction.atomic
-    def delete_project(project: Project):
+    def delete_project(project: Project, deleted_by_user=None):
         """
         Soft deletes a project and synchronizes employee statuses.
         """
+        from sprints.models import Sprint, SprintTask
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Get member profiles associated with this project to sync later
         member_profiles = list(EmployeeProfile.objects.filter(project_memberships__project=project))
         profiles_to_sync = [p.id for p in member_profiles]
@@ -212,13 +216,106 @@ class ProjectService:
             if lead_profile:
                 profiles_to_sync.append(lead_profile.id)
         
+        sprints = Sprint.objects.filter(project=project)
+        sprint_count = sprints.filter(is_deleted=False).count()
+        open_task_count = SprintTask.objects.filter(sprint__in=sprints, is_deleted=False).exclude(status__in=['CLOSED', 'RESOLVED']).count()
+
+        sprint_details = []
+        for sprint in sprints.filter(is_deleted=False):
+            tasks = SprintTask.objects.filter(sprint=sprint, is_deleted=False)
+            closed_tasks = tasks.filter(status__in=['CLOSED', 'RESOLVED']).count()
+            open_tasks = tasks.exclude(status__in=['CLOSED', 'RESOLVED']).count()
+            sprint_details.append({
+                'name': sprint.name,
+                'open': open_tasks,
+                'closed': closed_tasks
+            })
+
+        # Try to delete from backlog
+        try:
+            from backlog.services.backlog_client import BacklogService
+            backlog_service = BacklogService(project_key=project.project_id)
+            tasks_with_backlog = SprintTask.objects.filter(sprint__in=sprints, is_deleted=False, backlog_task_id__isnull=False).exclude(backlog_task_id='')
+            for task in tasks_with_backlog:
+                try:
+                    backlog_service.delete_issue(task.backlog_task_id)
+                except Exception as e:
+                    logger.error(f"Failed to delete backlog issue {task.backlog_task_id}: {e}")
+            
+            backlog_service.delete_project()
+        except Exception as e:
+            logger.error(f"Failed to delete backlog project/issues: {e}")
+
+        # Send Email
+        team_lead_email = project.team_lead.email if project.team_lead else None
+        if team_lead_email:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            
+            manager_name = deleted_by_user.full_name if deleted_by_user else "Unknown Manager"
+            subject = f"Alert: Project '{project.name}' has been deleted"
+            
+            sprint_rows = ""
+            for sd in sprint_details:
+                sprint_rows += f'''
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #e2e8f0;">{sd['name']}</td>
+                    <td style="padding: 10px; border: 1px solid #e2e8f0; color: #f59e0b; font-weight: bold;">{sd['open']}</td>
+                    <td style="padding: 10px; border: 1px solid #e2e8f0; color: #10b981; font-weight: bold;">{sd['closed']}</td>
+                </tr>
+                '''
+            
+            if not sprint_rows:
+                sprint_rows = '<tr><td colspan="3" style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b;">No sprints were found in this project.</td></tr>'
+
+            html_message = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <div style="background-color: #ef4444; color: white; padding: 20px; text-align: center;">
+                    <h2 style="margin: 0;">Project Deleted</h2>
+                </div>
+                <div style="padding: 20px; background-color: #f8fafc;">
+                    <p>Hello {project.team_lead.full_name},</p>
+                    <p>The project <strong>'{project.name}'</strong> has been permanently deleted from Sprintpilot.</p>
+                    <p><strong>Deleted by:</strong> {manager_name}</p>
+                    <h3 style="margin-top: 20px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px;">Project Summary at Deletion</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; background-color: white;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9;">
+                                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: left;">Sprint Name</th>
+                                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: left;">Open Tasks</th>
+                                <th style="padding: 10px; border: 1px solid #e2e8f0; text-align: left;">Closed Tasks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sprint_rows}
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
+                        This is an automated notification from Sprintpilot. Please do not reply to this email.
+                    </p>
+                </div>
+            </div>
+            '''
+            message = (f"The project '{project.name}' has been deleted by {manager_name}.\n"
+                      f"It had {sprint_count} sprint(s) and {open_task_count} open task(s).\n")
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [team_lead_email],
+                    fail_silently=False,
+                    html_message=html_message
+                )
+            except Exception as e:
+                logger.error(f"Failed to send email: {e}")
+        
         project.is_deleted = True
         project.save(update_fields=["is_deleted", "updated_at"])
         
         # Soft delete related SprintTasks (Cascade)
-        from sprints.models import Sprint, SprintTask
-        sprints = Sprint.objects.filter(project=project)
         SprintTask.objects.filter(sprint__in=sprints).update(is_deleted=True)
+        sprints.update(is_deleted=True)
         
         # Synchronize statuses of all involved profiles
         ProjectService.sync_employee_statuses(profiles_to_sync)

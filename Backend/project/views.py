@@ -284,7 +284,7 @@ class ProjectDetailView(APIView):
         
         try:
             # Deletion logic moved to Service layer for Transactional Safety
-            ProjectService.delete_project(project)
+            ProjectService.delete_project(project, deleted_by_user=request.user)
                     
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
@@ -372,15 +372,31 @@ class ProjectReassignAndRemoveMemberView(APIView):
             # Ensure the new assignee is actually a member of the project
             ProjectMember.objects.get_or_create(project=project, employee_profile_id=new_member_id)
 
-            SprintTask.objects.filter(
+            from django.utils import timezone
+            tasks_to_update = SprintTask.objects.filter(
                 sprint__project=project,
                 assigned_employee_id=old_member_id,
                 is_deleted=False
-            ).exclude(status='CLOSED').update(assigned_employee_id=new_member_id)
+            ).exclude(status='CLOSED')
+
+            affected_sprints = {}
+            for t in tasks_to_update:
+                sprint_id = str(t.sprint_id)
+                if sprint_id not in affected_sprints:
+                    affected_sprints[sprint_id] = []
+                affected_sprints[sprint_id].append(str(t.id))
+
+            tasks_to_update.update(
+                assigned_employee_id=new_member_id,
+                updated_at=timezone.now()
+            )
 
             ProjectMember.objects.filter(project=project, employee_profile_id=old_member_id).delete()
 
-        return Response({"detail": "Tasks reassigned and member removed successfully."}, status=status.HTTP_200_OK)
+        return Response({
+            "detail": "Tasks reassigned and member removed successfully.",
+            "affected_sprints": affected_sprints
+        }, status=status.HTTP_200_OK)
 
 class DashboardView(APIView):
     """
@@ -444,4 +460,27 @@ class DashboardView(APIView):
             'status_distribution': status_distribution,
             'due_today': due_today,
             'due_tomorrow': due_tomorrow
+        }, status=status.HTTP_200_OK)
+
+
+class ProjectDeleteSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsProjectManager()]
+
+    def get(self, request, pk, *args, **kwargs):
+        try:
+            project = Project.objects.get(pk=pk, is_deleted=False)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        from sprints.models import Sprint, SprintTask
+        sprints = Sprint.objects.filter(project=project, is_deleted=False)
+        sprint_count = sprints.count()
+        open_task_count = SprintTask.objects.filter(sprint__in=sprints, is_deleted=False).exclude(status__in=['CLOSED', 'RESOLVED']).count()
+        
+        return Response({
+            "sprint_count": sprint_count,
+            "open_task_count": open_task_count
         }, status=status.HTTP_200_OK)
