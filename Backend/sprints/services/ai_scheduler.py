@@ -153,7 +153,9 @@ Rules & Constraints:
               - H = H - 8.0.
      d. Transition/Overlap Days: If a task ends on a date with leftover capacity > 0, the next task in the sequence MUST start on that exact same date to consume the remaining capacity (resulting in an overlap where Task A's planned_end_date matches Task B's planned_start_date).
      e. Strict Daily Cap: For any single employee and any given date, the sum of hours allocated to all tasks scheduled on that day MUST NOT exceed 8.0 hours under any circumstances. If a task requires 8 hours, and the employee only has 4 hours capacity left on a day, you MUST start the task on that day (using the 4 hours) and end it on the next working day in the Valid Working Days list (using the remaining 4 hours).
-    - The planned_end_date field in the JSON MUST match the final date of this allocation sequence exactly.
+    - In the `reason` field of the response, write down BOTH:
+     1. Clear explanation of why this employee was selected based on their designation, experience, availability, and specific skills.
+     2. A detailed step-by-step trace of how the hours for that specific task were allocated across the dates and what leftover capacity remained on the final date (e.g. "Selected Ashna due to her Cypress and QA skills. Task starts Aug 10, consumes 8h. Continues Aug 11, consumes 4h. Ends Aug 11 with 4h leftover capacity"). The planned_end_date field in the JSON MUST match the final date of this allocation trace exactly.
 7. Return a list of recommendations, one for each task.
 
 Return the response in the specified schema format.

@@ -425,7 +425,7 @@ describe('TaskUploadModal Component', () => {
     fireEvent.change(dateInputs[0], { target: { value: '2026-07-01' } });
 
     fireEvent.click(screen.getByText('Confirm Import'));
-    expect(await screen.findByText('Task "Task Bad" cannot have negative estimated hours.')).toBeInTheDocument();
+    expect(await screen.findByText(/Estimated hours are mandatory for all tasks. Task "Task Bad" does not have estimated hours provided/i)).toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });

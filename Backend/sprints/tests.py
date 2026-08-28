@@ -169,19 +169,41 @@ class SprintAPITests(APITestCase):
                     "title": "Task UI New",
                     "category": "UI",
                     "priority": "High",
-                    "status": "TODO"
+                    "status": "TODO",
+                    "estimated_hours": 8.0
                 },
                 {
                     "title": "Task Backend New",
                     "category": "BACKEND",
                     "priority": "Normal",
-                    "status": "IN_PROGRESS"
+                    "status": "IN_PROGRESS",
+                    "estimated_hours": 16.0
                 }
             ]
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['milestone'], "Sprint 2")
+
+    def test_create_sprint_missing_estimated_hours_blocked(self):
+        url = reverse('sprint_list_create', kwargs={'project_id': self.active_project.id})
+        data = {
+            "milestone": "Sprint 3",
+            "start_date": str(datetime.date.today() + datetime.timedelta(days=15)),
+            "end_date": str(datetime.date.today() + datetime.timedelta(days=29)),
+            "status": "PLANNED",
+            "tasks": [
+                {
+                    "title": "Task Missing Hours",
+                    "category": "UI",
+                    "priority": "High",
+                    "status": "TODO"
+                }
+            ]
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Estimated hours are mandatory for task 'Task Missing Hours'", response.data['detail'])
 
     def test_create_sprint_completed_project_blocked(self):
         url = reverse('sprint_list_create', kwargs={'project_id': self.completed_project.id})
@@ -429,7 +451,8 @@ class SprintAPITests(APITestCase):
             "assigned_employee_id": str(self.profile.id),
             "planned_start_date": str(self.sprint.start_date),
             "planned_end_date": str(self.sprint.start_date + datetime.timedelta(days=1)),
-            "description": "This is a new backend task."
+            "description": "This is a new backend task.",
+            "estimated_hours": 16.0
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -453,7 +476,8 @@ class SprintAPITests(APITestCase):
             "assigned_employee_id": str(self.profile.id),
             "planned_start_date": str(start_date),
             "planned_end_date": str(end_date),
-            "description": "Story points test description"
+            "description": "Story points test description",
+            "estimated_hours": 40.0
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

@@ -480,6 +480,20 @@ class SprintService:
                 if not title:
                     continue
 
+                est_hours_raw = task_item.get('estimated_hours')
+                if est_hours_raw is None or est_hours_raw == '':
+                    est_hours_raw = task_item.get('estimatedHours')
+
+                if est_hours_raw is None or est_hours_raw == '':
+                    raise ValueError(f"Estimated hours are mandatory for task '{title}'. Please provide estimated hours for all tasks.")
+
+                try:
+                    est_hours_val = float(est_hours_raw)
+                    if est_hours_val <= 0:
+                        raise ValueError(f"Estimated hours must be greater than 0 for task '{title}'.")
+                except (ValueError, TypeError):
+                    raise ValueError(f"Invalid estimated hours for task '{title}'. Must be a valid number.")
+
                 cat_val = task_item.get('category', 'UI')
                 if isinstance(cat_val, list):
                     cat = ", ".join(cat_val)
@@ -512,7 +526,7 @@ class SprintService:
                     priority=priority,
                     status=status_val,
                     story_points=task_item.get('story_points') or task_item.get('storyPoints') or None,
-                    estimated_hours=task_item.get('estimated_hours') or task_item.get('estimatedHours') or None,
+                    estimated_hours=est_hours_val,
                     planned_start_date=task_item.get('planned_start_date') or None,
                     planned_end_date=task_item.get('planned_end_date') or None,
                     backlog_task_id=task_item.get('backlog_task_id') or ''

@@ -153,12 +153,19 @@ describe('AddTaskModal Component', () => {
     // Fill end date
     fireEvent.change(dateInputs[1], { target: { value: '2026-07-06' } });
 
+    // Missing estimated hours
+    fireEvent.submit(form);
+    expect(await screen.findByText('Estimated hours are required and must be greater than 0.')).toBeInTheDocument();
+
+    // Fill estimated hours
+    fireEvent.change(screen.getByPlaceholderText(/e.g. 12/i), { target: { value: '8' } });
+
     // Missing description
     fireEvent.submit(form);
     expect(await screen.findByText('Description is required.')).toBeInTheDocument();
   });
 
-  it('validates negative estimated hours error', async () => {
+  it('validates invalid or zero estimated hours error', async () => {
     const { container } = render(<AddTaskModal {...defaultProps} />);
 
     fireEvent.change(screen.getByPlaceholderText(/e.g. Implement User Authentication Flow/i), { target: { value: 'Task' } });
@@ -170,7 +177,7 @@ describe('AddTaskModal Component', () => {
     fireEvent.change(screen.getByPlaceholderText(/e.g. 12/i), { target: { value: '-5' } });
 
     fireEvent.submit(container.querySelector('form'));
-    expect(await screen.findByText('Estimated hours cannot be negative.')).toBeInTheDocument();
+    expect(await screen.findByText('Estimated hours are required and must be greater than 0.')).toBeInTheDocument();
   });
 
   it('handles API error when createSprintTask fails', async () => {
@@ -185,6 +192,7 @@ describe('AddTaskModal Component', () => {
     const dateInputs = container.querySelectorAll('input[type="date"]');
     fireEvent.change(dateInputs[0], { target: { value: '2026-07-01' } });
     fireEvent.change(dateInputs[1], { target: { value: '2026-07-02' } });
+    fireEvent.change(screen.getByPlaceholderText(/e.g. 12/i), { target: { value: '8' } });
     fireEvent.change(screen.getByPlaceholderText(/Enter task detailed description.../i), { target: { value: 'Desc' } });
 
     fireEvent.submit(container.querySelector('form'));

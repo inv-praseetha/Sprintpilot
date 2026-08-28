@@ -461,7 +461,7 @@ export default function TaskUploadModal({
           let parsedEstHours = null;
           if (estHoursVal !== undefined && estHoursVal !== null && estHoursVal !== '') {
             const num = parseFloat(estHoursVal);
-            if (!isNaN(num)) {
+            if (!isNaN(num) && num > 0) {
               parsedEstHours = num;
             }
           }
@@ -481,6 +481,12 @@ export default function TaskUploadModal({
         } else {
           setExcelData(parsedRows.map(t => ({ ...t, selected: true, initialJiraId: t.jiraId || '' })));
           
+          // Check if any row is missing estimated hours
+          const missingHoursTask = parsedRows.find(t => t.estimated_hours === null || t.estimated_hours === undefined || t.estimated_hours <= 0);
+          if (missingHoursTask) {
+            setErrorMsg(`Estimated hours are mandatory for all tasks. Task "${missingHoursTask.title}" is missing estimated hours. Please update your Excel file with estimated hours and re-upload.`);
+          }
+
           // Dynamically append any newly discovered categories from Excel to availableCategories
           const fileCats = parsedRows.map(r => r.category).filter(Boolean);
           setAvailableCategories(prev => {
@@ -540,11 +546,9 @@ export default function TaskUploadModal({
         setErrorMsg(`Task "${t.title}" must have a category.`);
         return;
       }
-      if (t.estimated_hours !== undefined && t.estimated_hours !== null) {
-        if (parseFloat(t.estimated_hours) < 0) {
-          setErrorMsg(`Task "${t.title}" cannot have negative estimated hours.`);
-          return;
-        }
+      if (t.estimated_hours === undefined || t.estimated_hours === null || t.estimated_hours === '' || isNaN(parseFloat(t.estimated_hours)) || parseFloat(t.estimated_hours) <= 0) {
+        setErrorMsg(`Estimated hours are mandatory for all tasks. Task "${t.title}" does not have estimated hours provided. Please update the file with estimated hours and re-upload.`);
+        return;
       }
     }
 
@@ -1047,7 +1051,13 @@ export default function TaskUploadModal({
                                 />
                               </div>
                             </td>
-                            <td className="py-2 px-3 text-slate-400 font-semibold">{row.estimated_hours !== null && row.estimated_hours !== undefined ? `${row.estimated_hours}h` : 'N/A'}</td>
+                            <td className="py-2 px-3 font-semibold">
+                              {row.estimated_hours !== null && row.estimated_hours !== undefined && row.estimated_hours > 0 ? (
+                                <span className="text-slate-400">{`${row.estimated_hours}h`}</span>
+                              ) : (
+                                <span className="text-rose-500 font-extrabold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">Required</span>
+                              )}
+                            </td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || 'N/A'}</td>
                           </tr>
                         ))}
@@ -1101,7 +1111,13 @@ export default function TaskUploadModal({
                                 />
                               </div>
                             </td>
-                            <td className="py-2 px-3 text-slate-400 font-semibold">{row.estimated_hours !== null && row.estimated_hours !== undefined ? `${row.estimated_hours}h` : 'N/A'}</td>
+                            <td className="py-2 px-3 font-semibold">
+                              {row.estimated_hours !== null && row.estimated_hours !== undefined && row.estimated_hours > 0 ? (
+                                <span className="text-slate-400">{`${row.estimated_hours}h`}</span>
+                              ) : (
+                                <span className="text-rose-500 font-extrabold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">Required</span>
+                              )}
+                            </td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || row.initialJiraId || 'N/A'}</td>
                           </tr>
                         ))}

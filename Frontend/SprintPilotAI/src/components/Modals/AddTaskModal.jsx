@@ -150,19 +150,17 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
       setError('Planned Start Date must be before or equal to Planned End Date.');
       return;
     }
-    if (formData.estimated_hours) {
-      const hoursVal = parseFloat(formData.estimated_hours);
-      if (isNaN(hoursVal) || hoursVal < 0) {
-        setError('Estimated hours cannot be negative.');
+    if (!formData.estimated_hours || isNaN(parseFloat(formData.estimated_hours)) || parseFloat(formData.estimated_hours) <= 0) {
+      setError('Estimated hours are required and must be greater than 0.');
+      return;
+    }
+    const hoursVal = parseFloat(formData.estimated_hours);
+    if (formData.planned_start_date && formData.planned_end_date && hoursVal > 0) {
+      const workingDays = getWorkingDaysCount(formData.planned_start_date, formData.planned_end_date);
+      const minDays = Math.ceil(hoursVal / 8);
+      if (workingDays < minDays) {
+        setError(`Estimated hours (${formData.estimated_hours}h) require at least ${minDays} working day(s). Selected range has only ${workingDays} working day(s).`);
         return;
-      }
-      if (formData.planned_start_date && formData.planned_end_date && hoursVal > 0) {
-        const workingDays = getWorkingDaysCount(formData.planned_start_date, formData.planned_end_date);
-        const minDays = Math.ceil(hoursVal / 8);
-        if (workingDays < minDays) {
-          setError(`Estimated hours (${formData.estimated_hours}h) require at least ${minDays} working day(s). Selected range has only ${workingDays} working day(s).`);
-          return;
-        }
       }
     }
     if (!formData.description.trim()) {
@@ -410,7 +408,7 @@ export default function AddTaskModal({ show, onClose, sprintId, sprintStartDate,
             </div>
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                Est. Hours
+                Est. Hours <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
