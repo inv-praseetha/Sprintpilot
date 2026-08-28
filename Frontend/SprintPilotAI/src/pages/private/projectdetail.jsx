@@ -11,6 +11,7 @@ import TeamRoster from '../../components/ProjectDetail/TeamRoster';
 import SprintsList from '../../components/ProjectDetail/SprintsList';
 import ProjectOverviewCard from '../../components/ProjectDetail/ProjectOverviewCard';
 import ReassignTasksModal from '../../components/ProjectDetail/ReassignTasksModal';
+import BacklogMultiSyncModal from '../../components/ProjectDetail/BacklogMultiSyncModal';
 import { getEffectiveSkills } from './projectcreation';
 import SprintServices from '../../services/SprintServices';
 import { useToast } from '../../context/ToastContext';
@@ -81,6 +82,10 @@ export default function ProjectDetail() {
   // Reassign Task Modal State
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [memberToReassign, setMemberToReassign] = useState(null);
+  
+  // Backlog Sync Modal States
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncPayload, setSyncPayload] = useState({});
 
   // Initialize and check authentication
   useEffect(() => {
@@ -193,6 +198,7 @@ export default function ProjectDetail() {
         status: sprint.backlog_status,
         progressPercentage: sprint.progress_percentage || 0,
         workspaceUrl: sprint.workspace_url,
+        jiraUrl: sprint.jira_url,
         rawStartDate: sprint.start_date,
         createdAt: sprint.created_at
       };
@@ -334,19 +340,37 @@ export default function ProjectDetail() {
 
   const handleConfirmReassign = async (oldId, newId) => {
     try {
-      await apiClient.post(`projects/${projectId}/reassign-and-remove/`, {
+      const response = await apiClient.post(`projects/${projectId}/reassign-and-remove/`, {
         old_member_id: oldId,
         new_member_id: newId
       });
-      toast.success('Tasks reassigned and member removed successfully!');
-      setShowReassignModal(false);
-      setMemberToReassign(null);
-      await fetchProjectData();
-      await fetchSprints();
+      
+      const affectedSprints = response.data.affected_sprints || {};
+      
+      if (Object.keys(affectedSprints).length > 0) {
+        setSyncPayload(affectedSprints);
+        setShowReassignModal(false);
+        setMemberToReassign(null);
+        setShowSyncModal(true); // Open the sync modal
+      } else {
+        toast.success('Tasks reassigned and member removed successfully!');
+        setShowReassignModal(false);
+        setMemberToReassign(null);
+        await fetchProjectData();
+        await fetchSprints();
+      }
     } catch (err) {
       console.error('[ProjectDetail] Error reassigning tasks:', err);
       toast.error(err.response?.data?.detail || 'Failed to reassign tasks.');
     }
+  };
+
+  const handleSyncComplete = async () => {
+    setShowSyncModal(false);
+    setSyncPayload({});
+    toast.success('Member removed and Backlog synced successfully!');
+    await fetchProjectData();
+    await fetchSprints();
   };
 
   const handleImportSuccess = async ({ milestoneName, tasks, holidays, sprintStartDate, sprintEndDate, targetProjectKey, jiraSprintName }) => {
@@ -618,6 +642,13 @@ export default function ProjectDetail() {
         onConfirmReassign={handleConfirmReassign}
         allEmployees={employees}
         projectSkills={project?.skills || []}
+      />
+
+      <BacklogMultiSyncModal
+        isOpen={showSyncModal}
+        darkMode={darkMode}
+        affectedSprints={syncPayload}
+        onComplete={handleSyncComplete}
       />
     </div>
   );

@@ -52,13 +52,11 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     team_size = serializers.IntegerField(required=False, default=1, validators=[MinValueValidator(1)])
     members = serializers.ListField(
         child=serializers.UUIDField(), 
-        required=False, 
-        default=list
+        required=False
     )
     skills = serializers.ListField(
         child=serializers.UUIDField(), 
-        required=False, 
-        default=list
+        required=False
     )
 
     class Meta:

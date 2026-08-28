@@ -64,6 +64,12 @@ class Project(models.Model):
         null=True, 
         blank=True
     )
+    jira_board_id = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="The ID of the primary Jira board for this project, used to construct backlog URLs."
+    )
     name = models.CharField(max_length=255, validators=[MinLengthValidator(3)])
     description = models.TextField(null=True, blank=True, validators=[MinLengthValidator(10), MaxLengthValidator(5000)])
     created_by = models.ForeignKey(

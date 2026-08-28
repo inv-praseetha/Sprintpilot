@@ -173,16 +173,16 @@ class BacklogSyncService:
                     logger.error(f"Database/Validation failure for Backlog Issue {issue_key}. Error: {e}")
                     failed_count += 1
 
-        # Auto-close sprints if all tasks are CLOSED
+        # Auto-close sprints if their end date has passed
         from sprints.models import Sprint
+        current_date = timezone.now().date()
         for project in projects:
             sprints = project.sprints.filter(status__in=[Sprint.Status.ACTIVE, Sprint.Status.PLANNED])
             for sprint in sprints:
-                tasks = sprint.tasks.filter(is_deleted=False)
-                if tasks.exists() and not tasks.exclude(status__in=[SprintTask.Status.CLOSED, SprintTask.Status.RESOLVED]).exists():
+                if sprint.end_date and sprint.end_date < current_date:
                     sprint.status = Sprint.Status.COMPLETED
                     sprint.save()
-                    logger.info(f"Auto-closed Sprint #{sprint.id} as all tasks are CLOSED/RESOLVED")
+                    logger.info(f"Auto-closed Sprint #{sprint.id} as its end date ({sprint.end_date}) has passed")
 
         duration = (timezone.now() - start_time).total_seconds()
         

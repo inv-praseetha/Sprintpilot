@@ -691,15 +691,22 @@ export default function SprintDetail() {
                       <button
                         onClick={handleSyncClick}
                         disabled={isSyncing || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || !isSyncNeeded}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
-                            ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-655'
-                          }`}
+                        className={`relative px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isSyncNeeded && !isSyncing
+                            ? (darkMode ? 'border-red-900/40 hover:bg-red-900/20 text-red-400' : 'border-red-200 hover:bg-red-50 text-red-600')
+                            : (darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-200 hover:bg-slate-50 text-slate-655')
+                        }`}
                       >
+                        {isSyncNeeded && !isSyncing && (
+                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                          </span>
+                        )}
                         {isSyncing ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                          <Loader2 className={`w-3.5 h-3.5 animate-spin ${isSyncNeeded ? '' : 'text-slate-400'}`} />
                         ) : (
-                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncNeeded ? '' : 'text-slate-400'}`} />
                         )}
                         Sync
                       </button>
@@ -783,15 +790,22 @@ export default function SprintDetail() {
                       <button
                         onClick={handleSyncClick}
                         disabled={isSyncing || isSyncingJira || sprint?.project_status === 'COMPLETED' || sprint?.status === 'COMPLETED' || !isSyncNeeded}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode
-                            ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                          }`}
+                        className={`relative px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isSyncNeeded && !isSyncing
+                            ? (darkMode ? 'border-red-900/40 hover:bg-red-900/20 text-red-400' : 'border-red-200 hover:bg-red-50 text-red-600')
+                            : (darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-200 hover:bg-slate-50 text-slate-600')
+                        }`}
                       >
+                        {isSyncNeeded && !isSyncing && (
+                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                          </span>
+                        )}
                         {isSyncing ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                          <Loader2 className={`w-3.5 h-3.5 animate-spin ${isSyncNeeded ? '' : 'text-slate-400'}`} />
                         ) : (
-                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncNeeded ? '' : 'text-slate-400'}`} />
                         )}
                         Sync to Backlog
                       </button>

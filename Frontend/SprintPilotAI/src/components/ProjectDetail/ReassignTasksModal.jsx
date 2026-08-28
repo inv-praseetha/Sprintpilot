@@ -12,17 +12,17 @@ export default function ReassignTasksModal({
   projectSkills
 }) {
   const [selectedInternalId, setSelectedInternalId] = useState('');
-  const [selectedExternalId, setSelectedExternalId] = useState('');
+  const [addedMembers, setAddedMembers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter external members based on skills (Must be before early return to follow Rules of Hooks)
   const externalEligibleMembers = useMemo(() => {
     if (!allEmployees || !members) return [];
 
-    const currentMemberIds = members.map(m => m.id);
+    const currentMemberIds = [...members.map(m => m.id), ...addedMembers.map(m => m.id)];
 
     return allEmployees.filter(emp => {
-      // Must not be already in the project
+      // Must not be already in the project or added locally
       if (currentMemberIds.includes(emp.id)) return false;
       if (emp.id === oldMemberId) return false;
       if (emp.user?.role === 'TEAM_LEAD') return false;
@@ -35,23 +35,21 @@ export default function ReassignTasksModal({
         projectSkills.some(ps => ps.id === skill.id || ps.parent === skill.id || ps.id === skill.parent)
       );
     });
-  }, [allEmployees, members, projectSkills, oldMemberId]);
+  }, [allEmployees, members, projectSkills, oldMemberId, addedMembers]);
 
   if (!isOpen) return null;
 
   // Filter out the member being removed so they can't reassign to themselves
-  const eligibleMembers = members.filter(m => m.id !== oldMemberId);
+  const baseEligibleMembers = members.filter(m => m.id !== oldMemberId);
+  const eligibleMembers = [...baseEligibleMembers, ...addedMembers];
   const oldMember = members.find(m => m.id === oldMemberId);
-
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const finalId = selectedInternalId || selectedExternalId;
-    if (!finalId) return;
+    if (!selectedInternalId) return;
 
     setIsSubmitting(true);
-    await onConfirmReassign(oldMemberId, finalId);
+    await onConfirmReassign(oldMemberId, selectedInternalId);
     setIsSubmitting(false);
   };
 
@@ -73,53 +71,56 @@ export default function ReassignTasksModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-2">
             <label className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Select From Project Members
+              Add Other Eligible Employee
             </label>
             <select
-              value={selectedInternalId}
+              value=""
               onChange={(e) => {
-                setSelectedInternalId(e.target.value);
-                setSelectedExternalId(''); // clear the other
+                const empId = e.target.value;
+                const emp = externalEligibleMembers.find(m => m.id === empId);
+                if (emp) {
+                  setAddedMembers(prev => [...prev, emp]);
+                  setSelectedInternalId(emp.id);
+                }
               }}
               className={`w-full p-3 rounded-xl border text-sm font-semibold outline-none transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-              required={!selectedExternalId}
+              disabled={externalEligibleMembers.length === 0}
             >
-              <option value="" disabled>-- Select a project member --</option>
-              {eligibleMembers.map(m => (
-                <option key={`internal-${m.id}`} value={m.id}>
-                  {m.user.full_name} ({m.designation || 'Member'}) - {m.active_task_count || 0} active tasks
+              <option value="" disabled>
+                {externalEligibleMembers.length > 0 
+                  ? "-- Select to add to project --" 
+                  : "-- No other eligible employees --"}
+              </option>
+              {externalEligibleMembers.map(m => (
+                <option key={`external-${m.id}`} value={m.id}>
+                  {m.user?.full_name} ({m.designation || 'Employee'}) - {m.active_task_count || 0} active tasks
                 </option>
               ))}
             </select>
           </div>
 
-          {externalEligibleMembers.length > 0 && (
-            <div className="space-y-2">
-              <label className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Or Select Other Eligible Employee
-              </label>
-              <select
-                value={selectedExternalId}
-                onChange={(e) => {
-                  setSelectedExternalId(e.target.value);
-                  setSelectedInternalId(''); // clear the other
-                }}
-                className={`w-full p-3 rounded-xl border text-sm font-semibold outline-none transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                required={!selectedInternalId}
-              >
-                <option value="" disabled>-- Select an external employee --</option>
-                {externalEligibleMembers.map(m => (
-                  <option key={`external-${m.id}`} value={m.id}>
-                    {m.user.full_name} ({m.designation || 'Employee'}) - {m.active_task_count || 0} active tasks
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="space-y-2">
+            <label className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Select Assignee (Project Members)
+            </label>
+            <select
+              value={selectedInternalId}
+              onChange={(e) => setSelectedInternalId(e.target.value)}
+              className={`w-full p-3 rounded-xl border text-sm font-semibold outline-none transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+              required
+            >
+              <option value="" disabled>-- Select a project member --</option>
+              {eligibleMembers.map(m => (
+                <option key={`internal-${m.id}`} value={m.id}>
+                  {m.user?.full_name} ({m.designation || 'Member'}) - {m.active_task_count || 0} active tasks
+                </option>
+              ))}
+            </select>
+          </div>
 
           <button
             type="submit"
-            disabled={!(selectedInternalId || selectedExternalId) || isSubmitting}
+            disabled={!selectedInternalId || isSubmitting}
             className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-black uppercase transition-all"
           >
             {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm & Remove Member'}

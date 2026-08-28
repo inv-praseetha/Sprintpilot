@@ -381,12 +381,12 @@ export default function ProjectCreation() {
       setSubmitting(false);
       return;
     }
-    if (!editingProjectId && selectedMembers.length === 0) {
+    if (selectedMembers.length === 0) {
       setFormError("At least one team member must be selected.");
       setSubmitting(false);
       return;
     }
-    if (!editingProjectId && selectedSkills.length === 0) {
+    if (selectedSkills.length === 0) {
       setFormError("At least one skill must be selected.");
       setSubmitting(false);
       return;
@@ -479,9 +479,21 @@ export default function ProjectCreation() {
   };
 
   const handleDeleteProject = async (projectId) => {
+    let sprintCount = 0;
+    let openTaskCount = 0;
+    try {
+      const summaryRes = await apiClient.get(`projects/${projectId}/delete-summary/`);
+      sprintCount = summaryRes.data.sprint_count || 0;
+      openTaskCount = summaryRes.data.open_task_count || 0;
+    } catch (err) {
+      console.error("Error fetching delete summary:", err);
+    }
+
+    const message = `Are you sure you want to delete this project? It has ${sprintCount} sprints and ${openTaskCount} open tasks in those sprints. Upon deletion, an email will be sent to the Team Lead and the project/tasks will be removed from Backlog.`;
+
     const isConfirmed = await confirm({
       title: 'Delete Project',
-      message: 'Are you sure you want to delete this project?',
+      message: message,
       confirmText: 'Delete',
       type: 'danger',
     });

@@ -84,6 +84,20 @@ export default function SprintsList({
                                 <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             )}
+                            {sprint.jiraUrl && (
+                              <a
+                                href={sprint.jiraUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${darkMode ? 'bg-indigo-900/40 hover:bg-indigo-900/70 text-indigo-400' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600'}`}
+                                title="View Board in Jira"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v4.34c0 2.4-1.97 4.34-4.35 4.34-2.4 0-4.34-1.94-4.34-4.34V2h2.56zm-5.2 6.52c0 2.4 1.97 4.35 4.35 4.35h1.78v4.34c0 2.4-1.97 4.35-4.35 4.35-2.4 0-4.35-1.95-4.35-4.35V8.52h2.57zM24 8.52c0 2.4-1.97 4.35-4.35 4.35-2.4 0-4.34-1.95-4.34-4.35V4.17c2.4 0 4.35 1.95 4.35 4.35z"/>
+                                </svg>
+                              </a>
+                            )}
                           </div>
                         </td>
 
@@ -124,13 +138,16 @@ export default function SprintsList({
 
                         {/* Status */}
                         <td className="py-4 px-5">
-                          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${sprint.status === 'CLOSED'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
-                              : sprint.status === 'IN PROGRESS'
-                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
-                                : sprint.status === 'NO TASKS'
-                                  ? 'bg-slate-500/10 text-slate-600 dark:text-slate-455 border border-slate-500/20'
-                                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
+                          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                            sprint.status === 'CLOSED'
+                              ? 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20'
+                              : sprint.status === 'RESOLVED'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455 border border-emerald-500/20'
+                                : sprint.status === 'IN PROGRESS'
+                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-450 border border-blue-500/20'
+                                  : sprint.status === 'NO TASKS'
+                                    ? 'bg-slate-500/10 text-slate-600 dark:text-slate-455 border border-slate-500/20'
+                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-455 border border-amber-500/20'
                             }`}>
                             {sprint.status || 'OPEN'}
                           </span>

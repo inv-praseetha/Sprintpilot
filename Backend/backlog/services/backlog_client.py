@@ -389,6 +389,28 @@ class BacklogService:
             logger.error(f"Failed to delete task {backlog_task_id} in Backlog: {e}")
             raise Exception(f"Failed to delete task in Backlog: {e}")
 
+
+    def delete_project(self):
+        if not self.workspace_url or not self.api_key:
+            raise ValueError("Backlog configuration missing.")
+
+        url = f"{self.workspace_url}/api/v2/projects/{self.project_key}"
+        params = {"apiKey": self.api_key}
+
+        try:
+            response = requests.delete(url, params=params)
+            response.raise_for_status()
+            return True
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                err_text = e.response.text
+                logger.error(f"Backlog response on project delete: {err_text}")
+                if e.response.status_code == 404:
+                    return True
+            logger.error(f"Failed to delete project {self.project_key} in Backlog: {e}")
+            # Don't throw exception, just log it because it might fail if we don't have admin rights
+            return False
+
     def fetch_updated_issues(self, updated_since=None):
         """
         Fetch issues updated since a given timestamp.
