@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, Edit, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Edit, Trash2, Loader2 } from 'lucide-react';
 import { getEffectiveSkills } from '../../pages/private/projectcreation';
 
 export default function ProjectTable({
@@ -10,7 +10,8 @@ export default function ProjectTable({
   handleRowClick,
   handleStatusChange,
   handleEditProject,
-  handleDeleteProject
+  handleDeleteProject,
+  deletingProjectId
 }) {
   return (
     <div className="overflow-x-auto">
@@ -189,14 +190,20 @@ export default function ProjectTable({
                     </button>
                     <button
                       onClick={() => handleDeleteProject(project.id)}
-                      disabled={project.status === 'COMPLETED'}
+                      disabled={project.status === 'COMPLETED' || deletingProjectId === project.id}
                       className={`p-2 rounded-xl border transition-all ${project.status === 'COMPLETED'
                         ? 'bg-rose-500/5 text-rose-400/50 dark:text-rose-400/40 border-rose-500/10 cursor-not-allowed'
+                        : deletingProjectId === project.id
+                        ? 'bg-rose-500/20 text-rose-600 border-rose-500/30 cursor-wait'
                         : 'bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border-rose-500/20 cursor-pointer'
                         }`}
                       title={project.status === 'COMPLETED' ? "Completed projects cannot be deleted" : "Delete Project"}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {deletingProjectId === project.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </td>

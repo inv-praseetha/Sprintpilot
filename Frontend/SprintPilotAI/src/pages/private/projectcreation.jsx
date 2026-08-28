@@ -96,6 +96,7 @@ export default function ProjectCreation() {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [deletingProjectId, setDeletingProjectId] = useState(null);
   const limits = useValidationLimits();
 
   // Pagination States
@@ -500,13 +501,18 @@ export default function ProjectCreation() {
     if (!isConfirmed) {
       return;
     }
+    
+    setDeletingProjectId(projectId);
     try {
       await apiClient.delete(`projects/${projectId}/`);
+      toast.success("Project deleted successfully!");
       fetchProjects(currentPage);
       fetchMetadata();
     } catch (err) {
       console.error("Error deleting project:", err);
       toast.error(err.response?.data?.detail || err.message || "Failed to delete project.");
+    } finally {
+      setDeletingProjectId(null);
     }
   };
 
@@ -594,6 +600,7 @@ export default function ProjectCreation() {
             handleStatusChange={handleStatusChange}
             handleEditProject={handleEditProject}
             handleDeleteProject={handleDeleteProject}
+            deletingProjectId={deletingProjectId}
           />
 
           {/* Pagination Controls */}

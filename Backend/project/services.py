@@ -231,20 +231,23 @@ class ProjectService:
                 'closed': closed_tasks
             })
 
-        # Try to delete from backlog
-        try:
-            from backlog.services.backlog_client import BacklogService
-            backlog_service = BacklogService(project_key=project.project_id)
-            tasks_with_backlog = SprintTask.objects.filter(sprint__in=sprints, is_deleted=False, backlog_task_id__isnull=False).exclude(backlog_task_id='')
-            for task in tasks_with_backlog:
-                try:
-                    backlog_service.delete_issue(task.backlog_task_id)
-                except Exception as e:
-                    logger.error(f"Failed to delete backlog issue {task.backlog_task_id}: {e}")
-            
-            backlog_service.delete_project()
-        except Exception as e:
-            logger.error(f"Failed to delete backlog project/issues: {e}")
+        # Try to delete from backlog ONLY if the project was actually synced
+        is_synced_to_backlog = sprints.filter(backlog_project_id__isnull=False).exclude(backlog_project_id='').exists()
+        
+        if is_synced_to_backlog:
+            try:
+                from backlog.services.backlog_client import BacklogService
+                backlog_service = BacklogService(project_key=project.project_id)
+                tasks_with_backlog = SprintTask.objects.filter(sprint__in=sprints, is_deleted=False, backlog_task_id__isnull=False).exclude(backlog_task_id='')
+                for task in tasks_with_backlog:
+                    try:
+                        backlog_service.delete_issue(task.backlog_task_id)
+                    except Exception as e:
+                        logger.error(f"Failed to delete backlog issue {task.backlog_task_id}: {e}")
+                
+                backlog_service.delete_project()
+            except Exception as e:
+                logger.error(f"Failed to delete backlog project/issues: {e}")
 
         # Send Email
         team_lead_email = project.team_lead.email if project.team_lead else None

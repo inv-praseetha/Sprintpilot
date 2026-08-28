@@ -91,8 +91,13 @@ class JiraIntegrationViewsTest(APITestCase):
         response = self.client.post(url, {})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    @patch('jira_integration.views.requests.get')
     @patch('jira_integration.views.requests.post')
-    def test_jira_fetch_tasks_success(self, mock_post):
+    def test_jira_fetch_tasks_success(self, mock_post, mock_get):
+        # Mock board ID GET
+        mock_get_response = mock_get.return_value
+        mock_get_response.status_code = 200
+        mock_get_response.json.return_value = {"values": [{"id": 123}]}
         # Create token
         JiraOAuthToken.objects.create(
             user=self.user,
@@ -134,8 +139,13 @@ class JiraIntegrationViewsTest(APITestCase):
         response = self.client.post(url, {'project_key': 'TEST', 'sprint_name': 'Sprint 1'})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    @patch('jira_integration.views.requests.get')
     @patch('jira_integration.views.requests.post')
-    def test_jira_sprint_sync_success(self, mock_post):
+    def test_jira_sprint_sync_success(self, mock_post, mock_get):
+        # Mock board ID GET
+        mock_get_response = mock_get.return_value
+        mock_get_response.status_code = 200
+        mock_get_response.json.return_value = {"values": [{"id": 456}]}
         JiraOAuthToken.objects.create(
             user=self.user,
             access_token='acc_tok',
@@ -225,3 +235,22 @@ class JiraIntegrationViewsTest(APITestCase):
         response = self.client.post(url, {'tasks': []}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("No tasks provided to append.", response.data['detail'])
+
+    def test_jira_sprint_append_duplicate_mapping(self):
+        # Create another sprint already mapped to "Sprint 1"
+        Sprint.objects.create(
+            project=self.project,
+            milestone='Sprint 2',
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date() + timezone.timedelta(days=14),
+            status='ACTIVE',
+            backlog_version_id='Sprint 1'
+        )
+        
+        url = reverse('jira_append_tasks', kwargs={'sprint_id': str(self.sprint.id)})
+        tasks_data = [{"title": "Task", "jiraId": "T-1", "category": "UI"}]
+        
+        # Try to map self.sprint to "Sprint 1"
+        response = self.client.post(url, {'sprint_name': 'Sprint 1', 'tasks': tasks_data}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("is already assigned to another sprint", response.data['detail'])
