@@ -109,7 +109,8 @@ export default function JiraSyncModal({
 
   useEffect(() => {
     if (isOpen && sprint) {
-      const defaultName = sprint.backlog_version_id || sprint.milestone || '';
+      const isNumeric = sprint.backlog_version_id && /^\d+$/.test(sprint.backlog_version_id);
+      const defaultName = (sprint.backlog_version_id && !isNumeric) ? sprint.backlog_version_id : (sprint.milestone || '');
       setSearchSprintName(defaultName);
       fetchNewJiraTasks(defaultName);
       

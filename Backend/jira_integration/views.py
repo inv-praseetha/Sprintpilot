@@ -451,9 +451,9 @@ class JiraSprintSyncView(APIView):
                 })
                 
             if len(new_tasks) > 0:
-                return Response({"tasks": new_tasks, "detail": f"Found {len(new_tasks)} new tasks in Jira.", "sprint_name": sprint.backlog_version_id or sprint.milestone}, status=status.HTTP_200_OK)
+                return Response({"tasks": new_tasks, "detail": f"Found {len(new_tasks)} new tasks in Jira.", "sprint_name": sprint_name}, status=status.HTTP_200_OK)
             else:
-                return Response({"tasks": [], "detail": "Sprint is already up to date with Jira. No new tasks found.", "sprint_name": sprint.backlog_version_id or sprint.milestone}, status=status.HTTP_200_OK)
+                return Response({"tasks": [], "detail": "Sprint is already up to date with Jira. No new tasks found.", "sprint_name": sprint_name}, status=status.HTTP_200_OK)
                 
         except Exception as e:
             return Response({"detail": f"An error occurred during Jira sync: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
