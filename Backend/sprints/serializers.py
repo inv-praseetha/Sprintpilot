@@ -140,6 +140,7 @@ class SprintSerializer(serializers.ModelSerializer):
     project_custom_id = serializers.CharField(source='project.project_id', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
     workspace_url = serializers.SerializerMethodField()
+    jira_url = serializers.SerializerMethodField()
     backlog_status = serializers.SerializerMethodField()
     progress_percentage = serializers.SerializerMethodField()
 
@@ -159,6 +160,7 @@ class SprintSerializer(serializers.ModelSerializer):
             'project_custom_id',
             'backlog_version_id',
             'workspace_url',
+            'jira_url',
             'backlog_status',
             'progress_percentage',
             'created_at'
@@ -177,7 +179,26 @@ class SprintSerializer(serializers.ModelSerializer):
             return f"{workspace}/find/{project_key}?allOver=false&fixedVersionId={obj.backlog_version_id}&limit=20&offset=0&order=false&projectId={obj.backlog_project_id}&simpleSearch=true&sort=UPDATED&statusId=1&statusId=2"
         return None
 
+    def get_jira_url(self, obj):
+        tasks_with_jira = obj.tasks.filter(is_deleted=False, jira_id__isnull=False).exclude(jira_id='')
+        if tasks_with_jira.exists():
+            from decouple import config
+            workspace = config('JIRA_WORKSPACE_URL', default='').rstrip('/')
+            project_key = obj.project.jira_id or obj.project.project_id if obj.project else ''
+            if workspace and project_key:
+                board_id = getattr(obj.project, 'jira_board_id', None)
+                if board_id:
+                    # Use rapidView URL which is universally supported across project types and goes directly to the backlog
+                    return f"{workspace}/secure/RapidBoard.jspa?rapidView={board_id}&view=planning"
+                
+                # Fallback to the project's default board/issue view universally using /browse/
+                return f"{workspace}/browse/{project_key}"
+        return None
+
     def get_backlog_status(self, obj):
+        if obj.status == 'COMPLETED':
+            return "CLOSED"
+            
         tasks = obj.tasks.filter(is_deleted=False)
         if not tasks.exists():
             return "NO TASKS"
@@ -185,7 +206,7 @@ class SprintSerializer(serializers.ModelSerializer):
         statuses = [t.status for t in tasks]
         
         if all(s in ['CLOSED', 'RESOLVED', 'COMPLETED', 'DONE'] for s in statuses):
-            return "CLOSED"
+            return "RESOLVED"
             
         if any(s in ['IN_PROGRESS', 'RESOLVED', 'QA', 'IN_REVIEW'] for s in statuses):
             return "IN PROGRESS"

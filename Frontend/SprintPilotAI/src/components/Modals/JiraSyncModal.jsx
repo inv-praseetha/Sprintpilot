@@ -233,6 +233,18 @@ export default function JiraSyncModal({
       return;
     }
 
+    for (let i = 0; i < selectedTasks.length; i++) {
+      const task = selectedTasks[i];
+      if (!task.assignee) {
+        setErrorMsg(`Please select an assignee for task: "${task.title}"`);
+        return;
+      }
+      if (!task.startDate || !task.endDate) {
+        setErrorMsg(`Please select both Start Date and End Date for task: "${task.title}"`);
+        return;
+      }
+    }
+
     setIsSaving(true);
     setErrorMsg('');
     try {

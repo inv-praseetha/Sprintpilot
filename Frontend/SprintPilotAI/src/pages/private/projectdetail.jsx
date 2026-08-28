@@ -198,6 +198,7 @@ export default function ProjectDetail() {
         status: sprint.backlog_status,
         progressPercentage: sprint.progress_percentage || 0,
         workspaceUrl: sprint.workspace_url,
+        jiraUrl: sprint.jira_url,
         rawStartDate: sprint.start_date,
         createdAt: sprint.created_at
       };

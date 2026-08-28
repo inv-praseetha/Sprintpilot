@@ -157,6 +157,28 @@ class JiraTokenExchangeView(APIView):
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+def ensure_jira_board_id(project, project_key, token_obj):
+    """
+    Fetches the Jira board ID for the project and saves it if not already present.
+    """
+    if project.jira_board_id:
+        return
+    try:
+        url = f"https://api.atlassian.com/ex/jira/{token_obj.cloud_id}/rest/agile/1.0/board?projectKeyOrId={project_key}"
+        headers = {
+            "Authorization": f"Bearer {token_obj.access_token}",
+            "Accept": "application/json"
+        }
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            data = res.json()
+            values = data.get("values", [])
+            if values:
+                # Save the first board found for the project
+                project.jira_board_id = str(values[0].get("id"))
+                project.save(update_fields=['jira_board_id'])
+    except Exception as e:
+        print(f"[Jira] Failed to fetch board ID for project {project_key}: {str(e)}")
 
 class JiraFetchTasksView(APIView):
     """
@@ -190,6 +212,9 @@ class JiraFetchTasksView(APIView):
                 {"detail": "Jira account is not connected. Please connect Jira first.", "auth_required": True},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
+        # Ensure we have the Jira board ID saved for direct backlog links
+        ensure_jira_board_id(project, project_key, token_obj)
 
         search_url = f"https://api.atlassian.com/ex/jira/{token_obj.cloud_id}/rest/api/3/search/jql"
         headers = {
@@ -229,21 +254,27 @@ class JiraFetchTasksView(APIView):
             if not issues:
                 return Response({"tasks": [], "message": "No tasks found in Jira matching the specified Project Key and Sprint Name."}, status=status.HTTP_200_OK)
                 
-            from sprints.models import SprintTask
-            fetched_jira_ids = [issue.get("key") for issue in issues if issue.get("key")]
+            from sprints.models import Sprint, SprintTask
             
-            # Check if any of these tasks already exist in the system for this project
-            existing_tasks_count = SprintTask.objects.filter(jira_id__in=fetched_jira_ids, is_deleted=False).count()
-            if existing_tasks_count > 0:
+            # Check if this Jira Sprint is already mapped to an active sprint in this project
+            existing_sprint = Sprint.objects.filter(
+                project=project,
+                backlog_version_id=sprint_name,
+                is_deleted=False
+            ).first()
+            
+            if existing_sprint:
                 return Response({
-                    "detail": f"This Jira sprint (or its tasks) has already been imported. To fetch newly created tasks, please use the 'Fetch from Jira' button inside the Sprint Details page.",
+                    "detail": f"The Jira sprint '{sprint_name}' is already imported as '{existing_sprint.milestone}'. To fetch new tasks, go to that sprint's details page and click 'Fetch from Jira'.",
                     "auth_required": False
                 }, status=status.HTTP_400_BAD_REQUEST)
+                
+            fetched_jira_ids = [issue.get("key") for issue in issues if issue.get("key")]
             
             tasks = []
             for issue in issues:
                 jira_id = issue.get("key")
-                    
+                
                 fields = issue.get("fields", {})
                 issue_type = fields.get("issuetype", {}).get("name", "").upper()
                 
@@ -269,6 +300,12 @@ class JiraFetchTasksView(APIView):
                     "status": "OPEN",
                     "jiraId": jira_id
                 })
+                
+            if not tasks:
+                return Response({
+                    "detail": "All tasks in this Jira sprint have already been imported into other sprints in this project.",
+                    "auth_required": False
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             return Response({"tasks": tasks}, status=status.HTTP_200_OK)
             
@@ -303,10 +340,24 @@ class JiraSprintSyncView(APIView):
         override_name = request.data.get('sprint_name')
         sprint_name = override_name or sprint.backlog_version_id or sprint.milestone
         
+        if override_name:
+            # Check if another sprint in the project is already mapped to this Jira sprint name
+            existing_sprint = Sprint.objects.filter(
+                project=sprint.project,
+                is_deleted=False,
+                backlog_version_id=override_name
+            ).exclude(id=sprint.id).first()
+            if existing_sprint:
+                return Response({
+                    "detail": f"The Jira sprint '{override_name}' is already synced with another sprint ('{existing_sprint.milestone}') in this project."
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Ensure we don't use purely numeric sprint names as defaults if they were accidentally saved
         if sprint.backlog_version_id and sprint.backlog_version_id.isdigit() and not override_name:
             sprint_name = sprint.milestone
 
+        # Ensure we have the Jira board ID saved for direct backlog links
+        ensure_jira_board_id(sprint.project, project_key, token_obj)
         
         search_url = f"https://api.atlassian.com/ex/jira/{token_obj.cloud_id}/rest/api/3/search/jql"
         headers = {
@@ -357,15 +408,16 @@ class JiraSprintSyncView(APIView):
                 if fallback_res.status_code == 200:
                     issues = fallback_res.json().get("issues", [])
 
-            # Save the successful sprint name if an override was provided
-            if issues and override_name and override_name != sprint.backlog_version_id:
-                sprint.backlog_version_id = override_name
-                sprint.save(update_fields=['backlog_version_id'])
+            # Do NOT save the sprint name here. It will be saved only when tasks are actually appended in JiraSprintAppendView.
 
             if not issues:
                 return Response({"detail": "No tasks found in Jira for this sprint."}, status=status.HTTP_200_OK)
                 
             fetched_jira_ids = [issue.get("key") for issue in issues if issue.get("key")]
+            
+            # Removed the overly strict task overlap check here.
+            # We allow fetching even if some tasks were previously in another sprint.
+                
             existing_jira_ids = set(SprintTask.objects.filter(sprint=sprint, jira_id__in=fetched_jira_ids, is_deleted=False).values_list('jira_id', flat=True))
             
             new_tasks = []
@@ -426,6 +478,16 @@ class JiraSprintAppendView(APIView):
             
         sprint_name_override = request.data.get("sprint_name")
         if sprint_name_override and sprint.backlog_version_id != sprint_name_override:
+            existing_mapped = Sprint.objects.filter(
+                project=sprint.project,
+                is_deleted=False,
+                backlog_version_id=sprint_name_override
+            ).exclude(id=sprint.id).first()
+            if existing_mapped:
+                return Response({
+                    "detail": f"The Jira sprint '{sprint_name_override}' is already assigned to another sprint ('{existing_mapped.milestone}')."
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
             sprint.backlog_version_id = sprint_name_override
             sprint.save(update_fields=['backlog_version_id'])
             
