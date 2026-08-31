@@ -1,7 +1,7 @@
 import uuid
 from unittest.mock import patch, MagicMock
 from django.urls import reverse
-from rest_framework.test import APIClient, APITestCase
+from rest_framework.test import APIClient, APITransactionTestCase
 from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta
@@ -10,7 +10,7 @@ from accounts.models import Employee, EmployeeProfile
 from project.models import Project, ProjectMember
 from sprints.models import Sprint, SprintTask
 
-class SprintSyncBacklogViewTests(APITestCase):
+class SprintSyncBacklogViewTests(APITransactionTestCase):
     def setUp(self):
         self.client = APIClient()
         

@@ -216,9 +216,11 @@ class TestBacklogClientService(TestCase):
         cats = self.service.fetch_project_categories()
         self.assertEqual(cats[0]["name"], "UI")
 
+    @patch.object(BacklogService, '_get_or_create_version')
     @patch.object(BacklogService, '_resolve_project_and_issue_type')
     @patch('backlog.services.backlog_client.requests.post')
-    def test_sync_task(self, mock_post, mock_resolve):
+    def test_sync_task(self, mock_post, mock_resolve, mock_version):
+        mock_version.return_value = 100
         mock_resolve.return_value = (123, 1)
         mock_post_response = MagicMock()
         mock_post_response.json.return_value = {"issueKey": "PROJ-1"}
@@ -235,14 +237,21 @@ class TestBacklogClientService(TestCase):
         task.status = 'OPEN'
         task.assigned_employee = None
         task.category = None
-        task.sprint = None
+        mock_sprint = MagicMock()
+        mock_sprint.milestone = "Sprint 1"
+        mock_sprint.backlog_version_id = None
+        task.sprint = mock_sprint
         task.jira_id = None
         
         issue_key = self.service.sync_task(task)
         self.assertEqual(issue_key, "PROJ-1")
 
+    @patch.object(BacklogService, '_get_or_create_version')
+    @patch.object(BacklogService, '_resolve_project_and_issue_type')
     @patch('backlog.services.backlog_client.requests.patch')
-    def test_update_task(self, mock_patch):
+    def test_update_task(self, mock_patch, mock_resolve, mock_version):
+        mock_version.return_value = 100
+        mock_resolve.return_value = (123, 1)
         mock_patch_response = MagicMock()
         mock_patch_response.json.return_value = {"issueKey": "PROJ-2"}
         mock_patch.return_value = mock_patch_response
@@ -258,7 +267,10 @@ class TestBacklogClientService(TestCase):
         task.status = 'OPEN'
         task.assigned_employee = None
         task.category = None
-        task.sprint = None
+        mock_sprint = MagicMock()
+        mock_sprint.milestone = "Sprint 1"
+        mock_sprint.backlog_version_id = None
+        task.sprint = mock_sprint
         task.jira_id = None
 
         issue_key = self.service.update_task(task)
