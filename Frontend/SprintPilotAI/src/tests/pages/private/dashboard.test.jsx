@@ -63,11 +63,23 @@ describe('Dashboard Component', () => {
   });
 
   it('renders dashboard metrics and projects lists successfully', async () => {
-    apiClient.get.mockResolvedValue({
-      data: [
-        { id: 1, name: 'Cloud Sync Platform', status: 'ACTIVE' },
-        { id: 2, name: 'AI Analytics Hub', status: 'ACTIVE' }
-      ]
+    apiClient.get.mockImplementation(async (url) => {
+      if (url.includes('sprints/team-performance')) {
+        return {
+          data: {
+            results: [
+              { id: 'EMP001', raw_id: 1, name: 'Praseetha KU', role: 'Developer', total_tasks: 5, completed_tasks: 4, on_time_rate: '80%', points: 10, rank: 1 }
+            ],
+            has_more: false
+          }
+        };
+      }
+      return {
+        data: [
+          { id: 1, name: 'Cloud Sync Platform', status: 'ACTIVE' },
+          { id: 2, name: 'AI Analytics Hub', status: 'ACTIVE' }
+        ]
+      };
     });
 
     SprintServices.getProjectSprints.mockImplementation(async (projectId) => {
@@ -113,11 +125,23 @@ describe('Dashboard Component', () => {
   });
 
   it('filters team members by search query', async () => {
-    apiClient.get.mockResolvedValue({
-      data: [
-        { id: 1, name: 'Cloud Sync Platform', status: 'ACTIVE' },
-        { id: 2, name: 'AI Analytics Hub', status: 'ACTIVE' }
-      ]
+    apiClient.get.mockImplementation(async (url) => {
+      if (url.includes('sprints/team-performance')) {
+        const isPraseethaSearch = url.includes('search=Praseetha');
+        const results = isPraseethaSearch
+          ? [{ id: 'EMP001', raw_id: 1, name: 'Praseetha KU', role: 'Developer', total_tasks: 5, completed_tasks: 4, on_time_rate: '80%', points: 10, rank: 1 }]
+          : [
+              { id: 'EMP001', raw_id: 1, name: 'Praseetha KU', role: 'Developer', total_tasks: 5, completed_tasks: 4, on_time_rate: '80%', points: 10, rank: 1 },
+              { id: 'EMP002', raw_id: 2, name: 'Abhiram S', role: 'Tester', total_tasks: 3, completed_tasks: 2, on_time_rate: '66%', points: 5, rank: 2 }
+            ];
+        return { data: { results, has_more: false } };
+      }
+      return {
+        data: [
+          { id: 1, name: 'Cloud Sync Platform', status: 'ACTIVE' },
+          { id: 2, name: 'AI Analytics Hub', status: 'ACTIVE' }
+        ]
+      };
     });
     SprintServices.getProjectSprints.mockResolvedValue([]);
 
@@ -135,7 +159,9 @@ describe('Dashboard Component', () => {
     const searchInput = screen.getByPlaceholderText(/Search team members/i);
     fireEvent.change(searchInput, { target: { value: 'Praseetha' } });
 
-    expect(screen.getByText('Praseetha KU')).toBeInTheDocument();
-    expect(screen.queryByText('Abhiram S')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Praseetha KU')).toBeInTheDocument();
+      expect(screen.queryByText('Abhiram S')).not.toBeInTheDocument();
+    });
   });
 });

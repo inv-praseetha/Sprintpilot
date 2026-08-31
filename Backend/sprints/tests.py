@@ -1064,8 +1064,8 @@ class TeamPerformanceTest(APITestCase):
         self.sprint = Sprint.objects.create(
             project=self.project,
             milestone="Sprint 1",
-            start_date=datetime.date(2026, 8, 3),
-            end_date=datetime.date(2026, 8, 31),
+            start_date=today - datetime.timedelta(days=14),
+            end_date=today + datetime.timedelta(days=14),
             status="ACTIVE"
         )
 
@@ -1076,8 +1076,8 @@ class TeamPerformanceTest(APITestCase):
             category="UI",
             status="CLOSED",
             assigned_employee=self.profile1,
-            planned_start_date=datetime.date(2026, 8, 3),
-            planned_end_date=datetime.date(2026, 8, 28),
+            planned_start_date=today - datetime.timedelta(days=5),
+            planned_end_date=today + datetime.timedelta(days=5),
             description="Completed task"
         )
         task1._skip_sync_validation = True
@@ -1090,8 +1090,8 @@ class TeamPerformanceTest(APITestCase):
             category="Backend",
             status="OPEN",
             assigned_employee=self.profile2,
-            planned_start_date=datetime.date(2026, 8, 3),
-            planned_end_date=datetime.date(2026, 8, 7),
+            planned_start_date=today - datetime.timedelta(days=10),
+            planned_end_date=today - datetime.timedelta(days=2),
             description="Overdue task"
         )
         task2._skip_sync_validation = True
