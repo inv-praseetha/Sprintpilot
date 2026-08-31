@@ -8,7 +8,7 @@ describe('ProjectTable Component', () => {
   it('renders without crashing', () => {
     const { container } = render(
       <BrowserRouter>
-        <ProjectTable projects={[]} loading={false} />
+        <ProjectTable filteredProjects={[]} loading={false} />
       </BrowserRouter>
     );
     expect(container).toBeInTheDocument();

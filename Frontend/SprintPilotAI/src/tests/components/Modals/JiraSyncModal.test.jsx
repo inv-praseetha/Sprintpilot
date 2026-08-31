@@ -23,7 +23,9 @@ vi.mock('lucide-react', () => ({
   X: () => <div data-testid="close-icon">X</div>,
   Database: () => <div data-testid="database-icon">DB</div>,
   AlertCircle: () => <div data-testid="alert-icon">Alert</div>,
-  Loader2: () => <div data-testid="loader-icon">Loader</div>
+  Loader2: () => <div data-testid="loader-icon">Loader</div>,
+  ChevronDown: () => <div data-testid="chevron-down-icon">ChevronDown</div>,
+  CheckCircle2: () => <div data-testid="check-circle-icon">Check</div>
 }));
 
 vi.mock('../../../components/Common/CustomDatePicker', () => ({
@@ -47,6 +49,7 @@ describe('JiraSyncModal Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    apiClient.get.mockResolvedValue({ data: [] });
   });
 
   it('renders nothing if not open', () => {
@@ -98,6 +101,28 @@ describe('JiraSyncModal Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Jira Task 1')).toBeInTheDocument();
     });
+
+    // Need to set assignee, startDate, endDate
+    const assigneeSelects = screen.getAllByRole('combobox');
+    // The first two are status and priority, the 3rd is assignee
+    fireEvent.change(assigneeSelects[2], { target: { value: '10' } });
+
+    // The Date pickers are rendered as inputs of type="date"
+    const dateInputs = screen.getAllByRole('textbox').filter(i => i.type === 'date' || i.type === 'text');
+    // Using testid or fallback. We mocked CustomDatePicker as <input type="date" />
+    const datePickers = screen.getAllByDisplayValue('');
+    if (datePickers.length >= 2) {
+      fireEvent.change(datePickers[0], { target: { value: '2026-07-01' } });
+      fireEvent.change(datePickers[1], { target: { value: '2026-07-10' } });
+    } else {
+      // In case we can't find by empty string, find by type
+      const dateTypeInputs = document.querySelectorAll('input[type="date"]');
+      if (dateTypeInputs.length >= 2) {
+         fireEvent.change(dateTypeInputs[0], { target: { value: '2026-07-01' } });
+         fireEvent.change(dateTypeInputs[1], { target: { value: '2026-07-10' } });
+      }
+    }
+
 
     // Mock successful save
     apiClient.post.mockResolvedValueOnce({ data: {} });
