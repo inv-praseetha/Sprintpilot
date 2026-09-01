@@ -226,7 +226,7 @@ class ProjectService:
             closed_tasks = tasks.filter(status__in=['CLOSED', 'RESOLVED']).count()
             open_tasks = tasks.exclude(status__in=['CLOSED', 'RESOLVED']).count()
             sprint_details.append({
-                'name': sprint.name,
+                'name': sprint.milestone,
                 'open': open_tasks,
                 'closed': closed_tasks
             })

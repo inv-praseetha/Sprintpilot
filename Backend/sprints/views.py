@@ -155,6 +155,7 @@ class SprintCloseView(APIView):
         try:
             SprintService.close_sprint(pk)
             return Response({"detail": "Sprint closed successfully and Backlog updated."}, status=status.HTTP_200_OK)
+            
         except Sprint.DoesNotExist:
             return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
