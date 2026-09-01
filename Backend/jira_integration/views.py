@@ -25,7 +25,7 @@ def extract_text_from_adf(node):
         text += node.get("text", "")
     
     if "content" in node and isinstance(node["content"], list):
-        for child in node["co=ntent"]:
+        for child in node["content"]:
             text += extract_text_from_adf(child)
             if child.get("type") in ["paragraph", "bulletList", "orderedList"]:
                 text += "\n"
@@ -34,11 +34,14 @@ def extract_text_from_adf(node):
 
 def check_project_access(user, project):
     """
-    Checks if the given user is the creator, team lead, or a member of the project.
+    Checks if the given user is the creator or team lead of the project.
+    Ordinary project members are intentionally denied access.
     """
     if project.created_by == user or project.team_lead == user:
         return True
-    return project.members.filter(employee_profile__user=user).exists()
+    
+    # Return False for ordinary project members
+    return False
 
 class JiraAuthUrlView(APIView):
     """
