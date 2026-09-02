@@ -296,7 +296,7 @@ class SprintNoteListView(APIView):
     """
     from rest_framework.parsers import MultiPartParser, JSONParser, FormParser
     parser_classes = (MultiPartParser, JSONParser, FormParser)
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPMOrReadOnly]
 
     def get(self, request, sprint_id, *args, **kwargs):
         try:

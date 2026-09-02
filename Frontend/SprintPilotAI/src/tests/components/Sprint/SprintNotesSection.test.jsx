@@ -6,6 +6,11 @@ import SprintServices from '../../../services/SprintServices';
 import { useToast } from '../../../context/ToastContext';
 import { useConfirm } from '../../../context/ConfirmContext';
 import apiClient from '../../../api/apiClient';
+import { useAuth } from '../../../context/AuthContext';
+
+vi.mock('../../../context/AuthContext', () => ({
+  useAuth: vi.fn()
+}));
 
 vi.mock('../../../services/SprintServices', () => ({
   default: {
@@ -81,6 +86,17 @@ describe('SprintNotesSection Component', () => {
     vi.clearAllMocks();
     useToast.mockReturnValue(mockToast);
     useConfirm.mockReturnValue(mockConfirm);
+    useAuth.mockReturnValue({ user: { role: 'PROJECT_MANAGER' } });
+  });
+
+  it('renders read-only view for Team Lead / non-PM users', () => {
+    useAuth.mockReturnValue({ user: { role: 'TEAM_LEAD' } });
+    render(<SprintNotesSection {...defaultProps} selectedNoteDate="2026-07-02" />);
+
+    expect(screen.getByText('Read-Only View')).toBeInTheDocument();
+    expect(screen.queryByTitle('Delete attachment')).not.toBeInTheDocument();
+    expect(screen.queryByText('Attach PDF')).not.toBeInTheDocument();
+    expect(screen.queryByText('Replace')).not.toBeInTheDocument();
   });
 
   it('renders notes content and historical timeline list including PDF only notes', () => {

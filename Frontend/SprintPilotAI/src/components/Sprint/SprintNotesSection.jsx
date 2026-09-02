@@ -14,6 +14,7 @@ import apiClient from '../../api/apiClient';
 import SprintServices from '../../services/SprintServices';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useAuth } from '../../context/AuthContext';
 
 const quillModules = {
   toolbar: [
@@ -61,6 +62,8 @@ export default function SprintNotesSection({
   const historyListRef = useRef(null);
   const toast = useToast();
   const confirm = useConfirm();
+  const { user } = useAuth();
+  const isProjectManager = user?.role === 'PROJECT_MANAGER';
 
   const getAttachmentUrl = (path) => {
     if (!path) return '';
@@ -75,6 +78,11 @@ export default function SprintNotesSection({
   };
 
   const handleAttachmentChange = async (e) => {
+    if (!isProjectManager) {
+      toast.error('Only Project Managers are allowed to add or edit attachments.');
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 
@@ -113,6 +121,11 @@ export default function SprintNotesSection({
   };
 
   const handleRemoveAttachment = async () => {
+    if (!isProjectManager) {
+      toast.error('Only Project Managers are allowed to delete attachments.');
+      return;
+    }
+
     const isConfirmed = await confirm({
       title: 'Delete Attachment',
       message: 'Are you sure you want to delete this PDF attachment?',
@@ -177,9 +190,9 @@ export default function SprintNotesSection({
     }
   };
 
-  // Debounce save for today's note
+  // Debounce save for today's note (restricted to Project Managers)
   useEffect(() => {
-    if (pageLoading) return;
+    if (pageLoading || !isProjectManager) return;
     if (todayNote === lastSavedContentRef.current) return;
 
     setIsSavingNote(true);
@@ -211,7 +224,7 @@ export default function SprintNotesSection({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayNote, selectedNoteDate, sprintId, pageLoading]);
+  }, [todayNote, selectedNoteDate, sprintId, pageLoading, isProjectManager]);
 
   // Infinite Scroll Effect
   useEffect(() => {
@@ -290,7 +303,9 @@ export default function SprintNotesSection({
           </div>
           {/* Autosave status indicator */}
           <div className="flex items-center gap-1.5 text-[11px] font-bold">
-            {isSavingNote ? (
+            {!isProjectManager ? (
+              <span className="px-2 py-0.5 rounded bg-slate-500/10 text-slate-400 uppercase tracking-wider text-[10px]">Read-Only View</span>
+            ) : isSavingNote ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-500" />
                 <span className="text-orange-500 uppercase tracking-wider">Saving...</span>
@@ -314,7 +329,7 @@ export default function SprintNotesSection({
                 onClick={() => setPdfPreviewToggle('editor')}
                 className="px-2.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border-none outline-none"
               >
-                Edit Text Note
+                {isProjectManager ? 'Edit Text Note' : 'View Text Note'}
               </button>
             </div>
             <div className="w-full flex-grow overflow-hidden relative" style={{ height: 'calc(100% - 37px)' }}>
@@ -337,13 +352,14 @@ export default function SprintNotesSection({
             <ReactQuill
               theme="snow"
               value={todayNote}
+              readOnly={!isProjectManager}
               onChange={(content, delta, source) => {
-                if (source === 'user') {
+                if (source === 'user' && isProjectManager) {
                   setTodayNote(content);
                 }
               }}
-              placeholder="Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)"
-              modules={quillModules}
+              placeholder={isProjectManager ? "Type sprint notes, blocker updates, or team call decisions here... (changes auto-save automatically)" : "No notes entered."}
+              modules={isProjectManager ? quillModules : { toolbar: false }}
               formats={quillFormats}
             />
           </div>
@@ -380,32 +396,36 @@ export default function SprintNotesSection({
                 >
                   <Download className="w-3 h-3" /> Download
                 </a>
-                <button
-                  onClick={handleRemoveAttachment}
-                  className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                    darkMode 
-                      ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-rose-500' 
-                      : 'border-slate-255 bg-white hover:bg-slate-50 text-rose-600'
-                  }`}
-                  title="Delete attachment"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {isProjectManager && (
+                  <button
+                    onClick={handleRemoveAttachment}
+                    className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
+                      darkMode 
+                        ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-rose-500' 
+                        : 'border-slate-255 bg-white hover:bg-slate-50 text-rose-600'
+                    }`}
+                    title="Delete attachment"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </>
             )}
-            <label className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-              darkMode 
-                ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' 
-                : 'border-slate-255 bg-white hover:bg-slate-50 text-slate-700'
-            }`}>
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={handleAttachmentChange}
-                className="hidden"
-              />
-              {currentNoteObj?.attachment ? 'Replace' : 'Attach PDF'}
-            </label>
+            {isProjectManager && (
+              <label className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
+                darkMode 
+                  ? 'border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300' 
+                  : 'border-slate-255 bg-white hover:bg-slate-50 text-slate-700'
+              }`}>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleAttachmentChange}
+                  className="hidden"
+                />
+                {currentNoteObj?.attachment ? 'Replace' : 'Attach PDF'}
+              </label>
+            )}
           </div>
         </div>
       </div>
