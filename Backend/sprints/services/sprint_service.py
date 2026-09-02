@@ -50,17 +50,32 @@ class SprintService:
         # 2. Gather tasks and group by category
         tasks = sprint.tasks.filter(is_deleted=False).order_by('created_at')
         
-        # Categories in required order
-        category_mapping = [
+        # Categories in required order (standard categories first)
+        standard_categories = [
             ('UI', 'UI Development'),
             ('Backend', 'Backend Development'),
             ('INFRA', 'Infra Development'),
             ('QA', 'QA Development')
         ]
         
+        known_keys = {key for key, _ in standard_categories}
+        category_mapping = list(standard_categories)
+
+        # Dynamically discover any new/custom task categories in the sprint
+        existing_task_categories = list(tasks.values_list('category', flat=True).distinct())
+        for cat in existing_task_categories:
+            if cat and cat not in known_keys:
+                cat_display = cat if cat.lower().endswith('development') else f"{cat} Development"
+                category_mapping.append((cat, cat_display))
+                known_keys.add(cat)
+                
+        # Check if there are any uncategorized tasks
+        if any(not t.category for t in tasks) and 'Other' not in known_keys:
+            category_mapping.append(('Other', 'General Tasks'))
+        
         # Save original styles from the template rows (B through G)
         styles = {}
-        for cat_key, cat_name in category_mapping:
+        for cat_key, cat_name in standard_categories:
             # Determine template row based on original cell positions
             if cat_name == 'UI Development':
                 template_row = 10
@@ -180,18 +195,59 @@ class SprintService:
                 if style_info['alignment']: cell.alignment = style_info['alignment']
                 cell.number_format = style_info['number_format']
         
+        # Distinct color themes for custom/dynamic category phase headers
+        custom_category_themes = [
+            ("6B46C1", "FFFFFF"),  # Dark Purple
+            ("319795", "FFFFFF"),  # Dark Teal
+            ("DD6B20", "FFFFFF"),  # Deep Orange
+            ("D69E2E", "FFFFFF"),  # Gold / Amber
+            ("B83280", "FFFFFF"),  # Deep Magenta
+            ("2D3748", "FFFFFF"),  # Slate Dark
+            ("38A169", "FFFFFF"),  # Emerald
+            ("3182CE", "FFFFFF"),  # Royal Blue
+        ]
+        custom_keys = [k for k, _ in category_mapping if k not in {'UI', 'Backend', 'INFRA', 'QA'}]
+        custom_color_map = {
+            k: custom_category_themes[idx % len(custom_category_themes)]
+            for idx, k in enumerate(custom_keys)
+        }
+
         # 4. Write data sequentially starting at Row 10
         current_row = 10
         for cat_key, cat_name in category_mapping:
-            cat_tasks = [t for t in tasks if t.category == cat_key]
+            if cat_key == 'Other':
+                cat_tasks = [t for t in tasks if not t.category or t.category == 'Other']
+            else:
+                cat_tasks = [t for t in tasks if t.category == cat_key]
+
+            # Skip rendering empty phase headers for dynamic categories if they have no tasks
+            if not cat_tasks and cat_key not in {'UI', 'Backend', 'INFRA', 'QA'}:
+                continue
             
             # Write Phase Header
-            style_list = styles[cat_name]
+            style_list = styles.get(cat_name) or styles.get('Backend Development') or styles['UI Development']
+            
+            # Custom fill & font if this is a dynamic category
+            custom_fill = None
+            custom_font = None
+            if cat_key in custom_color_map:
+                fill_hex, font_hex = custom_color_map[cat_key]
+                custom_fill = openpyxl.styles.PatternFill(start_color=fill_hex, end_color=fill_hex, fill_type="solid")
+                custom_font = openpyxl.styles.Font(name="Segoe UI", size=11, bold=True, color=font_hex)
+
             for col_idx in range(2, 8):
                 cell = ws.cell(row=current_row, column=col_idx)
                 style_info = style_list[col_idx - 2]
-                if style_info['fill']: cell.fill = style_info['fill']
-                if style_info['font']: cell.font = style_info['font']
+                if custom_fill:
+                    cell.fill = custom_fill
+                elif style_info['fill']:
+                    cell.fill = style_info['fill']
+
+                if custom_font:
+                    cell.font = custom_font
+                elif style_info['font']:
+                    cell.font = style_info['font']
+
                 if style_info['border']: cell.border = style_info['border']
                 if style_info['alignment']: cell.alignment = style_info['alignment']
                 cell.number_format = style_info['number_format']
@@ -201,8 +257,8 @@ class SprintService:
             
             # Write tasks under this phase
             for task in cat_tasks:
-                # Apply task style for this category
-                style_list = styles[f'task_{cat_key}']
+                # Apply task style for this category with fallback
+                style_list = styles.get(f'task_{cat_key}') or styles.get('task_Backend') or styles['task_UI']
                 for col_idx in range(2, 8):
                     cell = ws.cell(row=current_row, column=col_idx)
                     style_info = style_list[col_idx - 2]
@@ -688,6 +744,11 @@ class SprintService:
             if task.sprint:
                 if chk_start < task.sprint.start_date or chk_end > task.sprint.end_date:
                     raise ValueError(f"Task dates must fall within the sprint range ({task.sprint.start_date} to {task.sprint.end_date}).")
+
+        if chk_start and chk_start.weekday() >= 5:
+            raise ValueError(f"Task planned start date ({chk_start}) falls on a weekend.")
+        if chk_end and chk_end.weekday() >= 5:
+            raise ValueError(f"Task planned end date ({chk_end}) falls on a weekend.")
                     
         new_hours = data.get('estimated_hours') if 'estimated_hours' in data else data.get('estimatedHours')
         chk_hours = new_hours if new_hours is not None else task.estimated_hours

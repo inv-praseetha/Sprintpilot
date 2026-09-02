@@ -260,6 +260,10 @@ class SprintImportScheduleView(APIView):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            from django.core.exceptions import ValidationError
+            if isinstance(e, ValidationError):
+                msg = e.message_dict if hasattr(e, 'message_dict') else (e.messages if hasattr(e, 'messages') else str(e))
+                return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -292,7 +296,7 @@ class SprintNoteListView(APIView):
     """
     from rest_framework.parsers import MultiPartParser, JSONParser, FormParser
     parser_classes = (MultiPartParser, JSONParser, FormParser)
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPMOrReadOnly]
 
     def get(self, request, sprint_id, *args, **kwargs):
         try:
