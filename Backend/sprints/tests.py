@@ -137,6 +137,23 @@ class SprintAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+    def test_download_schedule_dynamic_category(self):
+        # Create a task with a custom category not in the default 4 (e.g. DevOps)
+        task_custom = SprintTask.objects.create(
+            sprint=self.sprint,
+            title="DevOps Pipeline Task",
+            status="OPEN",
+            category="DevOps",
+            assigned_employee=self.profile,
+            planned_start_date=self.sprint.start_date,
+            planned_end_date=self.sprint.start_date + datetime.timedelta(days=2),
+            description="DevOps task description"
+        )
+        url = reverse('sprint_download_schedule', kwargs={'sprint_id': self.sprint.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
     def test_download_schedule_not_found(self):
         non_existent_id = "00000000-0000-0000-0000-000000000000"
         url = reverse('sprint_download_schedule', kwargs={'sprint_id': non_existent_id})
