@@ -6,6 +6,7 @@ from sprints.models import SprintTask
 from accounts.models import EmployeeProfile
 
 logger = logging.getLogger(__name__)
+db_lock = threading.Lock()
 
 class BacklogSyncService:
     def __init__(self):
@@ -242,10 +243,11 @@ class BacklogSyncService:
                     try:
                         issue_key = backlog_service.sync_task(task)
                         if issue_key:
-                            task.backlog_task_id = issue_key
-                            task.save()
-                            task.synced_at = task.updated_at
-                            task.save(update_fields=['synced_at'])
+                            with db_lock:
+                                task.backlog_task_id = issue_key
+                                task.save()
+                                task.synced_at = task.updated_at
+                                task.save(update_fields=['synced_at'])
                             res["created_count"] = 1
                     except Exception as e:
                         res["error"] = f"Task '{task.title}' (Create): {str(e)}"
@@ -265,15 +267,17 @@ class BacklogSyncService:
                     try:
                         issue_key = backlog_service.update_task(task)
                         if issue_key:
-                            task.save()
-                            task.synced_at = task.updated_at
-                            task.save(update_fields=['synced_at'])
+                            with db_lock:
+                                task.save()
+                                task.synced_at = task.updated_at
+                                task.save(update_fields=['synced_at'])
                             res["updated_count"] = 1
                     except Exception as e:
                         if str(e) == "NO_CHANGES_DETECTED":
-                            task.save()
-                            task.synced_at = task.updated_at
-                            task.save(update_fields=['synced_at'])
+                            with db_lock:
+                                task.save()
+                                task.synced_at = task.updated_at
+                                task.save(update_fields=['synced_at'])
                             res["up_to_date_count"] = 1
                         else:
                             res["error"] = f"Task '{task.title}' (Update): {str(e)}"
