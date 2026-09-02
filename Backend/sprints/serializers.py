@@ -45,6 +45,11 @@ class SprintTaskSerializer(serializers.ModelSerializer):
         if start_date > end_date:
             raise serializers.ValidationError({"planned_start_date": "Planned start date must be before or equal to planned end date."})
             
+        if start_date.weekday() >= 5:
+            raise serializers.ValidationError({"planned_start_date": f"Task planned start date ({start_date}) falls on a weekend."})
+        if end_date.weekday() >= 5:
+            raise serializers.ValidationError({"planned_end_date": f"Task planned end date ({end_date}) falls on a weekend."})
+
         # Get sprint from context (if set during creation) or from instance
         sprint = self.context.get('sprint') or (self.instance.sprint if self.instance else None)
         if sprint:

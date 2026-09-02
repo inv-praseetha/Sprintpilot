@@ -73,9 +73,16 @@ def get_schedule_suggestions(sprint, tasks, api_key):
         sprint_end_dt = datetime.datetime.strptime(sprint.end_date, "%Y-%m-%d").date()
     else:
         sprint_end_dt = sprint.end_date
-    effective_end_date = sprint_end_dt - timedelta(days=2)
+
+    # Subtract 2 working days (excluding weekends) for mandatory buffer period
+    effective_end_date = sprint_end_dt
+    days_subtracted = 0
+    while days_subtracted < 2:
+        effective_end_date -= timedelta(days=1)
+        if effective_end_date.weekday() < 5 and effective_end_date.strftime("%Y-%m-%d") not in holidays:
+            days_subtracted += 1
+
     effective_end_str = effective_end_date.strftime("%Y-%m-%d")
-    empty_period_start = (effective_end_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Generate list of valid working days (excluding weekends and holidays)
     valid_working_days = []
@@ -114,10 +121,12 @@ Sprint Task List:
 {tasks_data}
 
 Rules & Constraints:
-1. Every task must be assigned a `planned_start_date` and `planned_end_date` chosen STRICTLY from the list of Valid Working Days. Under NO circumstances should a task be scheduled on any other date (such as a weekend, holiday, or day after {effective_end_str}).
+1. Every task must be assigned a `planned_start_date` and `planned_end_date` chosen STRICTLY from the list of Valid Working Days. Under NO circumstances should a task be scheduled on any other date (such as a weekend, holiday, or date after {effective_end_str}).
    - For each assigned employee, schedule their first task to start on the first available date in the Valid Working Days list so they do not sit idle.
 2. Planned start date must be less than or equal to planned end date.
-3. Weekend & Holiday Exclusion: You MUST NOT assign any task start/end dates on weekends or holidays. The list of Valid Working Days has already excluded weekends and holidays. Therefore, you are strictly prohibited from using any dates NOT listed under Valid Working Days.
+3. CRITICAL WEEKEND & HOLIDAY RESTRICTION: You MUST NOT assign any task start or end dates on weekends (Saturday or Sunday) or holidays. All task dates MUST be valid weekdays (Monday through Friday) selected ONLY from the list of Valid Working Days above. DO NOT OUTPUT WEEKEND DATES UNDER ANY CIRCUMSTANCES.
+   - ACCURATE DURATION & LOAD-BALANCING ENFORCEMENT: Never compress or truncate a task's duration into fewer working days than required by its `estimated_hours`. For example, if a task requires 24 hours (3 working days), its `planned_start_date` and `planned_end_date` MUST span across at least 3 valid working days.
+   - REASSIGNMENT ON OVERLOAD: If an assigned employee does not have enough remaining working days before {effective_end_str} to complete a task with its full required duration, you MUST NOT compress the task or cap its end date. Instead, REASSIGN that task to another employee from the Project Roster who has available capacity and enough working days before {effective_end_str} to complete the full task.
 4. Working Days Calculation: Calculate `working_days` as the exact count of days from the Valid Working Days list between `planned_start_date` and `planned_end_date` (inclusive).
 5. Task Assignment: Every single task in the list MUST be assigned to an employee from the roster. Do not leave any task unassigned (do not return null for `assigned_employee_id`). Even if the roster is small or does not have exact skill matches, assign each task to the employee who is relatively the closest fit or has adjacent skills.
    - Multiple tasks CAN be assigned to the same employee.
