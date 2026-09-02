@@ -281,6 +281,7 @@ class ProjectDetailView(APIView):
                 {"detail": "Cannot delete a completed project."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+     
         
         try:
             # Deletion logic moved to Service layer for Transactional Safety
