@@ -19,6 +19,7 @@ class Sprint(models.Model):
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.ACTIVE)
     backlog_version_id = models.CharField(max_length=50, null=True, blank=True)
     backlog_project_id = models.CharField(max_length=50, null=True, blank=True)
+    jira_sprint_name = models.CharField(max_length=150, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     synced_at = models.DateTimeField(null=True, blank=True)

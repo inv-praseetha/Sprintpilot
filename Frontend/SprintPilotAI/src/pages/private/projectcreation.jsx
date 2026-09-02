@@ -407,10 +407,8 @@ export default function ProjectCreation() {
       team_size: teamSize ? parseInt(teamSize, 10) : 0
     };
 
-    if (!editingProjectId) {
-      requestData.members = selectedMembers;
-      requestData.skills = selectedSkills;
-    }
+    requestData.members = selectedMembers;
+    requestData.skills = selectedSkills;
 
     try {
       const response = editingProjectId

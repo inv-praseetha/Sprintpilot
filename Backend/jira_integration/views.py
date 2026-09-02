@@ -13,6 +13,34 @@ import urllib.parse
 from django.utils import timezone
 from datetime import timedelta
 
+def refresh_jira_token(token_obj):
+    client_id = config("JIRA_CLIENT_ID", default=None)
+    client_secret = config("JIRA_CLIENT_SECRET", default=None)
+    if not client_id or not client_secret or not token_obj.refresh_token:
+        return False
+    
+    url = "https://auth.atlassian.com/oauth/token"
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": token_obj.refresh_token
+    }
+    try:
+        res = requests.post(url, json=payload)
+        if res.status_code == 200:
+            data = res.json()
+            token_obj.access_token = data.get("access_token")
+            if data.get("refresh_token"):
+                token_obj.refresh_token = data.get("refresh_token")
+            expires_in = data.get("expires_in", 3600)
+            token_obj.expires_at = timezone.now() + timedelta(seconds=expires_in)
+            token_obj.save(update_fields=['access_token', 'refresh_token', 'expires_at'])
+            return True
+    except Exception:
+        pass
+    return False
+
 def extract_text_from_adf(node):
     """
     Recursively extracts plain text from Atlassian Document Format (ADF).
@@ -240,11 +268,18 @@ class JiraFetchTasksView(APIView):
             res = requests.post(search_url, json=payload, headers=headers)
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
             if is_unauthorized:
-                JiraOAuthToken.objects.filter(user=request.user).delete()
-                return Response(
-                    {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                if refresh_jira_token(token_obj):
+                    headers["Authorization"] = f"Bearer {token_obj.access_token}"
+                    res = requests.post(search_url, json=payload, headers=headers)
+                    if res.status_code == 200:
+                        is_unauthorized = False
+                
+                if is_unauthorized:
+                    JiraOAuthToken.objects.filter(user=request.user).delete()
+                    return Response(
+                        {"detail": "Jira connection expired and could not be refreshed. Please reconnect.", "auth_required": True}, 
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
 
             if res.status_code == 404:
                 return Response({"detail": f"Jira Project Key '{project_key}' not found or inaccessible."}, status=status.HTTP_404_NOT_FOUND)
@@ -262,7 +297,7 @@ class JiraFetchTasksView(APIView):
             # Check if this Jira Sprint is already mapped to an active sprint in this project
             existing_sprint = Sprint.objects.filter(
                 project=project,
-                backlog_version_id=sprint_name,
+                jira_sprint_name=sprint_name,
                 is_deleted=False
             ).first()
             
@@ -341,14 +376,14 @@ class JiraSprintSyncView(APIView):
             
         project_key = sprint.project.jira_id or sprint.project.project_id
         override_name = request.data.get('sprint_name')
-        sprint_name = override_name or sprint.backlog_version_id or sprint.milestone
+        sprint_name = override_name or sprint.jira_sprint_name or sprint.milestone
         
         if override_name:
             # Check if another sprint in the project is already mapped to this Jira sprint name
             existing_sprint = Sprint.objects.filter(
                 project=sprint.project,
                 is_deleted=False,
-                backlog_version_id=override_name
+                jira_sprint_name=override_name
             ).exclude(id=sprint.id).first()
             if existing_sprint:
                 return Response({
@@ -356,7 +391,7 @@ class JiraSprintSyncView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
         
         # Ensure we don't use purely numeric sprint names as defaults if they were accidentally saved
-        if sprint.backlog_version_id and sprint.backlog_version_id.isdigit() and not override_name:
+        if sprint.jira_sprint_name and sprint.jira_sprint_name.isdigit() and not override_name:
             sprint_name = sprint.milestone
 
         # Ensure we have the Jira board ID saved for direct backlog links
@@ -380,11 +415,18 @@ class JiraSprintSyncView(APIView):
             is_unauthorized = res.status_code == 401 or "Unauthorized" in res.text or '"code":401' in res.text
             
             if is_unauthorized:
-                JiraOAuthToken.objects.filter(user=request.user).delete()
-                return Response(
-                    {"detail": "Jira connection expired. Please reconnect.", "auth_required": True}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                if refresh_jira_token(token_obj):
+                    headers["Authorization"] = f"Bearer {token_obj.access_token}"
+                    res = requests.post(search_url, json=payload, headers=headers)
+                    if res.status_code == 200:
+                        is_unauthorized = False
+                
+                if is_unauthorized:
+                    JiraOAuthToken.objects.filter(user=request.user).delete()
+                    return Response(
+                        {"detail": "Jira connection expired and could not be refreshed. Please reconnect.", "auth_required": True}, 
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
             if res.status_code != 200:
                 return Response({"detail": f"Failed to fetch from Jira: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -392,9 +434,9 @@ class JiraSprintSyncView(APIView):
             data = res.json()
             issues = data.get("issues", [])
             
-            # Fallback for older sprints where backlog_version_id wasn't saved 
+            # Fallback for older sprints where jira_sprint_name wasn't saved 
             # and milestone name might be prefixed with project key
-            if not issues and not sprint.backlog_version_id:
+            if not issues and not sprint.jira_sprint_name:
                 clean_name = sprint.milestone.replace(f"{project_key} ", "").strip()
                 if clean_name != sprint.milestone:
                     fallback_jql = f'project="{project_key}" AND sprint="{clean_name}" ORDER BY created DESC'
@@ -404,7 +446,7 @@ class JiraSprintSyncView(APIView):
                         issues = fallback_res.json().get("issues", [])
 
             # Ultimate Fallback 1: Auto-detect tasks from ANY currently active open sprint for this project
-            if not issues and not sprint.backlog_version_id:
+            if not issues and not sprint.jira_sprint_name:
                 fallback_jql = f'project="{project_key}" AND sprint in openSprints() ORDER BY created DESC'
                 payload["jql"] = fallback_jql
                 fallback_res = requests.post(search_url, json=payload, headers=headers)
@@ -480,67 +522,70 @@ class JiraSprintAppendView(APIView):
             return Response({"detail": "You do not have permission to access this sprint."}, status=status.HTTP_403_FORBIDDEN)
             
         sprint_name_override = request.data.get("sprint_name")
-        if sprint_name_override and sprint.backlog_version_id != sprint_name_override:
+        if sprint_name_override and sprint.jira_sprint_name != sprint_name_override:
             existing_mapped = Sprint.objects.filter(
                 project=sprint.project,
                 is_deleted=False,
-                backlog_version_id=sprint_name_override
+                jira_sprint_name=sprint_name_override
             ).exclude(id=sprint.id).first()
             if existing_mapped:
                 return Response({
                     "detail": f"The Jira sprint '{sprint_name_override}' is already assigned to another sprint ('{existing_mapped.milestone}')."
                 }, status=status.HTTP_400_BAD_REQUEST)
                 
-            sprint.backlog_version_id = sprint_name_override
-            sprint.save(update_fields=['backlog_version_id'])
+            sprint.jira_sprint_name = sprint_name_override
+            sprint.save(update_fields=['jira_sprint_name'])
             
         tasks_data = request.data.get("tasks", [])
         if not tasks_data:
             return Response({"detail": "No tasks provided to append."}, status=status.HTTP_400_BAD_REQUEST)
             
+        from django.db import transaction
         new_tasks_created = 0
-        for task_item in tasks_data:
-            assignee_id = task_item.get("assignee")
-            assignee_profile = None
-            if assignee_id:
-                try:
-                    assignee_profile = EmployeeProfile.objects.get(id=assignee_id)
-                except EmployeeProfile.DoesNotExist:
-                    pass
+        with transaction.atomic():
+            for task_item in tasks_data:
+                assignee_id = task_item.get("assignee")
+                assignee_profile = None
+                if assignee_id:
+                    try:
+                        assignee_profile = EmployeeProfile.objects.get(id=assignee_id)
+                    except EmployeeProfile.DoesNotExist:
+                        pass
 
-            start_date_str = task_item.get("startDate") or None
-            end_date_str = task_item.get("endDate") or None
-            
-            story_points = None
-            estimated_hours = None
-            if start_date_str and end_date_str:
-                from sprints.services.schedule_service import calculate_working_days
-                holidays = list(sprint.holidays.values_list('date', flat=True))
-                wd = calculate_working_days(start_date_str, end_date_str, holidays=holidays)
-                story_points = wd * 2
-                estimated_hours = wd * 8
-
-            cat_val = task_item.get("category", "UI")
-            if isinstance(cat_val, list):
-                cat_val = ", ".join(cat_val)
-
-            try:
-                SprintTask.objects.create(
-                    sprint=sprint,
-                    assigned_employee=assignee_profile,
-                    title=task_item.get("title", "Untitled Task"),
-                    description=task_item.get("description", "No description provided."),
-                    category=cat_val,
-                    status=task_item.get("status", "OPEN").upper(),
-                    priority=task_item.get("priority", "NORMAL").upper(),
-                    jira_id=task_item.get("jiraId", ""),
-                    planned_start_date=start_date_str,
-                    planned_end_date=end_date_str,
-                    story_points=story_points,
-                    estimated_hours=estimated_hours
-                )
-                new_tasks_created += 1
-            except django.core.exceptions.ValidationError as e:
-                return Response({"detail": f"Validation Error on task '{task_item.get('title')}': {str(e.message_dict if hasattr(e, 'message_dict') else e.messages)}"}, status=status.HTTP_400_BAD_REQUEST)
+                start_date_str = task_item.get("startDate") or None
+                end_date_str = task_item.get("endDate") or None
                 
+                story_points = None
+                estimated_hours = None
+                if start_date_str and end_date_str:
+                    from sprints.services.schedule_service import calculate_working_days
+                    holidays = list(sprint.holidays.values_list('date', flat=True))
+                    wd = calculate_working_days(start_date_str, end_date_str, holidays=holidays)
+                    story_points = wd * 2
+                    estimated_hours = wd * 8
+
+                cat_val = task_item.get("category", "UI")
+                if isinstance(cat_val, list):
+                    cat_val = ", ".join(cat_val)
+
+                try:
+                    SprintTask.objects.create(
+                        sprint=sprint,
+                        assigned_employee=assignee_profile,
+                        title=task_item.get("title", "Untitled Task"),
+                        description=task_item.get("description", "No description provided."),
+                        category=cat_val,
+                        status=task_item.get("status", "OPEN").upper(),
+                        priority=task_item.get("priority", "NORMAL").upper(),
+                        jira_id=task_item.get("jiraId", ""),
+                        planned_start_date=start_date_str,
+                        planned_end_date=end_date_str,
+                        story_points=story_points,
+                        estimated_hours=estimated_hours
+                    )
+                    new_tasks_created += 1
+                except django.core.exceptions.ValidationError as e:
+                    transaction.set_rollback(True)
+                    return Response({"detail": f"Validation Error on task '{task_item.get('title')}': {str(e.message_dict if hasattr(e, 'message_dict') else e.messages)}"}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response({"detail": f"Successfully appended {new_tasks_created} tasks to the sprint!"}, status=status.HTTP_200_OK)
