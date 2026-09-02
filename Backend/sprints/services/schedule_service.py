@@ -5,6 +5,45 @@ from accounts.models import EmployeeProfile
 from sprints.models import SprintTask, TaskRecommendation
 from sprints.services.ai_scheduler import get_schedule_suggestions
 
+def sanitize_weekday(date_val, is_end_date=False, sprint_start=None, sprint_end=None):
+    if not date_val:
+        return date_val
+    if isinstance(date_val, str):
+        try:
+            d = datetime.datetime.strptime(date_val, "%Y-%m-%d").date()
+        except ValueError:
+            return date_val
+    elif isinstance(date_val, datetime.date):
+        d = date_val
+    else:
+        return date_val
+
+    # Shift weekend (Saturday=5, Sunday=6) to preceding Friday
+    while d.weekday() >= 5:
+        d -= datetime.timedelta(days=1)
+
+    if sprint_start:
+        if isinstance(sprint_start, str):
+            sprint_start_dt = datetime.datetime.strptime(sprint_start, "%Y-%m-%d").date()
+        else:
+            sprint_start_dt = sprint_start
+        if d < sprint_start_dt:
+            d = sprint_start_dt
+            while d.weekday() >= 5:
+                d += datetime.timedelta(days=1)
+
+    if sprint_end:
+        if isinstance(sprint_end, str):
+            sprint_end_dt = datetime.datetime.strptime(sprint_end, "%Y-%m-%d").date()
+        else:
+            sprint_end_dt = sprint_end
+        if d > sprint_end_dt:
+            d = sprint_end_dt
+            while d.weekday() >= 5:
+                d -= datetime.timedelta(days=1)
+
+    return d.strftime("%Y-%m-%d")
+
 def generate_and_persist_recommendations(sprint, tasks, api_key):
     """
     Calls Gemini API, deletes previous recommendations, writes new recommendations,
@@ -28,8 +67,18 @@ def generate_and_persist_recommendations(sprint, tasks, api_key):
         for sug in suggestions:
             t_id = sug.get("task_id")
             emp_id = sug.get("assigned_employee_id")
-            start_date = sug.get("planned_start_date")
-            end_date = sug.get("planned_end_date")
+            start_date = sanitize_weekday(sug.get("planned_start_date"), is_end_date=False, sprint_start=sprint.start_date, sprint_end=sprint.end_date)
+            end_date = sanitize_weekday(sug.get("planned_end_date"), is_end_date=True, sprint_start=sprint.start_date, sprint_end=sprint.end_date)
+            
+            if start_date and end_date:
+                try:
+                    s_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+                    e_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+                    if e_dt < s_dt:
+                        end_date = start_date
+                except ValueError:
+                    pass
+
             confidence = sug.get("confidence", 1.0)
             matching_score = sug.get("matching_score", 1.0)
             if not emp_id:
@@ -156,12 +205,25 @@ def import_schedule(sprint, payload):
  
             if has_start:
                 start_date = item.get('planned_start_date') or item.get('startDate')
+                if start_date:
+                    start_date = sanitize_weekday(start_date, is_end_date=False, sprint_start=sprint.start_date, sprint_end=sprint.end_date)
                 task.planned_start_date = start_date or None
- 
+
             if has_end:
                 end_date = item.get('planned_end_date') or item.get('endDate')
+                if end_date:
+                    end_date = sanitize_weekday(end_date, is_end_date=True, sprint_start=sprint.start_date, sprint_end=sprint.end_date)
                 task.planned_end_date = end_date or None
             
+            if task.planned_start_date and task.planned_end_date:
+                try:
+                    s_d = datetime.datetime.strptime(str(task.planned_start_date), "%Y-%m-%d").date()
+                    e_d = datetime.datetime.strptime(str(task.planned_end_date), "%Y-%m-%d").date()
+                    if e_d < s_d:
+                        task.planned_end_date = task.planned_start_date
+                except ValueError:
+                    pass
+
             # Recalculate story points and hours based on final resolved dates
             if task.planned_start_date and task.planned_end_date:
                 wd = calculate_working_days(str(task.planned_start_date), str(task.planned_end_date), holidays=holidays)

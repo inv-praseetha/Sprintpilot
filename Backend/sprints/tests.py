@@ -1076,8 +1076,8 @@ class TeamPerformanceTest(APITestCase):
             category="UI",
             status="CLOSED",
             assigned_employee=self.profile1,
-            planned_start_date=today - datetime.timedelta(days=5),
-            planned_end_date=today + datetime.timedelta(days=5),
+            planned_start_date=today,
+            planned_end_date=today,
             description="Completed task"
         )
         task1._skip_sync_validation = True
@@ -1090,8 +1090,8 @@ class TeamPerformanceTest(APITestCase):
             category="Backend",
             status="OPEN",
             assigned_employee=self.profile2,
-            planned_start_date=today - datetime.timedelta(days=10),
-            planned_end_date=today - datetime.timedelta(days=2),
+            planned_start_date=today - datetime.timedelta(days=1),
+            planned_end_date=today - datetime.timedelta(days=1),
             description="Overdue task"
         )
         task2._skip_sync_validation = True

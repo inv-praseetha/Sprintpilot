@@ -688,6 +688,11 @@ class SprintService:
             if task.sprint:
                 if chk_start < task.sprint.start_date or chk_end > task.sprint.end_date:
                     raise ValueError(f"Task dates must fall within the sprint range ({task.sprint.start_date} to {task.sprint.end_date}).")
+
+        if chk_start and chk_start.weekday() >= 5:
+            raise ValueError(f"Task planned start date ({chk_start}) falls on a weekend.")
+        if chk_end and chk_end.weekday() >= 5:
+            raise ValueError(f"Task planned end date ({chk_end}) falls on a weekend.")
                     
         new_hours = data.get('estimated_hours') if 'estimated_hours' in data else data.get('estimatedHours')
         chk_hours = new_hours if new_hours is not None else task.estimated_hours
