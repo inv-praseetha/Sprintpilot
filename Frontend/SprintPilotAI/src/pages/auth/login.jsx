@@ -1,17 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import BrandHeader from "../../components/login/ BrandHeader";
+import { useAuth } from "../../context/AuthContext";
+import BrandHeader from "../../components/login/BrandHeader";
 import ErrorAlert from "../../components/login/ErrorAlert";
 import GoogleButtonSkeleton from "../../components/login/GoogleButtonSkeleton";
 import LoginIllustration from "../../components/login/LoginIllustration";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const btnContainerRef = useRef(null);
+
+  // Auto-hide error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 5000);
+      
+      // Cleanup function to clear the timer if the component unmounts
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -25,34 +39,25 @@ export default function Login() {
       setError(null);
       try {
         const idToken = response.credential;
-
-        const res = await fetch("http://localhost:8000/api/auth/google/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ token: idToken }),
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          localStorage.setItem("access_token", data.access_token);
-          localStorage.setItem("refresh_token", data.refresh_token);
-          localStorage.setItem("user", JSON.stringify(data.employee));
-
-          navigate("/dashboard");
-        } else {
-          setError(
-            data.detail ||
-              "Authentication failed. Please contact your administrator.",
-          );
-        }
+        await login(idToken);
+        navigate("/dashboard");
       } catch (err) {
-        console.error("[auth] Google auth error:", err);
-        setError(
-          "Unable to connect to the authentication server. Please check your network.",
-        );
+        console.error("[auth] Google auth error caught:", err);
+        let errorMsg = "Authentication failed. Please contact your administrator.";
+
+        if (err.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          errorMsg = err.response?.data?.detail || err.response?.data?.error || err.response?.data?.message || errorMsg;
+        } else if (err.request) {
+          // The request was made but no response was received
+          errorMsg = "Network error. Please check your connection and try again.";
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          errorMsg = err.message || errorMsg;
+        }
+
+        setError(errorMsg);
       } finally {
         setLoading(false);
       }

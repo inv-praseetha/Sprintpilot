@@ -50,49 +50,143 @@ export default function LoginIllustration() {
         </div>
       </div>
 
-      {/* Mock Card */}
+      {/* Mock Card with Dashboard Sprint Schedule & Status Graph */}
       <div
-        className="max-w-xs bg-white text-gray-900 rounded-2xl p-5 shadow-2xl relative z-10"
+        className="w-full max-w-sm bg-white/95 backdrop-blur text-gray-900 rounded-2xl p-5 shadow-2xl relative z-10"
         style={{ boxShadow: "0 20px 50px -20px rgba(0,0,0,0.35)" }}
       >
         <div className="flex justify-between items-start mb-4">
-          <div>
-            <div className="text-xs font-semibold" style={{ color: "#6B6E76" }}>
-              Task Overview
+          <div className="text-left">
+            <div className="text-xs font-bold text-slate-800">
+              Sprint Schedule & Status
             </div>
-            <div
-              className="text-2xl font-bold mt-1"
-              style={{ color: "#14151A" }}
-            >
-              100 Completed
+            <div className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-tight">
+              Track timelines, status, and task load for project sprints
             </div>
           </div>
+          
+          {/* Miniature Legends */}
+          <div className="flex flex-wrap gap-x-2 gap-y-1 justify-end max-w-[180px]">
+            <span className="inline-flex items-center gap-1 text-[8px] font-black text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#ea580c' }} />
+              Cloud Sync
+            </span>
+            <span className="inline-flex items-center gap-1 text-[8px] font-black text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
+              AI Analytics
+            </span>
+            <span className="inline-flex items-center gap-1 text-[8px] font-black text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#d946ef' }} />
+              Dev Portal
+            </span>
+            <span className="inline-flex items-center gap-1 text-[8px] font-black text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#8b5cf6' }} />
+              Security
+            </span>
+          </div>
         </div>
-        <div className="flex items-end gap-2 h-20 mb-3">
-          {[55, 40, 95, 35, 20].map((height, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t-md"
-              style={{
-                height: `${height}%`,
-                backgroundColor: i === 2 ? "#FF5A36" : "#FFD9CB",
-                backgroundImage:
-                  i === 2
-                    ? "repeating-linear-gradient(135deg, #FF5A36, #FF5A36 3px, #fff 3px, #fff 6px)"
-                    : undefined,
-              }}
+
+        {/* SVG Graph */}
+        <div className="relative w-full h-28 mb-3 overflow-visible">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 320 110" preserveAspectRatio="none">
+            {/* Grid lines */}
+            {[20, 55, 90].map((y, idx) => (
+              <line
+                key={idx}
+                x1="10"
+                y1={y}
+                x2="310"
+                y2={y}
+                className="stroke-slate-100"
+                strokeWidth="1"
+                strokeDasharray="3 3"
+              />
+            ))}
+            
+            {/* Project 1 path (Cloud Sync Platform) */}
+            <path
+              d="M 10 52 L 85 40 L 160 60 L 235 28 L 310 68"
+              fill="none"
+              stroke="#ea580c"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          ))}
+            
+            {/* Project 2 path (AI Analytics Hub) */}
+            <path
+              d="M 10 68 L 85 60 L 160 48 L 235 44 L 310 52"
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* Project 3 path (Developer Portal) */}
+            <path
+              d="M 10 20 L 85 36 L 160 72"
+              fill="none"
+              stroke="#d946ef"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* Project 4 path (Security Gateway) */}
+            <path
+              d="M 10 76 L 85 64 L 160 56 L 235 68 L 310 84"
+              fill="none"
+              stroke="#8b5cf6"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            
+            {/* Dots for Project 1 */}
+            {[[10, 52], [85, 40], [160, 60], [235, 28], [310, 68]].map(([x, y], i) => (
+              <g key={`p1-${i}`}>
+                <circle cx={x} cy={y} r="5" fill="#ea580c" fillOpacity="0.15" />
+                <circle cx={x} cy={y} r="2.5" fill="#ea580c" />
+                <circle cx={x} cy={y} r="0.8" fill="#ffffff" />
+              </g>
+            ))}
+            
+            {/* Dots for Project 2 */}
+            {[[10, 68], [85, 60], [160, 48], [235, 44], [310, 52]].map(([x, y], i) => (
+              <g key={`p2-${i}`}>
+                <circle cx={x} cy={y} r="5" fill="#3b82f6" fillOpacity="0.15" />
+                <circle cx={x} cy={y} r="2.5" fill="#3b82f6" />
+                <circle cx={x} cy={y} r="0.8" fill="#ffffff" />
+              </g>
+            ))}
+
+            {/* Dots for Project 3 */}
+            {[[10, 20], [85, 36], [160, 72]].map(([x, y], i) => (
+              <g key={`p3-${i}`}>
+                <circle cx={x} cy={y} r="5" fill="#d946ef" fillOpacity="0.15" />
+                <circle cx={x} cy={y} r="2.5" fill="#d946ef" />
+                <circle cx={x} cy={y} r="0.8" fill="#ffffff" />
+              </g>
+            ))}
+
+            {/* Dots for Project 4 */}
+            {[[10, 76], [85, 64], [160, 56], [235, 68], [310, 84]].map(([x, y], i) => (
+              <g key={`p4-${i}`}>
+                <circle cx={x} cy={y} r="5" fill="#8b5cf6" fillOpacity="0.15" />
+                <circle cx={x} cy={y} r="2.5" fill="#8b5cf6" />
+                <circle cx={x} cy={y} r="0.8" fill="#ffffff" />
+              </g>
+            ))}
+          </svg>
         </div>
-        <div
-          className="flex justify-between text-xs"
-          style={{ color: "#6B6E76" }}
-        >
-          <span>Jan</span>
-          <span>Feb</span>
-          <span>Mar</span>
-          <span>Apr</span>
-          <span>May</span>
+
+        <div className="flex justify-between text-[10px] font-black text-slate-400 px-1">
+          <span>Sprint 1</span>
+          <span>Sprint 2</span>
+          <span>Sprint 3</span>
+          <span>Sprint 4</span>
+          <span>Sprint 5</span>
         </div>
       </div>
 
