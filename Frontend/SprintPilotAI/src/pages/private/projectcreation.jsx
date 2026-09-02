@@ -249,6 +249,7 @@ export default function ProjectCreation() {
 
   // Dynamic filter: Show only employees who possess all of the selected skills.
   // If no skills are selected, show all active employees.
+  // Always include already selected members so they don't disappear from the dropdown.
   const filteredEmployeesForSelection = useMemo(() => {
     const activeEmployees = employees.filter(emp =>
       (emp.status === 'ACTIVE' || emp.status === 'WFM' || selectedMembers.includes(emp.id)) &&
@@ -256,7 +257,8 @@ export default function ProjectCreation() {
     );
     if (selectedSkills.length === 0) return activeEmployees;
     return activeEmployees.filter(emp =>
-      emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId)))
+      selectedMembers.includes(emp.id) || 
+      (emp.skills && selectedSkills.some(skillId => emp.skills.some(empSkill => String(empSkill.id) === String(skillId))))
     );
   }, [employees, selectedSkills, selectedMembers]);
 

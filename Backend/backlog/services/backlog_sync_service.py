@@ -4,6 +4,7 @@ from django.utils import timezone
 from backlog.services.backlog_client import BacklogService
 from sprints.models import SprintTask
 from accounts.models import EmployeeProfile
+import threading
 
 logger = logging.getLogger(__name__)
 db_lock = threading.Lock()
@@ -63,6 +64,9 @@ class BacklogSyncService:
 
         for project in projects:
             if not project.project_id:
+                print(f"Project {project.name} does not have a project ID")
+                error_message = f"Project {project.name} does not have a project ID"
+                logger.error(error_message)
                 continue
                 
             backlog_client = BacklogService(project_key=project.project_id)
@@ -237,6 +241,7 @@ class BacklogSyncService:
         from django.db import connection
 
         def process_task(task):
+            from django.db import transaction
             res = {"created_count": 0, "updated_count": 0, "up_to_date_count": 0, "error": None}
             try:
                 if not task.backlog_task_id:
@@ -244,10 +249,11 @@ class BacklogSyncService:
                         issue_key = backlog_service.sync_task(task)
                         if issue_key:
                             with db_lock:
-                                task.backlog_task_id = issue_key
-                                task.save()
-                                task.synced_at = task.updated_at
-                                task.save(update_fields=['synced_at'])
+                                with transaction.atomic():
+                                    task.backlog_task_id = issue_key
+                                    task.save()
+                                    task.synced_at = task.updated_at
+                                    task.save(update_fields=['synced_at'])
                             res["created_count"] = 1
                     except Exception as e:
                         res["error"] = f"Task '{task.title}' (Create): {str(e)}"
@@ -255,8 +261,9 @@ class BacklogSyncService:
                     try:
                         count = backlog_service.get_issue_comments_count(task.backlog_task_id)
                         if task.comment_count != count:
-                            task.comment_count = count
-                            task.save(update_fields=['comment_count'])
+                            with db_lock:
+                                task.comment_count = count
+                                task.save(update_fields=['comment_count'])
                     except Exception:
                         pass
 
@@ -268,16 +275,18 @@ class BacklogSyncService:
                         issue_key = backlog_service.update_task(task)
                         if issue_key:
                             with db_lock:
-                                task.save()
-                                task.synced_at = task.updated_at
-                                task.save(update_fields=['synced_at'])
+                                with transaction.atomic():
+                                    task.save()
+                                    task.synced_at = task.updated_at
+                                    task.save(update_fields=['synced_at'])
                             res["updated_count"] = 1
                     except Exception as e:
                         if str(e) == "NO_CHANGES_DETECTED":
                             with db_lock:
-                                task.save()
-                                task.synced_at = task.updated_at
-                                task.save(update_fields=['synced_at'])
+                                with transaction.atomic():
+                                    task.save()
+                                    task.synced_at = task.updated_at
+                                    task.save(update_fields=['synced_at'])
                             res["up_to_date_count"] = 1
                         else:
                             res["error"] = f"Task '{task.title}' (Update): {str(e)}"

@@ -22,7 +22,9 @@ class BacklogCategoriesView(APIView):
         if project_id:
             try:
                 db_cats = BacklogCategory.objects.filter(project_id=project_id)
+             
                 dynamic_categories = [c.name for c in db_cats]
+             
             except Exception:
                 pass
             
