@@ -55,6 +55,22 @@ class SprintModelTests(APITestCase):
         with self.assertRaises(ValidationError):
             sprint.full_clean()
 
+    def test_duplicate_milestone_validation(self):
+        Sprint.objects.create(
+            project=self.project,
+            milestone="Sprint Alpha",
+            start_date=datetime.date.today(),
+            end_date=datetime.date.today() + datetime.timedelta(days=14)
+        )
+        duplicate_sprint = Sprint(
+            project=self.project,
+            milestone="sprint alpha",
+            start_date=datetime.date.today() + datetime.timedelta(days=15),
+            end_date=datetime.date.today() + datetime.timedelta(days=29)
+        )
+        with self.assertRaises(ValidationError):
+            duplicate_sprint.clean()
+
 
 class SprintAPITests(APITestCase):
     def setUp(self):
@@ -233,6 +249,18 @@ class SprintAPITests(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Cannot create sprints in a completed project.", response.data['detail'])
+
+    def test_create_sprint_duplicate_milestone_blocked(self):
+        url = reverse('sprint_list_create', kwargs={'project_id': self.active_project.id})
+        data = {
+            "milestone": "sprint 1",
+            "start_date": str(datetime.date.today() + datetime.timedelta(days=15)),
+            "end_date": str(datetime.date.today() + datetime.timedelta(days=29)),
+            "status": "PLANNED"
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already exists in this project", response.data['detail'])
 
     # 5. Detail Sprint Tests
     def test_sprint_detail_success(self):

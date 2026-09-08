@@ -375,6 +375,15 @@ export default function ProjectDetail() {
 
   const handleImportSuccess = async ({ milestoneName, tasks, holidays, sprintStartDate, sprintEndDate, targetProjectKey, jiraSprintName }) => {
     try {
+      const trimmedMilestone = (milestoneName || '').trim();
+      const isDuplicate = sprints.some(
+        s => s.milestone && s.milestone.trim().toLowerCase() === trimmedMilestone.toLowerCase()
+      );
+      if (isDuplicate) {
+        toast.error(`A milestone named "${trimmedMilestone}" already exists in this project.`);
+        return;
+      }
+
       const sprintData = {
         name: milestoneName,
         goal: '',
@@ -600,6 +609,7 @@ export default function ProjectDetail() {
           darkMode={darkMode}
           activeProject={project.name}
           projectJiraId={project.jira_id}
+          existingMilestones={sprints.map(s => s.milestone || s.name).filter(Boolean)}
           projects={{
             [project.name]: {
               id: project.id || '',

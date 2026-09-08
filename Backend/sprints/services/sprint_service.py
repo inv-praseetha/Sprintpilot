@@ -492,6 +492,10 @@ class SprintService:
         if not milestone or not start_date or not end_date:
             raise ValueError("Sprint milestone, start_date, and end_date are required.")
 
+        milestone = str(milestone).strip()
+        if Sprint.objects.filter(project=project, milestone__iexact=milestone, is_deleted=False).exists():
+            raise ValueError(f"A sprint or milestone named '{milestone}' already exists in this project.")
+
         # Parse and validate sprint dates
         try:
             if isinstance(start_date, str):

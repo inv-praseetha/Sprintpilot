@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity, ChevronDown, Sparkles } from 'lucide-react';
+import { UploadCloud, X, FileText, Trash2, FolderKanban, AlertCircle, LayoutTemplate, Loader2, Database, Activity, ChevronDown, Sparkles, Info } from 'lucide-react';
 import ProjectService from '../../services/ProjectService';
 import CustomDatePicker from '../Common/CustomDatePicker';
 import apiClient from '../../api/apiClient';
@@ -124,7 +124,8 @@ export default function TaskUploadModal({
   projects,
   onImportSuccess,
   projectType,
-  projectJiraId
+  projectJiraId,
+  existingMilestones = []
 }) {
   const [excelFile, setExcelFile] = useState(null);
   const [excelData, setExcelData] = useState([]);
@@ -138,6 +139,17 @@ export default function TaskUploadModal({
   // Jira Specific States
   const [importMode, setImportMode] = useState('EXCEL'); // 'EXCEL' or 'JIRA'
   const [jiraProjectKey, setJiraProjectKey] = useState(projectJiraId || '');
+
+  const projectMilestones = (existingMilestones && existingMilestones.length > 0)
+    ? existingMilestones
+    : Object.values(projects || {}).flatMap(p => Object.keys(p.sprints || {}));
+
+  const isMilestoneDuplicate = Boolean(
+    milestoneName.trim() &&
+    projectMilestones.some(
+      m => m && m.toString().trim().toLowerCase() === milestoneName.trim().toLowerCase()
+    )
+  );
   const [jiraSprintName, setJiraSprintName] = useState('');
   const [isFetchingJira, setIsFetchingJira] = useState(false);
   const [jiraAuthRequired, setJiraAuthRequired] = useState(false);
@@ -296,7 +308,7 @@ export default function TaskUploadModal({
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
         if (rows.length < 4) {
-          setErrorMsg('Excel template is invalid or missing columns.');
+          setErrorMsg('Excel template is invalid or missing columns. Please use the template for uploading the sprint.');
           return;
         }
 
@@ -334,7 +346,7 @@ export default function TaskUploadModal({
 
         const rawHeaders = rows[3];
         if (!rawHeaders || rawHeaders.length === 0) {
-          setErrorMsg('Invalid format. Missing headers row.');
+          setErrorMsg('Invalid format. Missing headers row. Please use the template for uploading the sprint.');
           return;
         }
 
@@ -347,7 +359,7 @@ export default function TaskUploadModal({
         const estHoursIndex = headers.findIndex(h => h.includes('estimatedhours') || h.includes('estimatehours') || h.includes('esthours') || h.includes('hours'));
 
         if (titleIndex === -1 || descIndex === -1 || catIndex === -1) {
-          setErrorMsg('Invalid format. Missing required columns (Task Title, Description, Category).');
+          setErrorMsg('Invalid format. Missing required columns (Task Title, Description, Category). Please use the template for uploading the sprint.');
           return;
         }
 
@@ -500,16 +512,21 @@ export default function TaskUploadModal({
           });
         }
       } catch (err) {
-        console.error(err);
-        setErrorMsg('Error parsing Excel file. Please verify file integrity.');
+        console.error('Excel parse error:', err);
+        setErrorMsg('Error parsing Excel file. Please use the template for uploading the sprint.');
       }
     };
     reader.readAsArrayBuffer(file);
   };
 
   const handleConfirmUpload = () => {
-    if (!milestoneName.trim()) {
+    const trimmedMilestone = milestoneName.trim();
+    if (!trimmedMilestone) {
       setErrorMsg('Please specify a Milestone/Sprint name.');
+      return;
+    }
+    if (isMilestoneDuplicate) {
+      setErrorMsg(`A milestone/sprint named "${trimmedMilestone}" already exists in this project. Please choose a unique name.`);
       return;
     }
     if (!sprintStartDate) {
@@ -616,9 +633,9 @@ export default function TaskUploadModal({
       <div className={`relative w-full max-w-2xl rounded-3xl border shadow-2xl p-6 sm:p-8 overflow-hidden z-10 flex flex-col max-h-[85vh] ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
         }`}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
               <UploadCloud className="w-5 h-5 text-orange-500" />
             </div>
             <div>
@@ -634,6 +651,16 @@ export default function TaskUploadModal({
           </button>
         </div>
 
+        {/* Centralized Hint */}
+        {!errorMsg && importMode === 'EXCEL' && (
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs sm:text-sm font-semibold shadow-xs text-center">
+              <Info className="w-4.5 h-4.5 flex-shrink-0 text-amber-500" />
+              <span>Hint: Please use the template for uploading the sprint</span>
+            </div>
+          </div>
+        )}
+
         {/* Error Alert */}
         {errorMsg && (
           <div className="mb-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold flex items-center gap-2.5">
@@ -642,8 +669,33 @@ export default function TaskUploadModal({
           </div>
         )}
 
+        {/* Step 1: Download Template */}
+        {importMode === 'EXCEL' && (
+          <div className="mb-6">
+            <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">Get the Excel Template</h4>
+            <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${darkMode ? 'bg-slate-950/20 border-slate-800' : 'bg-slate-50/50 border-slate-200'
+              }`}>
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold block">Download static Excel template</span>
+                <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm">
+                  Populate task title, description, category, and optionally jira ID. Ensure formatting is strictly maintained.
+                </p>
+              </div>
+              <button
+                onClick={downloadSampleExcel}
+                className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border cursor-pointer hover:scale-102 active:scale-98 ${darkMode
+                    ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
+                    : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                  }`}
+              >
+                Download Template
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Mode Toggle - Segmented Control */}
-        <div className="flex gap-4 mb-8">
+        <div className="flex gap-4 mb-6">
           <button
             onClick={() => {
               if (importMode !== 'EXCEL') {
@@ -688,32 +740,9 @@ export default function TaskUploadModal({
 
           {importMode === 'EXCEL' ? (
             <>
-              {/* Step 1: Download Template */}
-              <div>
-                <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">1. Get the Excel Template</h4>
-                <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${darkMode ? 'bg-slate-950/20 border-slate-800' : 'bg-slate-50/50 border-slate-200'
-                  }`}>
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold block">Download static Excel template</span>
-                    <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm">
-                      Populate task title, description, category, and optionally jira ID. Ensure formatting is strictly maintained.
-                    </p>
-                  </div>
-                  <button
-                    onClick={downloadSampleExcel}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border cursor-pointer hover:scale-102 active:scale-98 ${darkMode
-                        ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
-                        : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                  >
-                    Download Template
-                  </button>
-                </div>
-              </div>
-
               {/* Step 2: Upload Excel File */}
               <div>
-                <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">2. Upload populated sheet</h4>
+                <h4 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase mb-2">Upload populated sheet</h4>
                 {!excelFile ? (
                   <label className={`border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-orange-500/50 hover:bg-orange-500/[0.02] transition-all ${darkMode ? 'border-slate-800' : 'border-slate-200'
                     }`}>
@@ -927,10 +956,21 @@ export default function TaskUploadModal({
                       type="text"
                       placeholder="e.g. Sprint 7 Launch"
                       value={milestoneName}
-                      onChange={(e) => setMilestoneName(e.target.value)}
-                      className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 focus:ring-orange-500 ${darkMode ? 'bg-slate-850 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
+                      onChange={(e) => {
+                        setMilestoneName(e.target.value);
+                        if (errorMsg) setErrorMsg('');
+                      }}
+                      className={`w-full text-xs font-semibold px-4 py-3 rounded-2xl border focus:outline-none focus:ring-1 ${isMilestoneDuplicate
+                          ? 'border-rose-500 focus:ring-rose-500'
+                          : 'focus:ring-orange-500 ' + (darkMode ? 'border-slate-700' : 'border-slate-200')
+                        } ${darkMode ? 'bg-slate-850 text-white' : 'bg-slate-50 text-slate-800'}`}
                     />
+                    {isMilestoneDuplicate && (
+                      <p className="text-[11px] text-rose-500 font-semibold mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>A milestone with this name already exists in this project.</span>
+                      </p>
+                    )}
                     <div className="mt-2 p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-start gap-2 text-left">
                       <span className="text-[10px] text-orange-600 dark:text-orange-400 font-bold leading-normal">
                         <span className="font-extrabold uppercase mr-1.5">Note:</span>

@@ -483,4 +483,54 @@ describe('TaskUploadModal Component', () => {
     fireEvent.click(screen.getByText('Confirm Import'));
     expect(await screen.findByText('Task "Valid Task Title" must have a category.')).toBeInTheDocument();
   });
+
+  it('validates duplicate milestone name against existingMilestones and blocks upload', async () => {
+    XLSX.read.mockReturnValue({
+      SheetNames: ['Sheet1'],
+      Sheets: { Sheet1: {} }
+    });
+
+    const mockRows = [
+      ['Title Banner'],
+      ['Project ID:', 'P-101'],
+      ['Notes'],
+      ['Task Title', 'Description', 'Category', 'Estimated Hours'],
+      ['Task A', 'Desc A', 'UI', 10]
+    ];
+    XLSX.utils.sheet_to_json.mockReturnValue(mockRows);
+
+    const fakeFile = new File(['dummy content'], 'test.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+
+    const readAsArrayBufferMock = vi.fn(function () {
+      this.onload({ target: { result: new ArrayBuffer(8) } });
+    });
+
+    vi.stubGlobal('FileReader', vi.fn(function () {
+      this.readAsArrayBuffer = readAsArrayBufferMock;
+    }));
+
+    render(
+      <TaskUploadModal
+        {...defaultProps}
+        existingMilestones={['Sprint 7', 'Sprint 8']}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [fakeFile] } });
+
+    const confirmBtn = await screen.findByText('Confirm Import');
+    const nameInput = screen.getByPlaceholderText(/e.g. Sprint 7 Launch/i);
+
+    // Enter existing milestone name (case-insensitive)
+    fireEvent.change(nameInput, { target: { value: 'sprint 7' } });
+    fireEvent.click(confirmBtn);
+
+    expect(screen.getAllByText(/already exists in this project/i).length).toBeGreaterThanOrEqual(1);
+    expect(defaultProps.onImportSuccess).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
 });

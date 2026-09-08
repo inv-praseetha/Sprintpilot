@@ -28,11 +28,26 @@ class Sprint(models.Model):
     class Meta:
         db_table = 'sprints'
         ordering = ['start_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['project', 'milestone'],
+                condition=models.Q(is_deleted=False),
+                name='unique_active_project_milestone'
+            )
+        ]
 
     def clean(self):
         from django.core.exceptions import ValidationError
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError("end_date must be greater than or equal to start_date")
+        if self.milestone and hasattr(self, 'project_id') and self.project_id:
+            existing = Sprint.objects.filter(
+                project_id=self.project_id,
+                milestone__iexact=self.milestone.strip(),
+                is_deleted=False
+            ).exclude(id=self.id)
+            if existing.exists():
+                raise ValidationError({"milestone": f"A sprint or milestone named '{self.milestone}' already exists in this project."})
 
     def save(self, *args, **kwargs):
         if self.status == self.Status.COMPLETED and not self.completed_at:
