@@ -1187,6 +1187,30 @@ class TeamPerformanceTest(APITestCase):
         self.assertEqual(res['month'], today.month)
         self.assertEqual(res['year'], today.year)
 
+    def test_team_performance_zero_task_employees_ranked_last(self):
+        from accounts.models import Employee, EmployeeProfile
+        # Create a 3rd employee with 0 tasks
+        user3 = Employee.objects.create(email="emp3@example.com", full_name="Employee Three", is_active=True)
+        EmployeeProfile.objects.create(user=user3, designation="QA", experience_years=2)
+        SprintService.recalculate_monthly_performance()
+
+        res = SprintService.get_team_performance()
+        results = res['results']
+        self.assertEqual(len(results), 3)
+
+        # Active employees (points: 1 and -1) should rank #1 and #2
+        self.assertEqual(results[0]['name'], "Employee One")
+        self.assertEqual(results[0]['rank'], 1)
+        self.assertEqual(results[1]['name'], "Employee Two")
+        self.assertEqual(results[1]['rank'], 2)
+
+        # Employee Three has 0 tasks, 0 points, but should rank #3 (after active employees)
+        self.assertEqual(results[2]['name'], "Employee Three")
+        self.assertEqual(results[2]['total_tasks'], 0)
+        self.assertEqual(results[2]['rank'], 3)
+        self.assertEqual(results[2]['on_time_rate'], "0%")
+
+
 
 
 
