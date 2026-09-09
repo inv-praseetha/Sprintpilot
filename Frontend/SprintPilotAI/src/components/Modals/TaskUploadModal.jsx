@@ -603,6 +603,13 @@ export default function TaskUploadModal({
     setExcelData(newData);
   };
 
+  const handleTaskHoursChange = (idx, newHours) => {
+    const newData = [...excelData];
+    const parsed = newHours === '' ? '' : parseFloat(newHours);
+    newData[idx].estimated_hours = isNaN(parsed) ? '' : parsed;
+    setExcelData(newData);
+  };
+
   const handleToggleCategory = (categoryName, isSelected) => {
     const newData = excelData.map(task =>
       task.category === categoryName ? { ...task, selected: isSelected } : task
@@ -1148,15 +1155,26 @@ export default function TaskUploadModal({
                                   onChange={(newCat) => handleTaskCategoryChange(idx, newCat)}
                                   darkMode={darkMode}
                                   availableCategories={availableCategories}
-                                />
+                                />  
                               </div>
                             </td>
-                            <td className="py-2 px-3 font-semibold">
-                              {row.estimated_hours !== null && row.estimated_hours !== undefined && row.estimated_hours > 0 ? (
-                                <span className="text-slate-400">{`${row.estimated_hours}h`}</span>
-                              ) : (
-                                <span className="text-rose-500 font-extrabold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">Required</span>
-                              )}
+                            <td className="py-2 px-3 font-semibold" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="0.5"
+                                  step="0.5"
+                                  value={row.estimated_hours !== null && row.estimated_hours !== undefined ? row.estimated_hours : ''}
+                                  placeholder="0"
+                                  onChange={(e) => handleTaskHoursChange(idx, e.target.value)}
+                                  className={`w-16 px-2 py-1 text-xs font-bold rounded-lg border text-center focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                    row.estimated_hours > 0
+                                      ? darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800 shadow-sm'
+                                      : 'bg-rose-50 border-rose-300 text-rose-600 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-400 placeholder:text-rose-400'
+                                  }`}
+                                />
+                                <span className="text-slate-400 text-xs font-semibold">h</span>
+                              </div>
                             </td>
                             <td className="py-2 px-3 text-slate-400 font-medium">{row.jiraId || row.initialJiraId || 'N/A'}</td>
                           </tr>

@@ -261,7 +261,7 @@ class JiraFetchTasksView(APIView):
         payload = {
             "jql": jql,
             "maxResults": 100,
-            "fields": ["summary", "description", "issuetype"]
+            "fields": ["summary", "description", "issuetype", "timetracking", "timeoriginalestimate"]
         }
         
         try:
@@ -331,12 +331,26 @@ class JiraFetchTasksView(APIView):
                 elif "INFRA" in issue_type or "OPS" in issue_type or "TASK" in issue_type:
                     category = "INFRA"
 
+                # Extract estimated hours from Jira time tracking
+                est_seconds = fields.get("timeoriginalestimate")
+                if est_seconds is None and isinstance(fields.get("timetracking"), dict):
+                    est_seconds = fields.get("timetracking", {}).get("originalEstimateSeconds")
+                
+                estimated_hours = None
+                if est_seconds is not None:
+                    try:
+                        hours_float = float(est_seconds) / 3600.0
+                        estimated_hours = int(hours_float) if hours_float.is_integer() else round(hours_float, 2)
+                    except (ValueError, TypeError):
+                        estimated_hours = None
+
                 tasks.append({
                     "title": fields.get("summary", "Untitled Task"),
                     "desc": str(desc),
                     "category": category,
                     "status": "OPEN",
-                    "jiraId": jira_id
+                    "jiraId": jira_id,
+                    "estimated_hours": estimated_hours
                 })
                 
             if not tasks:
