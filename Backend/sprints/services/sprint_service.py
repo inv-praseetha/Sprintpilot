@@ -1182,12 +1182,20 @@ class SprintService:
         for stats in emp_stats.values():
             total = stats['total_tasks']
             on_time = stats['on_time_tasks']
-            rate = round((on_time / total) * 100) if total > 0 else 100
+            rate = round((on_time / total) * 100) if total > 0 else 0
             stats['raw_rate'] = rate
             stats['on_time_rate'] = f"{rate}%"
             calc_list.append(stats)
 
-        calc_list.sort(key=lambda x: (x['points'], x['raw_rate']), reverse=True)
+        calc_list.sort(
+            key=lambda x: (
+                1 if x['total_tasks'] > 0 else 0,
+                x['points'],
+                x['raw_rate'],
+                x['total_tasks']
+            ),
+            reverse=True
+        )
 
         for rank, stats in enumerate(calc_list, start=1):
             emp_obj = stats['emp_obj']
@@ -1237,8 +1245,6 @@ class SprintService:
 
         result_list = []
         for r in records:
-            if r.total_tasks == 0:
-                continue
             emp = r.employee
             if not emp.user:
                continue
