@@ -36,6 +36,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
     """
     user = EmployeeSerializer(read_only=True)
     skills = serializers.SerializerMethodField()
+    active_task_count = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeProfile
@@ -48,13 +49,31 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "current_capacity_hours",
             "status",
             "skills",
+            "active_task_count",
         ]
         read_only_fields = fields
 
+    def get_active_task_count(self, obj):
+        if hasattr(obj, 'annotated_active_task_count'):
+            return obj.annotated_active_task_count
+            
+        from sprints.models import SprintTask
+        return obj.assigned_tasks.filter(
+            status__in=[SprintTask.Status.OPEN, SprintTask.Status.IN_PROGRESS],
+            is_deleted=False
+        ).count()
+
     def get_skills(self, obj):
+        relations = obj.employee_skill_relations.all()
         return [
-            {"id": s.id, "name": s.name, "category": s.category}
-            for s in obj.skills.all()
+            {
+                "id": rel.skill.id, 
+                "name": rel.skill.name, 
+                "category": rel.skill.category, 
+                "parent": rel.skill.parent_id,
+                "proficiency_level": rel.proficiency_level
+            }
+            for rel in relations
         ]
 
 

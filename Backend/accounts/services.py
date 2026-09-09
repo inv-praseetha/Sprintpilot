@@ -60,6 +60,8 @@ class AuthenticationService:
                 raise ExpiredGoogleTokenException("The Google ID token has expired.")
             
             raise InvalidGoogleTokenException("Invalid Google ID token.")
+        except InvalidGoogleTokenException:
+            raise
         except Exception as e:
             logger.exception("Unexpected error verifying Google token: %s", str(e))
             raise InvalidGoogleTokenException("Invalid Google ID token.")

@@ -1,6 +1,6 @@
 import uuid
 from django.db import models
-
+from django.core.validators import MinValueValidator, MaxValueValidator, MinLengthValidator, MaxLengthValidator
 
 class Employee(models.Model):
 
@@ -32,7 +32,8 @@ class Employee(models.Model):
     )
 
     role = models.CharField(
-        max_length=30,
+        max_length=15,
+        validators=[MinLengthValidator(8)],
         choices=Role.choices
     )
 
@@ -72,7 +73,7 @@ class Employee(models.Model):
 
 class EmployeeProfile(models.Model):
     class Status(models.TextChoices):
-        WFH = "WFH", "Work From Home"
+        WFM = "WFM", "WFM"
         ACTIVE = "ACTIVE", "Active"
         BUSY = "BUSY", "Busy"
 
@@ -115,6 +116,7 @@ class EmployeeProfile(models.Model):
 
     skills = models.ManyToManyField(
         'project.Skill',
+        through='EmployeeSkill',
         related_name="employee_profiles",
         blank=True
     )
@@ -132,3 +134,37 @@ class EmployeeProfile(models.Model):
 
     def __str__(self):
         return self.user.full_name
+
+class BlacklistedEmployeeToken(models.Model):
+    """
+    Custom token blacklist for the Employee authentication flow.
+    Stores revoked refresh tokens to prevent reuse after logout.
+    """
+    token = models.CharField(max_length=500, unique=True, db_index=True)
+    blacklisted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Blacklisted Token {self.id}"
+
+
+class EmployeeSkill(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employee = models.ForeignKey(
+        'EmployeeProfile',
+        on_delete=models.CASCADE,
+        related_name='employee_skill_relations'
+    )
+    skill = models.ForeignKey(
+        'project.Skill',
+        on_delete=models.CASCADE,
+        related_name='employee_skill_relations'
+    )
+    proficiency_level = models.PositiveSmallIntegerField(default=1)  # 1-10
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'employee_skills'
+        unique_together = ('employee', 'skill')
+
+    def __str__(self):
+        return f"{self.employee.user.full_name} - {self.skill.name} (Level {self.proficiency_level})"

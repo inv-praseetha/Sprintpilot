@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from './MainLayouut';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Bot,
@@ -21,16 +22,14 @@ function SidebarLink({ to, icon, label }) {
       const cleanIcon = icon.trim();
       const iconClass = cleanIcon.startsWith('fa-') ? `fa-solid ${cleanIcon}` : icon;
       return (
-        <i className={`${iconClass} w-5 h-5 flex items-center justify-center text-lg transition-colors ${
-          isActive ? 'text-orange-500' : 'text-slate-400 group-hover:text-slate-600'
-        }`} />
+        <i className={`${iconClass} w-5 h-5 flex items-center justify-center text-lg transition-colors ${isActive ? 'text-orange-500' : 'text-slate-400 group-hover:text-slate-600'
+          }`} />
       );
     }
     const IconComponent = icon;
     return (
-      <IconComponent className={`w-5 h-5 transition-colors ${
-        isActive ? 'text-orange-500' : 'text-slate-400 group-hover:text-slate-600'
-      }`} />
+      <IconComponent className={`w-5 h-5 transition-colors ${isActive ? 'text-orange-500' : 'text-slate-400 group-hover:text-slate-600'
+        }`} />
     );
   };
 
@@ -38,11 +37,10 @@ function SidebarLink({ to, icon, label }) {
     <Link
       to={to}
       onClick={() => setSidebarOpen(false)}
-      className={`w-full flex items-center justify-between py-3 px-4 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
-        isActive
+      className={`w-full flex items-center justify-between py-3 px-4 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${isActive
           ? 'bg-orange-500/[0.08] text-orange-600'
           : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
-      }`}
+        }`}
     >
       {isActive && (
         <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-orange-500 rounded-r-md" />
@@ -57,18 +55,19 @@ function SidebarLink({ to, icon, label }) {
 
 export default function SideBar() {
   const { darkMode, setDarkMode, sidebarOpen, setSidebarOpen } = useTheme();
+  const { user } = useAuth();
 
   const menuItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, to: '/' },
+    { name: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
     { name: 'Projects', icon: FolderKanban, to: '/projects' },
-    { name: 'Sprints', icon: Bot, to: '/sprints' }
+    { name: 'Status', icon: Bot, to: '/status' }
   ];
 
   return (
     <>
       {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div 
+        <div
           onClick={() => setSidebarOpen(false)}
           className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 lg:hidden"
         />
@@ -87,14 +86,11 @@ export default function SideBar() {
               </div>
               <div>
                 <h2 className="font-bold text-lg leading-tight tracking-tight">Sprint Pilot AI</h2>
-                <span className="text-xs text-slate-400">hello@sprintpilotai.com</span>
+                <span className="text-xs text-slate-400">{user?.email || ''}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-                <ChevronDown className="w-4 h-4" />
-              </button>
-              <button 
+              <button
                 onClick={() => setSidebarOpen(false)}
                 className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer lg:hidden"
               >
@@ -102,7 +98,7 @@ export default function SideBar() {
               </button>
             </div>
           </div>
-          
+
           {/* Main Menu */}
           <div className="mb-4">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3 px-2">Main Menu</span>
@@ -135,7 +131,7 @@ export default function SideBar() {
               <Moon className="w-5 h-5 text-slate-400" />
               <span className="text-sm font-medium text-slate-400">Dark Mode</span>
             </div>
-            <button 
+            <button
               onClick={() => setDarkMode(!darkMode)}
               className={`w-11 h-6 rounded-full relative p-0.5 transition-colors cursor-pointer ${darkMode ? 'bg-orange-500' : 'bg-slate-200'}`}
             >
